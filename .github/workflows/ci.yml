@@ -41,3 +41,6 @@ jobs:
 
       - name: Run govulncheck (source mode, project only)
         run: govulncheck -mode=source ./...
+        
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
