@@ -1,4 +1,4 @@
-name: Auth Service 
+name:  Auth Service DevSecOps CI
 
 on:
   push:
@@ -25,8 +25,15 @@ jobs:
       - name: Go fmt
         run: go fmt ./...
 
-      - name: Go test
-        run: go test ./... -v
+      - name: Go test with coverage
+        run: |
+          go test ./... -coverprofile=coverage.out
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: apps/backend/auth-service/coverage.out
 
   sonarcloud:
     name: Code Quality (SonarCloud)
@@ -74,7 +81,12 @@ jobs:
           go-version: '1.25.5'
 
       - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-      - run: gosec ./...
+      - run: gosec -fmt=json -out=gosec-report.json ./...
+      - name: Upload SAST report (gosec)
+        uses: actions/upload-artifact@v4
+        with:
+          name: gosec-report
+          path: apps/backend/auth-service/gosec-report.json
 
   sca:
     name: SCA (govulncheck)
@@ -91,8 +103,12 @@ jobs:
           go-version: '1.25.5'
 
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - run: govulncheck -mode=source ./...
-        
+      - run: govulncheck -mode=source -json ./... > govulncheck-report.json
+      - name: Upload SCA report (govulncheck)
+        uses: actions/upload-artifact@v4
+        with:
+          name: govulncheck-report
+          path: apps/backend/auth-service/govulncheck-report.json
   secrets:
     name: Secret Scanning (Gitleaks)
     needs: build-test
