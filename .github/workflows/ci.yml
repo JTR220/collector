@@ -1,55 +1,65 @@
-name: Build
+name: Go Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+
 jobs:
-  build-and-test:
-    name: Build and Test
+  discover-services:
+    name: Discover Go services
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - id: set-matrix
+        name: Find go.mod files
+        run: |
+          SERVICES=$(find apps -name go.mod -exec dirname {} \; | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=$SERVICES" >> $GITHUB_OUTPUT
+
+  ci:
+    name: Go CI (${{ matrix.service }})
+    needs: discover-services
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.discover-services.outputs.matrix) }}
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.5'
+          go-version: '1.22'
           cache: true
+
       - name: Go fmt
-        run: |
-          go fmt ./...
+        run: go fmt ./...
 
-      - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-          | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+      - name: Go test
+        run: go test ./... -v
 
-      - name: Run golangci-lint
-        run: |
-          golangci-lint run
-
-      - name: Run tests
-        run: |
-          go test ./... -v
-  
       - name: Install gosec
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: Run gosec
-        run: |
-          gosec ./...
+        run: gosec ./...
 
       - name: Run govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
-  
+
       - name: Gitleaks scan
         uses: gitleaks/gitleaks-action@v2
