@@ -1,4 +1,4 @@
-name: Auth Service DevSecOps CI (Blocking)
+name: Auth Service 
 
 on:
   push:
@@ -28,6 +28,36 @@ jobs:
       - name: Go test
         run: go test ./... -v
 
+sonarcloud:
+  name: Code Quality (SonarCloud)
+  needs: build-test
+  runs-on: ubuntu-latest
+
+  defaults:
+    run:
+      working-directory: apps/backend/auth-service
+
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.5'
+        cache: true
+        cache-dependency-path: apps/backend/auth-service/go.sum
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@v2
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.projectKey=JTR220_collector
+          -Dsonar.organization=jtr220
+          -Dsonar.sources=.
+          -Dsonar.exclusions=**/*_test.go
 
   sast:
     name: SAST (gosec)
