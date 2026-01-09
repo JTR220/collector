@@ -24,5 +24,9 @@ func main() {
 	authorized.PUT("/article/:id", controllers.UpdateArticle)
 	authorized.GET("/article/:id", controllers.GetArticle)
 	router.POST("/utilisateur", controllers.CreateUser)
-	router.Run()
+	err = router.Run()
+	if err != nil {
+		log.Fatalf("Le serveur n'a pas pu démarrer : %v", err)
+		return
+	}
 }
