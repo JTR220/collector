@@ -1,0 +1,73 @@
+name: Auth Service DevSecOps CI (Blocking)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  
+  build-test:
+    name: Build & Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend/auth-service
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Go fmt
+        run: go fmt ./...
+
+      - name: Go test
+        run: go test ./... -v
+
+
+  sast:
+    name: SAST (gosec)
+    needs: build-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend/auth-service
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - run: gosec ./...
+
+  sca:
+    name: SCA (govulncheck)
+    needs: build-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend/auth-service
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck -mode=source ./...
+        
+    secrets:
+      name: Secret Scanning (Gitleaks)
+      needs: build-test
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/checkout@v4
+        - uses: gitleaks/gitleaks-action@v2
