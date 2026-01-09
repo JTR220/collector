@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  
+
   build-test:
     name: Build & Tests
     runs-on: ubuntu-latest
@@ -63,11 +63,11 @@ jobs:
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck -mode=source ./...
         
-    secrets:
-      name: Secret Scanning (Gitleaks)
-      needs: build-test
-      runs-on: ubuntu-latest
+  secrets:
+    name: Secret Scanning (Gitleaks)
+    needs: build-test
+    runs-on: ubuntu-latest
 
-      steps:
-        - uses: actions/checkout@v4
-        - uses: gitleaks/gitleaks-action@v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
