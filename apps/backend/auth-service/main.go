@@ -1,12 +1,10 @@
 package main
 
 import (
-	"auth-service/controllers"
-	"auth-service/middlewares"
 	"auth-service/repository"
+	"auth-service/routes"
 	"log"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
@@ -17,13 +15,7 @@ func main() {
 		return
 	}
 	repository.InitDB()
-	router := gin.Default()
-	authorized := router.Group("/log", middlewares.AuthRequired())
-	authorized.POST("/article", controllers.CreateArticle)
-	authorized.DELETE("/article/:id", controllers.DeleteArticle)
-	authorized.PUT("/article/:id", controllers.UpdateArticle)
-	authorized.GET("/article/:id", controllers.GetArticle)
-	router.POST("/utilisateur", controllers.CreateUser)
+	router := routes.InitRouter()
 	err = router.Run()
 	if err != nil {
 		log.Fatalf("Le serveur n'a pas pu démarrer : %v", err)
