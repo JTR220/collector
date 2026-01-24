@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"auth-service/models"
-	"auth-service/repository"
+	"catalog-service/models"
+	"catalog-service/repository"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,7 +30,7 @@ func GetArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.Preload("Photos").First(&article, id).Error; err != nil {
+	if err := repository.DB.Preload("Category").First(&article, id).Error; err != nil {
 		c.JSON(404, gin.H{"error": "Article introuvable"})
 		return
 	}
@@ -38,6 +38,15 @@ func GetArticle(c *gin.Context) {
 	c.JSON(200, article)
 }
 
+func GetAllArticles(c *gin.Context) {
+	var articles []models.Article
+
+	if err := repository.DB.Preload("Category").Find(&articles).Error; err != nil {
+		c.JSON(404, gin.H{"error": "Article introuvable"})
+		return
+	}
+	c.JSON(200, articles)
+}
 func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
@@ -65,7 +74,7 @@ func UpdateArticle(c *gin.Context) {
 		return
 	}
 
-	article.Titre = input.Titre
+	article.Name = input.Name
 	article.Description = input.Description
 	article.Prix = input.Prix
 	article.FraisPort = input.FraisPort
