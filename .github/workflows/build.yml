@@ -1,119 +1,137 @@
-name:  Auth Service DevSecOps CI
+name: Global Backend DevSecOps CI
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'apps/backend/**' # Ne se déclenche que si le backend est modifié
   pull_request:
     branches: [ main ]
+    paths:
+      - 'apps/backend/**'
 
 jobs:
-
   build-test:
-    name: Build & Tests
+    name: Build & Tests (${{ matrix.service }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # Permet de voir les erreurs sur tous les services même si l'un échoue
+      matrix:
+        service: [auth-service, catalog-service] # Liste de tes micro-services
+    
     defaults:
       run:
-        working-directory: apps/backend/auth-service
+        working-directory: apps/backend/${{ matrix.service }}
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.5'
-          cache: true
 
-      - name: Go fmt
-        run: go fmt ./...
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23' # Version stable recommandée (1.25 n'existe pas encore)
+          cache: true
+          cache-dependency-path: apps/backend/${{ matrix.service }}/go.sum
+
+      - name: Go fmt check
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Formatage incorrect détecté"
+            exit 1
+          fi
 
       - name: Go test with coverage
-        run: |
-          go test ./... -coverprofile=coverage.out
+        run: go test ./... -coverprofile=coverage.out
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: apps/backend/auth-service/coverage.out
+          name: coverage-report-${{ matrix.service }}
+          path: apps/backend/${{ matrix.service }}/coverage.out
 
   sonarcloud:
-    name: Code Quality (SonarCloud)
+    name: Code Quality (${{ matrix.service }})
     needs: build-test
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        service: [auth-service, catalog-service]
     defaults:
       run:
-        working-directory: apps/backend/auth-service
+        working-directory: apps/backend/${{ matrix.service }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 
 
-      - uses: actions/setup-go@v5
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
         with:
-          go-version: '1.25.5'
-          cache: true
-          cache-dependency-path: apps/backend/auth-service/go.sum
+          name: coverage-report-${{ matrix.service }}
+          path: apps/backend/${{ matrix.service }}
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.projectKey=JTR220_collector
+            -Dsonar.projectKey=JTR220_collector_${{ matrix.service }}
+            -Dsonar.go.govulncheck.reportPaths=govulncheck-report.json
             -Dsonar.organization=jtr220
             -Dsonar.sources=.
+            -Dsonar.go.coverage.reportPaths=coverage.out
             -Dsonar.exclusions=**/*_test.go
 
-  sast:
-    name: SAST (gosec)
+  security-scans:
+    name: Security Scans (${{ matrix.service }})
     needs: build-test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, catalog-service]
     defaults:
       run:
-        working-directory: apps/backend/auth-service
+        working-directory: apps/backend/${{ matrix.service }}
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.5'
 
-      - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-      - run: gosec -fmt=json -out=gosec-report.json ./...
-      - name: Upload SAST report (gosec)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      # SAST - Gosec
+      - name: SAST (gosec)
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -fmt=json -out=gosec-report.json ./...
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: apps/backend/${{ matrix.service }}/gosec.sarif
+
+      # SCA - Govulncheck
+      - name: SCA (govulncheck)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      - name: Upload Security Reports
         uses: actions/upload-artifact@v4
         with:
-          name: gosec-report
-          path: apps/backend/auth-service/gosec-report.json
+          name: security-reports-${{ matrix.service }}
+          path: |
+            apps/backend/${{ matrix.service }}/gosec-report.json
 
-  sca:
-    name: SCA (govulncheck)
-    needs: build-test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/backend/auth-service
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.5'
-
-      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - run: govulncheck -mode=source -json ./... > govulncheck-report.json
-      - name: Upload SCA report (govulncheck)
-        uses: actions/upload-artifact@v4
-        with:
-          name: govulncheck-report
-          path: apps/backend/auth-service/govulncheck-report.json
-  secrets:
+  secrets-gitleaks:
     name: Secret Scanning (Gitleaks)
-    needs: build-test
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
