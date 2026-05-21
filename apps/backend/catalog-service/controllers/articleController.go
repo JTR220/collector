@@ -3,26 +3,28 @@ package controllers
 import (
 	"catalog-service/models"
 	"catalog-service/repository"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 func CreateArticle(c *gin.Context) {
 	var article models.Article
+
 	if err := c.ShouldBindJSON(&article); err != nil {
-		c.JSON(400, gin.H{"error": "Données invalides : " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides : " + err.Error()})
 		return
 	}
 
 	if err := repository.DB.Create(&article).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Erreur lors de la création de l'article"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la creation de l'article"})
 		return
 	}
 
-	c.JSON(201, gin.H{
+	c.JSON(http.StatusCreated, gin.H{
 		"status":  "created",
 		"article": article,
-		"message": "Article mis en vente avec succès !",
+		"message": "Article mis en vente avec succes",
 	})
 }
 
@@ -30,47 +32,54 @@ func GetArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.Preload("Category").First(&article, id).Error; err != nil {
-		c.JSON(404, gin.H{"error": "Article introuvable"})
+	if err := repository.DB.Preload("Category").First(&article, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
 		return
 	}
 
-	c.JSON(200, article)
+	c.JSON(http.StatusOK, article)
 }
 
 func GetAllArticles(c *gin.Context) {
 	var articles []models.Article
 
-	if err := repository.DB.Preload("Category").Find(&articles).Error; err != nil {
-		c.JSON(404, gin.H{"error": "Article introuvable"})
+	if err := repository.DB.Preload("Category").Order("id desc").Find(&articles).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de recuperer les articles"})
 		return
 	}
-	c.JSON(200, articles)
+
+	c.JSON(http.StatusOK, articles)
 }
+
 func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.First(&article, id).Error; err != nil {
-		c.JSON(404, gin.H{"error": "Article introuvable"})
+	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
 		return
 	}
 
-	repository.DB.Delete(&article)
-	c.JSON(200, gin.H{"message": "Article supprimé du catalogue"})
+	if err := repository.DB.Delete(&article).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de supprimer l'article"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Article supprime du catalogue"})
 }
+
 func UpdateArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.First(&article, id).Error; err != nil {
-		c.JSON(404, gin.H{"error": "Article introuvable"})
+	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
 		return
 	}
 
 	var input models.Article
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(400, gin.H{"error": "Données invalides"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides"})
 		return
 	}
 
@@ -78,10 +87,14 @@ func UpdateArticle(c *gin.Context) {
 	article.Description = input.Description
 	article.Prix = input.Prix
 	article.FraisPort = input.FraisPort
+	article.CategoryID = input.CategoryID
 
-	repository.DB.Save(&article)
+	if err := repository.DB.Save(&article).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de mettre a jour l'article"})
+		return
+	}
 
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"article": article,
 	})

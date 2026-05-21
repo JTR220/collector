@@ -11,14 +11,14 @@ import (
 func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatal(" Echec de la connexion : ", err)
-		return
+		log.Printf("Chargement de .env ignore : %v", err)
 	}
+
 	repository.InitDB()
 	router := routes.InitRouter()
 	err = router.Run()
 	if err != nil {
-		log.Fatalf("Le serveur n'a pas pu démarrer : %v", err)
+		log.Fatalf("Le serveur n'a pas pu demarrer : %v", err)
 		return
 	}
 }

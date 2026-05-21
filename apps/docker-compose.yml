@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: collector-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: collector
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d collector"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build:
+      context: ./backend/auth-service
+    container_name: collector-auth-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: collector
+      DB_PORT: 5432
+      FRONTEND_ORIGIN: http://localhost:5173
+      JWT_SECRET: collector-jwt-secret-dev
+    ports:
+      - "8080:8080"
+
+  catalog-service:
+    build:
+      context: ./backend/catalog-service
+    container_name: collector-catalog-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: collector
+      DB_PORT: 5432
+      FRONTEND_ORIGIN: http://localhost:5173
+      JWT_SECRET: collector-jwt-secret-dev
+    ports:
+      - "8081:8081"
+
+  collector-front:
+    build:
+      context: ./collector-front
+    container_name: collector-front
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - catalog-service
+    environment:
+      VITE_CATALOG_API_BASE_URL: http://localhost:8081
+      VITE_AUTH_API_BASE_URL: http://localhost:8080
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:

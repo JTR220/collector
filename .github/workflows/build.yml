@@ -2,11 +2,11 @@ name: Global Backend DevSecOps CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'apps/backend/**' # Ne se déclenche que si le backend est modifié
+      - 'apps/backend/**'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'apps/backend/**'
 
@@ -15,10 +15,10 @@ jobs:
     name: Build & Tests (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # Permet de voir les erreurs sur tous les services même si l'un échoue
+      fail-fast: false
       matrix:
-        service: [auth-service, catalog-service] # Liste de tes micro-services
-    
+        service: [auth-service, catalog-service]
+
     defaults:
       run:
         working-directory: apps/backend/${{ matrix.service }}
@@ -29,14 +29,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23' # Version stable recommandée (1.25 n'existe pas encore)
+          go-version-file: apps/backend/${{ matrix.service }}/go.mod
           cache: true
           cache-dependency-path: apps/backend/${{ matrix.service }}/go.sum
 
       - name: Go fmt check
         run: |
           if [ -n "$(gofmt -l .)" ]; then
-            echo "Formatage incorrect détecté"
+            echo "Formatage Go incorrect detecte"
             exit 1
           fi
 
@@ -44,6 +44,7 @@ jobs:
         run: go test ./... -coverprofile=coverage.out
 
       - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-${{ matrix.service }}
@@ -56,6 +57,7 @@ jobs:
     strategy:
       matrix:
         service: [auth-service, catalog-service]
+
     defaults:
       run:
         working-directory: apps/backend/${{ matrix.service }}
@@ -63,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
       - name: Download coverage report
         uses: actions/download-artifact@v4
@@ -78,7 +80,6 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=JTR220_collector_${{ matrix.service }}
-            -Dsonar.go.govulncheck.reportPaths=govulncheck-report.json
             -Dsonar.organization=jtr220
             -Dsonar.sources=.
             -Dsonar.go.coverage.reportPaths=coverage.out
@@ -91,6 +92,7 @@ jobs:
     strategy:
       matrix:
         service: [auth-service, catalog-service]
+
     defaults:
       run:
         working-directory: apps/backend/${{ matrix.service }}
@@ -101,31 +103,38 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: apps/backend/${{ matrix.service }}/go.mod
 
-      # SAST - Gosec
-      - name: SAST (gosec)
+      - name: Install security tools
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -fmt=json -out=gosec-report.json ./...
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: SAST (gosec JSON)
+        run: gosec -fmt=json -out=gosec-report.json ./...
+
+      - name: SAST (gosec SARIF)
+        if: always()
+        run: gosec -fmt=sarif -out=gosec.sarif ./... || true
 
       - name: Upload SARIF to GitHub Security
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: apps/backend/${{ matrix.service }}/gosec.sarif
 
-      # SCA - Govulncheck
       - name: SCA (govulncheck)
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+        run: govulncheck -format json ./... > govulncheck-report.json
 
       - name: Upload Security Reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: security-reports-${{ matrix.service }}
           path: |
             apps/backend/${{ matrix.service }}/gosec-report.json
+            apps/backend/${{ matrix.service }}/gosec.sarif
+            apps/backend/${{ matrix.service }}/govulncheck-report.json
 
   secrets-gitleaks:
     name: Secret Scanning (Gitleaks)
@@ -134,4 +143,5 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: gitleaks/gitleaks-action@v2

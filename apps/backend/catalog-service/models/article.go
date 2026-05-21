@@ -15,5 +15,5 @@ type Article struct {
 	Prix        float64   `json:"prix" binding:"required"`
 	FraisPort   float64   `json:"fraisPort" binding:"required"`
 	CategoryID  uint      `json:"categoryId"`
-	Category    Categorie `json:"category" gorm:"foreignKey:CategoryID"`
+	Category    Categorie `json:"category" gorm:"foreignKey:CategoryID" binding:"-"`
 }

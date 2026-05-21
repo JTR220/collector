@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-import "gorm.io/driver/postgres"
 
 var DB *gorm.DB
 
@@ -20,14 +20,16 @@ func InitDB() {
 		os.Getenv("DB_NAME"),
 		os.Getenv("DB_PORT"),
 	)
+
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("🔥 Echec de la connexion à la base de données : ", err)
+		log.Fatal("Echec de la connexion a la base de donnees : ", err)
 	}
+
 	err = DB.AutoMigrate(&models.Categorie{}, &models.Article{})
 	if err != nil {
-		log.Fatal("🔥 Echec lors de la creation des tables : ", err)
+		log.Fatal("Echec lors de la creation des tables : ", err)
 		return
 	}
 }
