@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { COLLECTIBLES } from '$lib/data/collectibles';
+	import { onMount } from 'svelte';
+	import { fetchArticles, type ArticleAPI } from '$lib/api/catalog';
 	import { eur } from '$lib/utils/format';
 	import HoloPanel from '$lib/components/holo/HoloPanel.svelte';
 	import HoloMeter from '$lib/components/holo/HoloMeter.svelte';
@@ -8,20 +9,31 @@
 
 	const tabs = ['FEED', 'COLLECTION', 'WISHLIST', 'LISTES', 'NOTES', 'TRADES'];
 	let activeTab = $state('FEED');
-	const items = COLLECTIBLES;
+
+	let articles = $state<ArticleAPI[]>([]);
+	onMount(async () => {
+		try { articles = await fetchArticles(); } catch { /* silencieux */ }
+	});
 
 	type DiaryKind = 'acquis' | 'trade' | 'wishlist' | 'noté' | 'vendu';
 	const kindColor: Record<DiaryKind, string> = {
 		acquis: '#7cd9a0', trade: '#8a909a', wishlist: '#a8c8e4', noté: '#cbd5e0', vendu: '#e89a9a'
 	};
 
-	const diary = [
-		{ month:'MAI', day:20, kind:'acquis' as DiaryKind,  item:items[0], rating:5, note:'Exemplaire en parfait état, reflets holographiques intacts. Vendeur sérieux, emballage triple couche.', likes:42, comments:7, xp:420 },
-		{ month:'MAI', day:18, kind:'vendu' as DiaryKind,   item:items[1], rating:null, note:null, likes:12, comments:3, xp:280 },
-		{ month:'MAI', day:16, kind:'noté' as DiaryKind,    item:items[2], rating:4, note:'Très bon état pour un reprint 88. Quelques pliures mineures sur la couverture, mais rien de rédhibitoire.', likes:28, comments:5, xp:80 },
-		{ month:'MAI', day:14, kind:'trade' as DiaryKind,   item:items[4], rating:null, note:null, likes:8, comments:2, xp:150 },
-		{ month:'MAI', day:12, kind:'wishlist' as DiaryKind, item:items[3], rating:null, note:null, likes:5, comments:0, xp:30 },
+	// Diary entries référencent les articles par leur slug
+	const diaryDefs = [
+		{ month:'MAI', day:20, kind:'acquis' as DiaryKind,  slug:'PKM-001', rating:5, note:'Exemplaire en parfait état, reflets holographiques intacts. Vendeur sérieux, emballage triple couche.', likes:42, comments:7, xp:420 },
+		{ month:'MAI', day:18, kind:'vendu' as DiaryKind,   slug:'GBC-014', rating:null, note:null, likes:12, comments:3, xp:280 },
+		{ month:'MAI', day:16, kind:'noté' as DiaryKind,    slug:'CMX-007', rating:4, note:'Très bon état pour un reprint 88. Quelques pliures mineures sur la couverture, mais rien de rédhibitoire.', likes:28, comments:5, xp:80 },
+		{ month:'MAI', day:14, kind:'trade' as DiaryKind,   slug:'FIG-101', rating:null, note:null, likes:8, comments:2, xp:150 },
+		{ month:'MAI', day:12, kind:'wishlist' as DiaryKind, slug:'VNL-022', rating:null, note:null, likes:5, comments:0, xp:30 },
 	];
+
+	const diary = $derived(
+		diaryDefs
+			.map((d) => ({ ...d, item: articles.find((a) => a.slug === d.slug) }))
+			.filter((d) => d.item != null) as Array<typeof diaryDefs[0] & { item: ArticleAPI }>
+	);
 
 	const popularLists = [
 		{ title:'Top TCG Holo 1ère édition',      handle:'holo_king',    count:24 },
@@ -58,22 +70,24 @@
 	<input class="search-input" placeholder="Rechercher…" type="search" />
 </div>
 
-<div style="margin-bottom:18px">
-	<HoloEyebrow>PIÈCES FÉTICHES</HoloEyebrow>
-	<div class="fav-grid">
-		{#each items.slice(0, 4) as item}
-			<div class="fav-card">
-				<HoloArt {item} size={140} />
-				<div style="display:flex;flex-direction:column;gap:2px;padding:6px 0">
-					<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#a8c8e4">{item.id}</span>
-					<div style="font-size:14px;color:#cbd5e0">{'★'.repeat(item.rarityScore)}{'☆'.repeat(5-item.rarityScore)}</div>
-					<p style="font-family:'Major Mono Display',monospace;font-size:14px;color:#e8eaed;margin:2px 0;line-height:1.1">{item.name}</p>
-					<p style="font-size:10px;color:#5a606a;font-family:'JetBrains Mono',monospace">{item.year} · {item.grade}</p>
+{#if articles.length > 0}
+	<div style="margin-bottom:18px">
+		<HoloEyebrow>PIÈCES FÉTICHES</HoloEyebrow>
+		<div class="fav-grid">
+			{#each articles.slice(0, 4) as article}
+				<div class="fav-card">
+					<HoloArt item={article} size={140} />
+					<div style="display:flex;flex-direction:column;gap:2px;padding:6px 0">
+						<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#a8c8e4">{article.slug}</span>
+						<div style="font-size:14px;color:#cbd5e0">{'★'.repeat(article.rarityScore)}{'☆'.repeat(5-article.rarityScore)}</div>
+						<p style="font-family:'Major Mono Display',monospace;font-size:14px;color:#e8eaed;margin:2px 0;line-height:1.1">{article.name}</p>
+						<p style="font-size:10px;color:#5a606a;font-family:'JetBrains Mono',monospace">{article.year} · {article.grade}</p>
+					</div>
 				</div>
-			</div>
-		{/each}
+			{/each}
+		</div>
 	</div>
-</div>
+{/if}
 
 <div class="body-grid">
 	<div>
@@ -89,7 +103,7 @@
 				<div class="diary-content">
 					<span class="kind-tag" style="border-color:{color}44;color:{color};background:{color}12">{entry.kind}</span>
 					<p style="font-family:'Major Mono Display',monospace;font-size:16px;color:#e8eaed;margin:4px 0 2px;line-height:1.1">{entry.item.name}</p>
-					<p style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a606a">{entry.item.series} · {eur(entry.item.price)}</p>
+					<p style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a606a">{entry.item.series} · {eur(entry.item.prix)}</p>
 					{#if entry.rating}
 						<div style="margin:4px 0;font-size:15px;color:#cbd5e0">{'★'.repeat(entry.rating)}{'☆'.repeat(5-entry.rating)}</div>
 					{/if}
@@ -105,6 +119,9 @@
 				</div>
 			</div>
 		{/each}
+		{#if diary.length === 0}
+			<p style="color:#5a606a;font-family:'JetBrains Mono',monospace;font-size:12px;padding:20px 0">Chargement du journal…</p>
+		{/if}
 	</div>
 
 	<div class="aside">

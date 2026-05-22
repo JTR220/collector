@@ -15,10 +15,11 @@ func main() {
 	}
 
 	repository.InitDB()
+	repository.SeedData()
+
 	router := routes.InitRouter()
 	err = router.Run(":8081")
 	if err != nil {
 		log.Fatalf("Le serveur n'a pas pu demarrer : %v", err)
-		return
 	}
 }

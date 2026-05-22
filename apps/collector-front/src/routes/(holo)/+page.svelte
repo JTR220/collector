@@ -1,28 +1,45 @@
 <script lang="ts">
-	import { COLLECTIBLES } from '$lib/data/collectibles';
+	import { onMount } from 'svelte';
+	import { fetchArticles, type ArticleAPI } from '$lib/api/catalog';
 	import { eur, pct } from '$lib/utils/format';
 	import HoloMeter from '$lib/components/holo/HoloMeter.svelte';
 
-	const items = COLLECTIBLES;
+	let articles = $state<ArticleAPI[]>([]);
+	let loading = $state(true);
+	let error = $state<string | null>(null);
 
-	const meters = [
-		{ label: 'TCG',      value: 42 },
-		{ label: 'CONSOLES', value: 28 },
-		{ label: 'COMICS',   value: 18 },
-		{ label: 'VINYLES',  value: 12 }
-	];
+	onMount(async () => {
+		try {
+			articles = await fetchArticles();
+		} catch (e) {
+			error = 'Impossible de charger le catalogue. Vérifiez que le catalog-service est démarré.';
+			console.error(e);
+		} finally {
+			loading = false;
+		}
+	});
+
+	const meters = $derived((() => {
+		const counts: Record<string, number> = {};
+		for (const a of articles) counts[a.category.name] = (counts[a.category.name] ?? 0) + 1;
+		const total = articles.length || 1;
+		return Object.entries(counts).map(([label, val]) => ({
+			label: label.toUpperCase(),
+			value: Math.round((val / total) * 100)
+		}));
+	})());
 
 	type TiltState = { x: number; y: number; on: boolean; px: number; py: number };
-	let tilts = $state<Record<string, TiltState>>({});
+	let tilts = $state<Record<number, TiltState>>({});
 
-	function onMove(e: MouseEvent, id: string) {
+	function onMove(e: MouseEvent, id: number) {
 		const el = e.currentTarget as HTMLElement;
 		const r = el.getBoundingClientRect();
 		const px = (e.clientX - r.left) / r.width;
 		const py = (e.clientY - r.top) / r.height;
 		tilts[id] = { x: (py - 0.5) * -10, y: (px - 0.5) * 14, on: true, px, py };
 	}
-	function onLeave(id: string) {
+	function onLeave(id: number) {
 		tilts[id] = { x: 0, y: 0, on: false, px: 0.5, py: 0.5 };
 	}
 
@@ -41,7 +58,7 @@
 		<div class="kicker">SAISON 03 · DROP DE LA SEMAINE</div>
 		<h1 class="hero-title">HOLO RARES &amp; SCELLÉS</h1>
 		<p class="hero-lede">
-			Six pièces vérifiées · grading PSA / CGC · livraison <em>tracée</em> sous boîtier antichoc.
+			Pièces vérifiées · grading PSA / CGC · livraison <em>tracée</em> sous boîtier antichoc.
 			Passe la souris sur les cartes pour faire bouger le foil.
 		</p>
 		<div class="hero-actions">
@@ -60,86 +77,91 @@
 	</div>
 </section>
 
-<!-- Card grid -->
-<section class="grid-section">
-	{#each items as item (item.id)}
-		{@const t = tilts[item.id]}
-		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-		<article
-			class="card"
-			style="
-				transform:perspective(900px) rotateX({t?.x ?? 0}deg) rotateY({t?.y ?? 0}deg) translateZ(0);
-				box-shadow:{cardShadow(t)};
-				transition:transform 80ms linear,box-shadow 220ms ease;
-			"
-			onmousemove={(e) => onMove(e, item.id)}
-			onmouseleave={() => onLeave(item.id)}
-		>
-			<!-- Steel foil sheen — monochrome ice, shifts with cursor -->
-			<div
-				class="card-sheen"
+<!-- States -->
+{#if loading}
+	<div class="state-msg">Chargement du catalogue…</div>
+{:else if error}
+	<div class="state-msg error">{error}</div>
+{:else if articles.length === 0}
+	<div class="state-msg">Aucun article disponible.</div>
+{:else}
+	<!-- Card grid -->
+	<section class="grid-section">
+		{#each articles as article (article.ID)}
+			{@const t = tilts[article.ID]}
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<article
+				class="card"
 				style="
-					opacity:{t?.on ? 0.32 : 0.12};
-					transform:translate({((t?.px ?? 0.5)-0.5)*40}px,{((t?.py ?? 0.5)-0.5)*30}px);
+					transform:perspective(900px) rotateX({t?.x ?? 0}deg) rotateY({t?.y ?? 0}deg) translateZ(0);
+					box-shadow:{cardShadow(t)};
+					transition:transform 80ms linear,box-shadow 220ms ease;
 				"
-				aria-hidden="true"
-			></div>
-			<div class="card-scanlines" aria-hidden="true"></div>
+				onmousemove={(e) => onMove(e, article.ID)}
+				onmouseleave={() => onLeave(article.ID)}
+			>
+				<div
+					class="card-sheen"
+					style="
+						opacity:{t?.on ? 0.32 : 0.12};
+						transform:translate({((t?.px ?? 0.5)-0.5)*40}px,{((t?.py ?? 0.5)-0.5)*30}px);
+					"
+					aria-hidden="true"
+				></div>
+				<div class="card-scanlines" aria-hidden="true"></div>
 
-			<!-- Header row -->
-			<div class="card-top-row">
-				<span class="card-id">{item.id}</span>
-				<span class="card-cat">{item.category}</span>
-			</div>
-
-			<!-- Art zone — single azure gradient -->
-			<div class="card-art">
-				<div class="card-art-scanlines" aria-hidden="true"></div>
-				<span class="card-glyph">{item.glyph}</span>
-				<span class="card-rarity-badge">{item.rarity.toUpperCase()}</span>
-			</div>
-
-			<!-- Meta -->
-			<div class="card-meta">
-				<div class="name-price-row">
-					<div>
-						<p class="card-name">{item.name}</p>
-						<p class="card-series">{item.series}</p>
-					</div>
-					<div style="text-align:right">
-						<p class="price-label">PRIX</p>
-						<p class="price-val">{eur(item.price)}</p>
-					</div>
+				<div class="card-top-row">
+					<span class="card-id">{article.slug || `#${article.ID}`}</span>
+					<span class="card-cat">{article.category.name}</span>
 				</div>
 
-				<div class="chip-row">
-					<span class="chip">{item.grade}</span>
-					<span class="chip">{item.year}</span>
-					<span class="chip" style="color:{item.delta >= 0 ? '#7cd9a0' : '#e89a9a'}">{pct(item.delta)}</span>
-					<span style="flex:1"></span>
-					<button class="buy-btn">ENCHÉRIR</button>
+				<div class="card-art">
+					<div class="card-art-scanlines" aria-hidden="true"></div>
+					<span class="card-glyph">{article.glyph}</span>
+					<span class="card-rarity-badge">{article.rarity.toUpperCase()}</span>
 				</div>
-			</div>
-		</article>
-	{/each}
-</section>
 
-<!-- Ticker -->
-<footer class="ticker">
-	<span class="ticker-live">● LIVE</span>
-	<div class="ticker-track">
-		<div class="ticker-inner">
-			{#each [...items, ...items] as item}
-				<span class="ticker-item">
-					<b style="color:#a8c8e4">{item.id}</b>
-					<span style="color:#8a909a">{item.name}</span>
-					<span style="color:{item.delta >= 0 ? '#7cd9a0' : '#e89a9a'}">{pct(item.delta)}</span>
-					<span style="color:#e8eaed">{eur(item.price)}</span>
-				</span>
-			{/each}
+				<div class="card-meta">
+					<div class="name-price-row">
+						<div>
+							<p class="card-name">{article.name}</p>
+							<p class="card-series">{article.series}</p>
+						</div>
+						<div style="text-align:right">
+							<p class="price-label">PRIX</p>
+							<p class="price-val">{eur(article.prix)}</p>
+						</div>
+					</div>
+
+					<div class="chip-row">
+						<span class="chip">{article.grade}</span>
+						<span class="chip">{article.year}</span>
+						<span class="chip" style="color:{article.delta >= 0 ? '#7cd9a0' : '#e89a9a'}">{pct(article.delta)}</span>
+						<span style="flex:1"></span>
+						<button class="buy-btn">ENCHÉRIR</button>
+					</div>
+				</div>
+			</article>
+		{/each}
+	</section>
+
+	<!-- Ticker -->
+	<footer class="ticker">
+		<span class="ticker-live">● LIVE</span>
+		<div class="ticker-track">
+			<div class="ticker-inner">
+				{#each [...articles, ...articles] as article}
+					<span class="ticker-item">
+						<b style="color:#a8c8e4">{article.slug || `#${article.ID}`}</b>
+						<span style="color:#8a909a">{article.name}</span>
+						<span style="color:{article.delta >= 0 ? '#7cd9a0' : '#e89a9a'}">{pct(article.delta)}</span>
+						<span style="color:#e8eaed">{eur(article.prix)}</span>
+					</span>
+				{/each}
+			</div>
 		</div>
-	</div>
-</footer>
+	</footer>
+{/if}
 
 <style>
 	/* Hero */
@@ -166,9 +188,13 @@
 
 	.hero-meters { display: flex; flex-direction: column; gap: 9px; align-self: flex-end; }
 	.meter-row { display: flex; align-items: center; gap: 14px; }
-	.meter-label { width: 96px; font-size: 10px; letter-spacing: 0.20em; color: #8a909a; font-family: 'JetBrains Mono', monospace; }
+	.meter-label { width: 112px; font-size: 10px; letter-spacing: 0.20em; color: #8a909a; font-family: 'JetBrains Mono', monospace; }
 	.meter-track { flex: 1; }
 	.meter-val { width: 32px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a909a; }
+
+	/* States */
+	.state-msg { text-align: center; padding: 60px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8a909a; letter-spacing: 0.18em; }
+	.state-msg.error { color: #e89a9a; }
 
 	/* Grid */
 	.grid-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative; z-index: 2; padding: 6px 0 18px; }

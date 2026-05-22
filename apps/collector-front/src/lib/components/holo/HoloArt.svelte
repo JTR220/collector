@@ -1,14 +1,9 @@
 <script lang="ts">
-	import type { Collectible } from '$lib/data/collectibles';
-	type Props = { item: Collectible; size?: number };
+	type Props = { item: { glyph: string }; size?: number };
 	let { item, size = 140 }: Props = $props();
 </script>
 
-<!-- Single steel-azure gradient regardless of item hue -->
-<div
-	class="art"
-	style="width:{size}px;height:{size}px"
->
+<div class="art" style="width:{size}px;height:{size}px">
 	<div class="scanlines" aria-hidden="true"></div>
 	<span class="glyph">{item.glyph}</span>
 </div>

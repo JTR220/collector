@@ -1,0 +1,46 @@
+const BASE_URL = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
+
+export type CategoryAPI = {
+	ID: number;
+	name: string;
+	description: string;
+};
+
+export type ArticleAPI = {
+	ID: number;
+	slug: string;
+	name: string;
+	description: string;
+	series: string;
+	year: number;
+	rarity: string;
+	rarityScore: number;
+	grade: string;
+	prix: number;
+	fraisPort: number;
+	seller: string;
+	sellerScore: number;
+	delta: number;
+	priceHistory: number[];
+	glyph: string;
+	dropId: string;
+	dropStatus: 'live' | 'next' | 'sold' | 'soon';
+	dropDate: string;
+	seatsLeft: number;
+	seatsTotal: number;
+	resellPrice: number;
+	categoryId: number;
+	category: CategoryAPI;
+};
+
+export async function fetchArticles(): Promise<ArticleAPI[]> {
+	const res = await fetch(`${BASE_URL}/article`);
+	if (!res.ok) throw new Error(`catalog-service error: ${res.status}`);
+	return res.json();
+}
+
+export async function fetchCategories(): Promise<CategoryAPI[]> {
+	const res = await fetch(`${BASE_URL}/category`);
+	if (!res.ok) throw new Error(`catalog-service error: ${res.status}`);
+	return res.json();
+}
