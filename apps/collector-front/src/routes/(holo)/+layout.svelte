@@ -6,7 +6,7 @@
 	let { children } = $props();
 
 	const routeToActive: Record<string, string> = {
-		'/vitrine': 'VITRINE',
+		'/': 'VITRINE',
 		'/profil': 'PROFIL',
 		'/quetes': 'QUÊTES',
 		'/ligue': 'LIGUE',

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { COLLECTIBLES } from '$lib/data/collectibles';
-	import type { Collectible } from '$lib/data/collectibles';
 	import { eur, pct } from '$lib/utils/format';
 	import HoloMeter from '$lib/components/holo/HoloMeter.svelte';
 
@@ -34,7 +33,7 @@
 	}
 </script>
 
-<svelte:head><title>VITRINE · Collector.shop</title></svelte:head>
+<svelte:head><title>Collector.shop · Holo Rares &amp; Scellés</title></svelte:head>
 
 <!-- Hero -->
 <section class="hero">
@@ -47,7 +46,7 @@
 		</p>
 		<div class="hero-actions">
 			<a href="/drops" class="cta-btn">OUVRIR LE BOOSTER</a>
-			<a href="/vitrine" class="ghost-btn">· filtrer par rareté</a>
+			<a href="/quetes" class="ghost-btn">· voir les quêtes</a>
 		</div>
 	</div>
 	<div class="hero-meters">

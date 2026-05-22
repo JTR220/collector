@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { auth, isAuthenticated } from '$lib/stores/auth';
+
 	const authApiUrl = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 
 	type Mode = 'login' | 'register';
@@ -10,7 +14,10 @@
 	let loading = false;
 	let error = '';
 	let success = '';
-	let token = '';
+
+	onMount(() => {
+		if ($isAuthenticated) goto('/');
+	});
 
 	async function submit() {
 		loading = true;
@@ -26,9 +33,8 @@
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? 'Erreur connexion');
-				token = data.token;
-				localStorage.setItem('collector_token', token);
-				success = `Connecté en tant que ${data.user.name}. Token JWT stocké.`;
+				auth.login(data.token, data.user);
+				goto('/');
 			} else {
 				const res = await fetch(`${authApiUrl}/utilisateur`, {
 					method: 'POST',
@@ -37,20 +43,17 @@
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? 'Erreur inscription');
-				success = 'Compte créé. Vous pouvez maintenant vous connecter.';
+				success = 'Compte créé. Connectez-vous maintenant.';
 				mode = 'login';
+				email = '';
+				password = '';
+				name = '';
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Erreur inconnue';
 		} finally {
 			loading = false;
 		}
-	}
-
-	function logout() {
-		localStorage.removeItem('collector_token');
-		token = '';
-		success = 'Déconnecté.';
 	}
 </script>
 
@@ -71,7 +74,7 @@
 			</h1>
 			<p class="mt-2 text-sm text-slate-400">
 				{mode === 'login'
-					? 'Obtenez votre token JWT pour accéder aux routes protégées.'
+					? 'Accédez à votre collection et participez aux drops exclusifs.'
 					: "Créez un compte pour rejoindre collector.shop."}
 			</p>
 
@@ -89,22 +92,7 @@
 				</div>
 			{/if}
 
-			{#if token}
-				<div class="mt-4 rounded-2xl border border-slate-700 bg-slate-800 p-4">
-					<p class="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-						Token JWT (Bearer)
-					</p>
-					<p class="break-all font-mono text-xs text-orange-400">{token}</p>
-					<button
-						onclick={logout}
-						class="mt-3 rounded-xl bg-red-900 px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-800"
-					>
-						Déconnexion
-					</button>
-				</div>
-			{/if}
-
-			<form class="mt-6 space-y-4" onsubmit={(e) => { e.preventDefault(); submit(); }}>
+<form class="mt-6 space-y-4" onsubmit={(e) => { e.preventDefault(); submit(); }}>
 				{#if mode === 'register'}
 					<input
 						class="w-full rounded-2xl border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder:text-slate-500 focus:border-orange-400 focus:outline-none"

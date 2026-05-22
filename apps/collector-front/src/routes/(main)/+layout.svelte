@@ -1,13 +1,20 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
+	import { auth } from '$lib/stores/auth';
+	import { goto } from '$app/navigation';
+
 	let { children } = $props();
 
 	const nav = [
-		{ href: '/', label: 'Catalogue' },
-		{ href: '/dashboard', label: 'Tableau de bord' },
-		{ href: '/login', label: 'Connexion' },
-		{ href: '/vitrine', label: 'Vitrine Holo' }
+		{ href: '/', label: '← Collector.shop' },
+		{ href: '/admin', label: 'Admin Catalogue' },
+		{ href: '/dashboard', label: 'Tableau de bord' }
 	];
+
+	function logout() {
+		auth.logout();
+		goto('/login');
+	}
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
@@ -20,7 +27,7 @@
 			</span>
 			<span class="text-sm font-bold text-white">.shop</span>
 		</a>
-		<ul class="flex gap-1">
+		<ul class="flex gap-1 items-center">
 			{#each nav as item}
 				<li>
 					<a
@@ -31,6 +38,23 @@
 					</a>
 				</li>
 			{/each}
+			{#if $auth.user}
+				<li class="ml-2 flex items-center gap-2">
+					<span class="text-xs text-slate-500">{$auth.user.name}</span>
+					<button
+						onclick={logout}
+						class="rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-widest text-red-400 transition hover:bg-slate-800"
+					>
+						Déconnexion
+					</button>
+				</li>
+			{:else}
+				<li>
+					<a href="/login" class="rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-widest text-orange-400 transition hover:bg-slate-800">
+						Connexion
+					</a>
+				</li>
+			{/if}
 		</ul>
 	</div>
 </nav>

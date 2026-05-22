@@ -169,10 +169,10 @@
 </script>
 
 <svelte:head>
-	<title>Collector.shop | Catalogue</title>
+	<title>Collector.shop | Admin Catalogue</title>
 	<meta
 		name="description"
-		content="Front catalogue de collector.shop branche au service catalogue."
+		content="Administration du catalogue collector.shop."
 	/>
 </svelte:head>
 

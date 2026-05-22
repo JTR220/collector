@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { auth } from '$lib/stores/auth';
+	import { goto } from '$app/navigation';
+
 	type Props = {
 		active?: string;
 		credits?: string;
@@ -9,13 +12,18 @@
 	let { active = 'VITRINE', credits = '04 820', level = 12, xp = 3820, streak = 47 }: Props = $props();
 
 	const nav = [
-		{ label: 'VITRINE', href: '/vitrine' },
+		{ label: 'VITRINE', href: '/' },
 		{ label: 'PROFIL', href: '/profil' },
 		{ label: 'QUÊTES', href: '/quetes' },
 		{ label: 'LIGUE', href: '/ligue' },
 		{ label: 'DROPS', href: '/drops' },
 		{ label: 'JOURNAL', href: '/journal' }
 	];
+
+	function logout() {
+		auth.logout();
+		goto('/login');
+	}
 </script>
 
 <header class="header">
@@ -33,54 +41,66 @@
 	</nav>
 
 	<div class="user-strip">
-		<div
-			class="tip-wrap"
-			data-tip="Votre niveau de collectionneur. Montez en XP pour débloquer des rangs de ligue et des récompenses exclusives."
-		>
-			<div class="pill" style="border-color:#a8c8e455;background:#a8c8e40e">
-				<span class="pill-icon" style="color:#a8c8e4">◈</span>
-				<div class="pill-inner">
-					<span class="pill-label">NIV</span>
-					<span class="pill-val" style="color:#a8c8e4">{level}</span>
+		{#if $auth.user}
+			<div
+				class="tip-wrap"
+				data-tip="Votre niveau de collectionneur. Montez en XP pour débloquer des rangs de ligue et des récompenses exclusives."
+			>
+				<div class="pill" style="border-color:#a8c8e455;background:#a8c8e40e">
+					<span class="pill-icon" style="color:#a8c8e4">◈</span>
+					<div class="pill-inner">
+						<span class="pill-label">NIV</span>
+						<span class="pill-val" style="color:#a8c8e4">{level}</span>
+					</div>
 				</div>
 			</div>
-		</div>
 
-		<div
-			class="tip-wrap"
-			data-tip="Points d'expérience gagnés en achetant, notant des pièces et en complétant des quêtes. Progressez vers le niveau suivant."
-		>
-			<div class="pill" style="border-color:#cbd5e055;background:#cbd5e00e">
-				<span class="pill-icon" style="color:#cbd5e0">⚡</span>
-				<div class="pill-inner">
-					<span class="pill-label">XP</span>
-					<span class="pill-val" style="color:#cbd5e0">{xp.toLocaleString('fr-FR')}</span>
+			<div
+				class="tip-wrap"
+				data-tip="Points d'expérience gagnés en achetant, notant des pièces et en complétant des quêtes. Progressez vers le niveau suivant."
+			>
+				<div class="pill" style="border-color:#cbd5e055;background:#cbd5e00e">
+					<span class="pill-icon" style="color:#cbd5e0">⚡</span>
+					<div class="pill-inner">
+						<span class="pill-label">XP</span>
+						<span class="pill-val" style="color:#cbd5e0">{xp.toLocaleString('fr-FR')}</span>
+					</div>
 				</div>
 			</div>
-		</div>
 
-		<div
-			class="tip-wrap"
-			data-tip="Jours consécutifs d'activité. Ne cassez pas votre streak pour conserver vos bonus de quêtes quotidiennes !"
-		>
-			<div class="pill" style="border-color:#8a909a55;background:#8a909a0e">
-				<span class="pill-icon pulse" style="color:#8a909a">●</span>
-				<div class="pill-inner">
-					<span class="pill-label">STREAK</span>
-					<span class="pill-val" style="color:#8a909a">{streak}j</span>
+			<div
+				class="tip-wrap"
+				data-tip="Jours consécutifs d'activité. Ne cassez pas votre streak pour conserver vos bonus de quêtes quotidiennes !"
+			>
+				<div class="pill" style="border-color:#8a909a55;background:#8a909a0e">
+					<span class="pill-icon pulse" style="color:#8a909a">●</span>
+					<div class="pill-inner">
+						<span class="pill-label">STREAK</span>
+						<span class="pill-val" style="color:#8a909a">{streak}j</span>
+					</div>
 				</div>
 			</div>
-		</div>
 
-		<div
-			class="tip-wrap"
-			data-tip="Monnaie virtuelle de la plateforme. Utilisez vos crédits pour participer aux raffles et accéder aux drops exclusifs."
-		>
-			<div class="coin">
-				<span class="coin-label">CRÉDITS</span>
-				<span class="coin-val">{credits}</span>
+			<div
+				class="tip-wrap"
+				data-tip="Monnaie virtuelle de la plateforme. Utilisez vos crédits pour participer aux raffles et accéder aux drops exclusifs."
+			>
+				<div class="coin">
+					<span class="coin-label">CRÉDITS</span>
+					<span class="coin-val">{credits}</span>
+				</div>
 			</div>
-		</div>
+
+			<div class="user-block">
+				<div class="user-info">
+					<span class="user-label">COMPTE</span>
+					<span class="user-name">{$auth.user.name}</span>
+				</div>
+				<button class="logout-btn" onclick={logout}>↩</button>
+			</div>
+		{:else}
+			<a href="/login" class="login-btn">SE CONNECTER</a>
+		{/if}
 	</div>
 </header>
 
@@ -244,4 +264,38 @@
 		transform: translateX(50%) translateY(0);
 	}
 	.tip-wrap:hover::before { opacity: 1; }
+
+	/* ── Auth ── */
+	.user-block {
+		display: flex; align-items: center; gap: 8px;
+		padding: 6px 10px;
+		border: 1px solid rgba(168,200,228,0.22);
+		border-radius: 8px;
+		background: rgba(168,200,228,0.06);
+	}
+	.user-info { display: flex; flex-direction: column; line-height: 1; }
+	.user-label { font-size: 9px; letter-spacing: 0.22em; color: #5a606a; }
+	.user-name {
+		font-family: 'Space Grotesk', sans-serif;
+		font-size: 13px; font-weight: 600;
+		color: #a8c8e4; max-width: 120px;
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.logout-btn {
+		background: none; border: 1px solid rgba(255,255,255,0.10);
+		border-radius: 6px; padding: 4px 7px;
+		font-size: 13px; color: #8a909a; cursor: pointer;
+		transition: color 120ms, border-color 120ms;
+	}
+	.logout-btn:hover { color: #e8eaed; border-color: rgba(255,255,255,0.22); }
+
+	.login-btn {
+		padding: 7px 13px; border-radius: 8px;
+		font-size: 10px; font-weight: 700; letter-spacing: 0.22em;
+		color: #0e1014; text-decoration: none;
+		background: linear-gradient(135deg, #a8c8e4, #6a7280);
+		box-shadow: 0 0 14px rgba(168,200,228,0.15);
+		transition: filter 120ms;
+	}
+	.login-btn:hover { filter: brightness(1.08); }
 </style>
