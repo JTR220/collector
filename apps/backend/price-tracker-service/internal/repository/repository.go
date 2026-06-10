@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/JTR220/collector/price-tracker-service/internal/model"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/JTR220/collector/price-tracker-service/internal/model"
 )
 
 type PriceRepository struct {

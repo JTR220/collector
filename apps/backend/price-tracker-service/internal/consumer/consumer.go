@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"github.com/JTR220/collector/price-tracker-service/config"
 	"github.com/JTR220/collector/price-tracker-service/internal/detector"
 	"github.com/JTR220/collector/price-tracker-service/internal/model"
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
+	"github.com/google/uuid"
+	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog/log"
 )
 
 // Publisher sends fraud alerts to RabbitMQ
@@ -30,7 +30,7 @@ func (p *Publisher) PublishAlert(alert model.FraudAlertEvent) error {
 		return err
 	}
 	return p.ch.Publish(
-		p.exchange, // exchange
+		p.exchange,    // exchange
 		"fraud.alert", // routing key
 		false,
 		false,

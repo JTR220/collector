@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/JTR220/collector/price-tracker-service/config"
 	"github.com/JTR220/collector/price-tracker-service/internal/detector"
 	"github.com/JTR220/collector/price-tracker-service/internal/model"
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
+	"github.com/google/uuid"
 )
 
 // mockRepo allows testing without a real DB

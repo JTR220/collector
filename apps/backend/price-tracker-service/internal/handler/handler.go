@@ -3,10 +3,10 @@ package handler
 import (
 	"net/http"
 
+	"github.com/JTR220/collector/price-tracker-service/internal/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"github.com/JTR220/collector/price-tracker-service/internal/repository"
 )
 
 type Handler struct {

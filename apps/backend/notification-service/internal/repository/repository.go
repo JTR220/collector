@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 
+	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/JTR220/collector/notification-service/internal/model"
 )
 
 type NotificationRepository struct {

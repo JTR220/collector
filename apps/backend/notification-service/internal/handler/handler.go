@@ -46,7 +46,7 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 		auth := api.Group("/")
 		auth.Use(h.JWTMiddleware())
 		{
-			auth.GET("/notifications",         h.GetNotifications)
+			auth.GET("/notifications", h.GetNotifications)
 			auth.PUT("/notifications/:id/read", h.MarkRead)
 			auth.PUT("/notifications/read-all", h.MarkAllRead)
 			auth.GET("/notifications/unread-count", h.UnreadCount)
@@ -61,9 +61,9 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 // @Router      /api/v1/health [get]
 func (h *Handler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status":           "ok",
-		"service":          "notification-service",
-		"ws_clients":       h.hub.ConnectedCount(),
+		"status":     "ok",
+		"service":    "notification-service",
+		"ws_clients": h.hub.ConnectedCount(),
 	})
 }
 

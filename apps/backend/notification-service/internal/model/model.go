@@ -10,11 +10,11 @@ import (
 type NotificationType string
 
 const (
-	TypePriceDrop    NotificationType = "PRICE_DROP"    // baisse de prix
-	TypePriceSpike   NotificationType = "PRICE_SPIKE"   // hausse de prix
-	TypeFraudAlert   NotificationType = "FRAUD_ALERT"   // alerte fraude détectée
-	TypeNewItem      NotificationType = "NEW_ITEM"       // nouvel article dans une catégorie suivie
-	TypeItemSold     NotificationType = "ITEM_SOLD"      // article vendu (pour le vendeur)
+	TypePriceDrop  NotificationType = "PRICE_DROP"  // baisse de prix
+	TypePriceSpike NotificationType = "PRICE_SPIKE" // hausse de prix
+	TypeFraudAlert NotificationType = "FRAUD_ALERT" // alerte fraude détectée
+	TypeNewItem    NotificationType = "NEW_ITEM"    // nouvel article dans une catégorie suivie
+	TypeItemSold   NotificationType = "ITEM_SOLD"   // article vendu (pour le vendeur)
 )
 
 // Notification is persisted in the database and sent via WebSocket

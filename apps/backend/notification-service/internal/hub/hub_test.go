@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/model"
+	"github.com/google/uuid"
 )
 
 func TestHub_Run_StartsWithoutPanic(t *testing.T) {

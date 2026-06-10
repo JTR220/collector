@@ -18,23 +18,23 @@ type PriceHistory struct {
 
 // FraudAlert is raised when a detection rule is triggered
 type FraudAlert struct {
-	ID        uuid.UUID  `db:"id"          json:"id"`
-	ItemID    uuid.UUID  `db:"item_id"     json:"item_id"`
-	SellerID  uuid.UUID  `db:"seller_id"   json:"seller_id"`
+	ID        uuid.UUID   `db:"id"          json:"id"`
+	ItemID    uuid.UUID   `db:"item_id"     json:"item_id"`
+	SellerID  uuid.UUID   `db:"seller_id"   json:"seller_id"`
 	Reason    AlertReason `db:"reason"     json:"reason"`
-	Detail    string     `db:"detail"      json:"detail"`
-	OldPrice  float64    `db:"old_price"   json:"old_price"`
-	NewPrice  float64    `db:"new_price"   json:"new_price"`
-	Resolved  bool       `db:"resolved"    json:"resolved"`
-	CreatedAt time.Time  `db:"created_at"  json:"created_at"`
+	Detail    string      `db:"detail"      json:"detail"`
+	OldPrice  float64     `db:"old_price"   json:"old_price"`
+	NewPrice  float64     `db:"new_price"   json:"new_price"`
+	Resolved  bool        `db:"resolved"    json:"resolved"`
+	CreatedAt time.Time   `db:"created_at"  json:"created_at"`
 }
 
 type AlertReason string
 
 const (
-	ReasonSuspiciousSpike AlertReason = "SUSPICIOUS_SPIKE"  // prix +50% en <24h
-	ReasonFloodPricing    AlertReason = "FLOOD_PRICING"     // >5 modifs en 1h
-	ReasonDumping         AlertReason = "DUMPING"           // prix anormalement bas
+	ReasonSuspiciousSpike AlertReason = "SUSPICIOUS_SPIKE" // prix +50% en <24h
+	ReasonFloodPricing    AlertReason = "FLOOD_PRICING"    // >5 modifs en 1h
+	ReasonDumping         AlertReason = "DUMPING"          // prix anormalement bas
 )
 
 // PriceUpdatedEvent matches the message published by catalog-service

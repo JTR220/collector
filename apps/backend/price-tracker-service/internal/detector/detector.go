@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"github.com/JTR220/collector/price-tracker-service/config"
 	"github.com/JTR220/collector/price-tracker-service/internal/model"
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 // Detector runs all fraud detection rules against a price event

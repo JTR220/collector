@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/spf13/viper"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -21,11 +21,11 @@ type DatabaseConfig struct {
 }
 
 type RabbitMQConfig struct {
-	URL                string `mapstructure:"RABBITMQ_URL"`
-	ExchangeEvents     string `mapstructure:"RABBITMQ_EXCHANGE_EVENTS"`
-	ExchangeAlerts     string `mapstructure:"RABBITMQ_EXCHANGE_ALERTS"`
-	QueuePriceNotif    string `mapstructure:"RABBITMQ_QUEUE_PRICE_NOTIF"`
-	QueueFraudNotif    string `mapstructure:"RABBITMQ_QUEUE_FRAUD_NOTIF"`
+	URL             string `mapstructure:"RABBITMQ_URL"`
+	ExchangeEvents  string `mapstructure:"RABBITMQ_EXCHANGE_EVENTS"`
+	ExchangeAlerts  string `mapstructure:"RABBITMQ_EXCHANGE_ALERTS"`
+	QueuePriceNotif string `mapstructure:"RABBITMQ_QUEUE_PRICE_NOTIF"`
+	QueueFraudNotif string `mapstructure:"RABBITMQ_QUEUE_FRAUD_NOTIF"`
 }
 
 type JWTConfig struct {
