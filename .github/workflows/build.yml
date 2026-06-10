@@ -95,7 +95,16 @@
           with:
             name: coverage-${{ matrix.service }}
             path: apps/backend/${{ matrix.service }}
-
+        - name: Verify SONAR_TOKEN
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          run: |
+            if [ -z "$SONAR_TOKEN" ]; then
+              echo "❌ SONAR_TOKEN is missing"
+              exit 1
+            else
+              echo "✅ SONAR_TOKEN is available"
+            fi
         - name: SonarCloud Scan
           uses: sonarsource/sonarqube-scan-action@v6
           env:
