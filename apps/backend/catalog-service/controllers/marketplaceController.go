@@ -153,7 +153,9 @@ func UploadArticleImage(c *gin.Context) {
 		return
 	}
 
-	if err := os.MkdirAll(filepath.Join("uploads", "articles"), 0o755); err != nil {
+	// 0o750 : pas de droits "other" (gosec G301) — les fichiers sont servis par
+	// le process lui-même via router.Static, personne d'autre n'a besoin de lire
+	if err := os.MkdirAll(filepath.Join("uploads", "articles"), 0o750); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Stockage indisponible"})
 		return
 	}

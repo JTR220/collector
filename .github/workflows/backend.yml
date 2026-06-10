@@ -95,6 +95,9 @@ jobs:
   sonarcloud:
     name: SonarCloud
     needs: lint-test
+    # Les PR Dependabot ne reçoivent pas les secrets du repo (SONAR_TOKEN vide
+    # -> "Project not found") : on saute le scan, le reste de la CI suffit.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
 
     steps:
@@ -247,7 +250,7 @@ jobs:
 
       # Étape 6 — scan de l'image complète, bloquant sur CRITICAL/HIGH
       - name: Trivy image scan (bloquant CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}:scan
           format: sarif
