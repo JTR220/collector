@@ -39,6 +39,9 @@ func InitRouter() *gin.Engine {
 	router.GET("/article/:id", controllers.GetArticle)
 	router.GET("/category", controllers.GetAllCategories)
 
+	// Photos d'articles uploadées (servies en statique)
+	router.Static("/uploads", "./uploads")
+
 	// Routes protégées (écriture réservée aux utilisateurs authentifiés)
 	protected := router.Group("/")
 	protected.Use(middlewares.AuthRequired())
@@ -47,6 +50,42 @@ func InitRouter() *gin.Engine {
 		protected.PUT("/article/:id", controllers.UpdateArticle)
 		protected.DELETE("/article/:id", controllers.DeleteArticle)
 		protected.POST("/category", controllers.CreateCategory)
+
+		// Marketplace : annonces, photos, achats directs
+		protected.POST("/market/listings", controllers.CreateListing)
+		protected.DELETE("/market/listings/:id", controllers.DeleteListing)
+		protected.GET("/me/listings", controllers.GetMyListings)
+		protected.POST("/article/:id/image", controllers.UploadArticleImage)
+		protected.POST("/article/:id/buy", controllers.BuyArticle)
+		protected.GET("/me/orders", controllers.GetMyOrders)
+		protected.GET("/me/sales", controllers.GetMySales)
+		protected.POST("/orders/:id/status", controllers.UpdateOrderStatus)
+
+		// Engagement : progression du joueur
+		protected.GET("/me/stats", controllers.GetMyStats)
+
+		// Drops : achat, raffle, rappel, liste d'attente
+		protected.POST("/article/:id/entry", controllers.CreateDropEntry)
+		protected.GET("/me/entries", controllers.GetMyDropEntries)
+
+		// Wishlist
+		protected.GET("/me/wishlist", controllers.GetMyWishlist)
+		protected.POST("/me/wishlist", controllers.AddToWishlist)
+		protected.DELETE("/me/wishlist/:articleId", controllers.RemoveFromWishlist)
+
+		// Journal
+		protected.GET("/me/journal", controllers.GetMyJournal)
+		protected.POST("/me/journal", controllers.CreateJournalEntry)
+		protected.POST("/me/journal/:id/like", controllers.LikeJournalEntry)
+
+		// Quêtes
+		protected.GET("/me/quests", controllers.GetMyQuests)
+		protected.POST("/me/quests/:id/progress", controllers.ProgressQuest)
+		protected.POST("/me/quests/:id/skip", controllers.SkipQuest)
+
+		// Ligue
+		protected.GET("/league", controllers.GetLeague)
+		protected.POST("/league/challenge", controllers.ChallengeRival)
 	}
 
 	return router

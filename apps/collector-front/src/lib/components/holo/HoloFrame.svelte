@@ -17,7 +17,7 @@
 			radial-gradient(50% 50% at 90% 100%, rgba(120,140,160,0.05) 0%, transparent 55%),
 			#0e1014;
 		color: #e8eaed;
-		font-family: 'Space Grotesk', sans-serif;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		padding: 22px 30px 24px;
 		overflow-x: hidden;
 	}

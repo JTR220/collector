@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
+export const BASE_URL = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
 
 export type CategoryAPI = {
 	ID: number;
@@ -19,7 +19,11 @@ export type ArticleAPI = {
 	prix: number;
 	fraisPort: number;
 	seller: string;
+	sellerId: number;
 	sellerScore: number;
+	imageUrl: string;
+	saleType: 'drop' | 'direct';
+	sold: boolean;
 	delta: number;
 	priceHistory: number[];
 	glyph: string;
@@ -32,6 +36,18 @@ export type ArticleAPI = {
 	categoryId: number;
 	category: CategoryAPI;
 };
+
+/** Résout l'URL d'affichage de la photo d'un article (chemin /uploads servi par le catalog-service, ou URL absolue). */
+export function articleImage(article: Pick<ArticleAPI, 'imageUrl'>): string | null {
+	if (!article.imageUrl) return null;
+	return article.imageUrl.startsWith('http') ? article.imageUrl : `${BASE_URL}${article.imageUrl}`;
+}
+
+export async function fetchArticle(id: number | string): Promise<ArticleAPI> {
+	const res = await fetch(`${BASE_URL}/article/${id}`);
+	if (!res.ok) throw new Error(`catalog-service error: ${res.status}`);
+	return res.json();
+}
 
 export async function fetchArticles(): Promise<ArticleAPI[]> {
 	const res = await fetch(`${BASE_URL}/article`);

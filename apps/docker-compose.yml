@@ -54,6 +54,8 @@ services:
       JWT_SECRET: collector-jwt-secret-dev
     ports:
       - "8081:8081"
+    volumes:
+      - catalog_uploads:/app/uploads
 
   collector-front:
     build:
@@ -71,3 +73,4 @@ services:
 
 volumes:
   postgres_data:
+  catalog_uploads:

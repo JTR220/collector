@@ -38,7 +38,7 @@
 	.glyph {
 		position: relative;
 		z-index: 1;
-		font-family: 'Major Mono Display', monospace;
+		font-family: 'Newsreader', Georgia, serif;
 		font-size: 48px;
 		color: rgba(255,255,255,0.94);
 		text-shadow: 0 4px 22px rgba(0,0,0,0.45);

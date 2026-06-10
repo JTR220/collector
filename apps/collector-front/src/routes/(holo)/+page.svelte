@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchArticles, type ArticleAPI } from '$lib/api/catalog';
-	import { eur, pct } from '$lib/utils/format';
-	import HoloMeter from '$lib/components/holo/HoloMeter.svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
+	import { eur, pct, sparkPath } from '$lib/utils/format';
+	import GPanel from '$lib/components/galerie/GPanel.svelte';
+	import GMeter from '$lib/components/galerie/GMeter.svelte';
+	import GChip from '$lib/components/galerie/GChip.svelte';
+	import GSpark from '$lib/components/galerie/GSpark.svelte';
+	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
 	let articles = $state<ArticleAPI[]>([]);
 	let loading = $state(true);
@@ -19,143 +25,198 @@
 		}
 	});
 
+	// Filtres pilotés par l'URL : /?cat=TCG&max=300
+	const filterCat = $derived($page.url.searchParams.get('cat'));
+	const filterMax = $derived(Number($page.url.searchParams.get('max')) || null);
+
+	const filtered = $derived(
+		articles.filter(
+			(a) =>
+				(!filterCat || a.category.name === filterCat) &&
+				(!filterMax || a.prix <= filterMax)
+		)
+	);
+
+	function setCategoryFilter(cat: string) {
+		goto(filterCat === cat ? '/' : `/?cat=${encodeURIComponent(cat)}`, { noScroll: true });
+	}
+
 	const meters = $derived((() => {
 		const counts: Record<string, number> = {};
 		for (const a of articles) counts[a.category.name] = (counts[a.category.name] ?? 0) + 1;
 		const total = articles.length || 1;
 		return Object.entries(counts).map(([label, val]) => ({
-			label: label.toUpperCase(),
-			value: Math.round((val / total) * 100)
+			label,
+			value: Math.round((val / total) * 100),
+			count: val
 		}));
 	})());
 
-	type TiltState = { x: number; y: number; on: boolean; px: number; py: number };
-	let tilts = $state<Record<number, TiltState>>({});
-
-	function onMove(e: MouseEvent, id: number) {
-		const el = e.currentTarget as HTMLElement;
-		const r = el.getBoundingClientRect();
-		const px = (e.clientX - r.left) / r.width;
-		const py = (e.clientY - r.top) / r.height;
-		tilts[id] = { x: (py - 0.5) * -10, y: (px - 0.5) * 14, on: true, px, py };
-	}
-	function onLeave(id: number) {
-		tilts[id] = { x: 0, y: 0, on: false, px: 0.5, py: 0.5 };
+	// Hue dérivée du nom de catégorie pour le placeholder art
+	function categoryHue(name: string): number {
+		const map: Record<string, number> = {
+			TCG: 18, Console: 48, Comics: 220, Vinyle: 350,
+			'Designer Toy': 280, Horlogerie: 195
+		};
+		return map[name] ?? (name.charCodeAt(0) * 47) % 360;
 	}
 
-	function cardShadow(t: TiltState | undefined) {
-		if (t?.on)
-			return `0 24px 50px -22px rgba(168,200,228,0.22),0 6px 16px rgba(0,0,0,0.5),inset 0 0 0 1px rgba(168,200,228,0.28)`;
-		return `0 12px 26px -16px rgba(0,0,0,0.6),inset 0 0 0 1px rgba(255,255,255,0.07)`;
+	// Sparkline fictive dérivée du prix (pour la démo)
+	function demoSpark(prix: number, delta: number): number[] {
+		const base = prix / (1 + delta / 100);
+		return [base*0.88, base*0.91, base*0.94, base*0.97, base, prix*0.98, prix*0.99, prix];
 	}
 </script>
 
-<svelte:head><title>Collector.shop · Holo Rares &amp; Scellés</title></svelte:head>
+<svelte:head><title>Collector.shop · Vitrine</title></svelte:head>
 
 <!-- Hero -->
 <section class="hero">
-	<div class="hero-text">
-		<div class="kicker">SAISON 03 · DROP DE LA SEMAINE</div>
-		<h1 class="hero-title">HOLO RARES &amp; SCELLÉS</h1>
+	<div>
+		<Kicker>Saison 03 — sélection de la semaine</Kicker>
+		<h1 class="hero-title">Holo rares<br/>&amp; scellés.</h1>
 		<p class="hero-lede">
-			Pièces vérifiées · grading PSA / CGC · livraison <em>tracée</em> sous boîtier antichoc.
-			Passe la souris sur les cartes pour faire bouger le foil.
+			Pièces vérifiées · grading PSA / CGC · livraison tracée sous boîtier antichoc.
+			Chaque lot est authentifié avant mise en ligne.
 		</p>
-		<div class="hero-actions">
-			<a href="/drops" class="cta-btn">OUVRIR LE BOOSTER</a>
-			<a href="/quetes" class="ghost-btn">· voir les quêtes</a>
+		<div class="hero-ctas">
+			<a href="/drops" class="btn-primary">Parcourir la sélection</a>
+			<a href="/vendre" class="btn-link">Vendre une pièce →</a>
+			<a href="/grading" class="btn-link">Comment fonctionne le grading →</a>
 		</div>
 	</div>
-	<div class="hero-meters">
-		{#each meters as m}
-			<div class="meter-row">
-				<span class="meter-label">{m.label}</span>
-				<div class="meter-track"><HoloMeter value={m.value} /></div>
-				<span class="meter-val">{m.value}</span>
-			</div>
-		{/each}
-	</div>
+
+	<GPanel>
+		<Kicker>Catégories</Kicker>
+		<div class="meters-list">
+			{#if meters.length === 0}
+				{#each ['TCG','Console','Comics','Vinyles'] as cat, i}
+					<div class="meter-row">
+						<span class="meter-label">{cat}</span>
+						<div style="flex:1"><GMeter value={[42,28,18,12][i]} /></div>
+						<span class="meter-count">{[42,28,18,12][i]}</span>
+					</div>
+				{/each}
+			{:else}
+				{#each meters as m}
+					<button
+						class="meter-row meter-btn"
+						class:meter-active={filterCat === m.label}
+						onclick={() => setCategoryFilter(m.label)}
+						title={filterCat === m.label ? 'Retirer le filtre' : `Filtrer : ${m.label}`}
+					>
+						<span class="meter-label">{m.label}</span>
+						<div style="flex:1"><GMeter value={m.value} /></div>
+						<span class="meter-count">{m.count}</span>
+					</button>
+				{/each}
+			{/if}
+		</div>
+	</GPanel>
 </section>
 
-<!-- States -->
+<!-- États -->
 {#if loading}
 	<div class="state-msg">Chargement du catalogue…</div>
 {:else if error}
-	<div class="state-msg error">{error}</div>
+	<div class="state-error">{error}</div>
 {:else if articles.length === 0}
-	<div class="state-msg">Aucun article disponible.</div>
+	<div class="state-msg">Aucun article disponible pour le moment.</div>
 {:else}
-	<!-- Card grid -->
+	{#if filterCat || filterMax}
+		<div class="filter-bar">
+			<span class="filter-label">
+				Filtre actif :
+				{#if filterCat}{filterCat}{/if}
+				{#if filterMax}{filterCat ? ' · ' : ''}moins de {eur(filterMax)}{/if}
+				— {filtered.length} pièce{filtered.length > 1 ? 's' : ''}
+			</span>
+			<a href="/" class="filter-clear">× effacer</a>
+		</div>
+	{/if}
+
+	<!-- Grille de cartes -->
 	<section class="grid-section">
-		{#each articles as article (article.ID)}
-			{@const t = tilts[article.ID]}
-			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-			<article
-				class="card"
-				style="
-					transform:perspective(900px) rotateX({t?.x ?? 0}deg) rotateY({t?.y ?? 0}deg) translateZ(0);
-					box-shadow:{cardShadow(t)};
-					transition:transform 80ms linear,box-shadow 220ms ease;
-				"
-				onmousemove={(e) => onMove(e, article.ID)}
-				onmouseleave={() => onLeave(article.ID)}
-			>
-				<div
-					class="card-sheen"
-					style="
-						opacity:{t?.on ? 0.32 : 0.12};
-						transform:translate({((t?.px ?? 0.5)-0.5)*40}px,{((t?.py ?? 0.5)-0.5)*30}px);
-					"
-					aria-hidden="true"
-				></div>
-				<div class="card-scanlines" aria-hidden="true"></div>
-
-				<div class="card-top-row">
+		{#each filtered as article (article.ID)}
+			{@const hue = categoryHue(article.category.name)}
+			{@const spark = demoSpark(article.prix, article.delta)}
+			{@const up = article.delta >= 0}
+			{@const img = articleImage(article)}
+			<article class="card">
+				<div class="card-eyebrow">
+					<span class="card-cat">{article.category.name} · {article.year}</span>
 					<span class="card-id">{article.slug || `#${article.ID}`}</span>
-					<span class="card-cat">{article.category.name}</span>
 				</div>
 
-				<div class="card-art">
-					<div class="card-art-scanlines" aria-hidden="true"></div>
-					<span class="card-glyph">{article.glyph}</span>
-					<span class="card-rarity-badge">{article.rarity.toUpperCase()}</span>
+				<!-- Photo produit (placeholder dégradé en dessous si l'image manque ou casse) -->
+				<div
+					class="card-art"
+					style="background:linear-gradient(155deg, oklch(0.30 0.045 {hue}) 0%, oklch(0.24 0.045 {hue}) 100%)"
+				>
+					<div class="card-art-trame" aria-hidden="true"></div>
+					<span class="card-art-label">photo produit<br/>{article.slug || `#${article.ID}`}</span>
+					{#if img}
+						<img
+							class="card-art-img"
+							src={img}
+							alt={article.name}
+							loading="lazy"
+							onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+						/>
+					{/if}
+					{#if article.saleType === 'direct'}
+						<span class="card-direct">vente directe</span>
+					{/if}
+					{#if article.sold}
+						<span class="card-sold">vendu</span>
+					{/if}
+					<span class="card-rarity">{article.rarity}</span>
 				</div>
 
-				<div class="card-meta">
-					<div class="name-price-row">
+				<div class="card-body">
+					<div class="card-name-row">
 						<div>
 							<p class="card-name">{article.name}</p>
 							<p class="card-series">{article.series}</p>
 						</div>
-						<div style="text-align:right">
-							<p class="price-label">PRIX</p>
-							<p class="price-val">{eur(article.prix)}</p>
+						<div class="card-chips">
+							<GChip>{article.grade}</GChip>
 						</div>
 					</div>
 
-					<div class="chip-row">
-						<span class="chip">{article.grade}</span>
-						<span class="chip">{article.year}</span>
-						<span class="chip" style="color:{article.delta >= 0 ? '#7cd9a0' : '#e89a9a'}">{pct(article.delta)}</span>
-						<span style="flex:1"></span>
-						<button class="buy-btn">ENCHÉRIR</button>
+					<div class="card-divider"></div>
+
+					<div class="card-price-row">
+						<div>
+							<div class="card-price-label">Cote actuelle</div>
+							<div class="card-price">{eur(article.prix)}</div>
+						</div>
+						<div class="card-spark-col">
+							<GSpark values={spark} color={up ? '#86c099' : '#d79c86'} w={80} h={24} dot={false} />
+							<span class="card-delta" style="color:{up ? '#86c099' : '#d79c86'}">{pct(article.delta)}</span>
+						</div>
 					</div>
+
+					<a class="card-cta" href={`/lot/${article.ID}`}>Voir le lot</a>
 				</div>
 			</article>
 		{/each}
 	</section>
 
-	<!-- Ticker -->
+	<!-- Footer ticker -->
 	<footer class="ticker">
-		<span class="ticker-live">● LIVE</span>
+		<span class="ticker-live">
+			<span class="ticker-dot"></span>
+			Dernières ventes
+		</span>
 		<div class="ticker-track">
 			<div class="ticker-inner">
 				{#each [...articles, ...articles] as article}
 					<span class="ticker-item">
-						<b style="color:#a8c8e4">{article.slug || `#${article.ID}`}</b>
-						<span style="color:#8a909a">{article.name}</span>
-						<span style="color:{article.delta >= 0 ? '#7cd9a0' : '#e89a9a'}">{pct(article.delta)}</span>
-						<span style="color:#e8eaed">{eur(article.prix)}</span>
+						<span class="ticker-id">{article.slug || `#${article.ID}`}</span>
+						<span class="ticker-name">{article.name}</span>
+						<span class="ticker-price">{eur(article.prix)}</span>
+						<span style="color:{article.delta >= 0 ? '#86c099' : '#d79c86'}">{pct(article.delta)}</span>
 					</span>
 				{/each}
 			</div>
@@ -164,136 +225,371 @@
 {/if}
 
 <style>
-	/* Hero */
-	.hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 48px; margin-bottom: 28px; align-items: center; padding: 24px 0 18px; position: relative; z-index: 2; }
+	/* ── Hero ── */
+	.hero {
+		display: grid;
+		grid-template-columns: 1.55fr 1fr;
+		gap: 56px;
+		padding: 30px 0 26px;
+		align-items: start;
+	}
 	@media (max-width: 768px) { .hero { grid-template-columns: 1fr; gap: 24px; } }
 
-	.kicker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.34em; color: #8a909a; margin-bottom: 14px; }
 	.hero-title {
-		font-family: 'Major Mono Display', monospace;
-		font-size: clamp(32px, 5vw, 60px);
-		line-height: 0.95; margin: 0 0 14px; letter-spacing: -0.02em;
-		color: #e8eaed; text-shadow: 0 0 28px rgba(168,200,228,0.18);
+		font-family: 'Newsreader', Georgia, serif;
+		font-weight: 500;
+		font-size: clamp(36px, 5vw, 50px);
+		line-height: 1.05;
+		color: #ece5da;
+		margin: 10px 0 14px;
+		text-wrap: balance;
 	}
-	.hero-lede { font-size: 13.5px; color: #8a909a; line-height: 1.55; margin-bottom: 22px; max-width: 500px; }
-	.hero-actions { display: flex; gap: 18px; align-items: center; }
-	.cta-btn {
-		background: linear-gradient(135deg, #a8c8e4, #6a7280);
-		color: #0e1014; padding: 13px 22px; border-radius: 8px;
-		font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-decoration: none;
-		box-shadow: 0 0 22px rgba(168,200,228,0.18); transition: filter 150ms;
+	.hero-lede {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 15px;
+		color: #a39a8c;
+		line-height: 1.6;
+		margin-bottom: 24px;
+		max-width: 480px;
 	}
-	.cta-btn:hover { filter: brightness(1.08); }
-	.ghost-btn { color: #8a909a; font-size: 10.5px; letter-spacing: 0.18em; text-decoration: none; }
+	.hero-ctas { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+	.btn-primary {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 600;
+		padding: 12px 22px;
+		border-radius: 7px;
+		background: #86b3a4;
+		color: #191714;
+		text-decoration: none;
+		transition: filter 120ms;
+	}
+	.btn-primary:hover { filter: brightness(1.08); }
+	.btn-link {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+		color: #a39a8c;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	.btn-link:hover { color: #ece5da; }
 
-	.hero-meters { display: flex; flex-direction: column; gap: 9px; align-self: flex-end; }
-	.meter-row { display: flex; align-items: center; gap: 14px; }
-	.meter-label { width: 112px; font-size: 10px; letter-spacing: 0.20em; color: #8a909a; font-family: 'JetBrains Mono', monospace; }
-	.meter-track { flex: 1; }
-	.meter-val { width: 32px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a909a; }
+	.meters-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+	.meter-row { display: flex; align-items: center; gap: 12px; }
+	.meter-btn {
+		background: none;
+		border: none;
+		padding: 4px 6px;
+		margin: -4px -6px;
+		border-radius: 6px;
+		cursor: pointer;
+		width: 100%;
+		text-align: left;
+		transition: background 120ms;
+	}
+	.meter-btn:hover { background: rgba(255,255,255,0.04); }
+	.meter-active { background: rgba(134,179,164,0.08); }
+	.meter-active .meter-label { color: #86b3a4; }
 
-	/* States */
-	.state-msg { text-align: center; padding: 60px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8a909a; letter-spacing: 0.18em; }
-	.state-msg.error { color: #e89a9a; }
+	.filter-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 9px 14px;
+		border: 1px solid rgba(134,179,164,0.28);
+		border-radius: 7px;
+		background: rgba(134,179,164,0.05);
+		margin-bottom: 16px;
+	}
+	.filter-label {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12.5px;
+		color: #86b3a4;
+	}
+	.filter-clear {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		color: #a39a8c;
+		text-decoration: none;
+	}
+	.filter-clear:hover { color: #ece5da; }
+	.meter-label {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		color: #a39a8c;
+		width: 90px;
+		flex-shrink: 0;
+	}
+	.meter-count {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 12px;
+		color: #766d60;
+		width: 28px;
+		text-align: right;
+		flex-shrink: 0;
+	}
 
-	/* Grid */
-	.grid-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative; z-index: 2; padding: 6px 0 18px; }
+	/* ── États ── */
+	.state-msg {
+		text-align: center;
+		padding: 60px 0;
+		font-family: 'Newsreader', Georgia, serif;
+		font-style: italic;
+		font-size: 16px;
+		color: #a39a8c;
+	}
+	.state-error {
+		padding: 12px 16px;
+		border-radius: 7px;
+		background: rgba(215,156,134,0.06);
+		border: 1px solid rgba(215,156,134,0.3);
+		color: #d79c86;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+		margin-bottom: 20px;
+	}
+
+	/* ── Grille ── */
+	.grid-section {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 18px;
+		padding: 4px 0 24px;
+	}
 	@media (max-width: 900px) { .grid-section { grid-template-columns: repeat(2, 1fr); } }
 	@media (max-width: 580px) { .grid-section { grid-template-columns: 1fr; } }
 
-	/* Card */
+	/* ── Carte ── */
 	.card {
-		position: relative; overflow: hidden; border-radius: 12px;
-		background: linear-gradient(180deg, #181a20 0%, #0d0f13 100%);
-		border: 1px solid rgba(255,255,255,0.07);
-		padding: 13px; display: flex; flex-direction: column; gap: 11px;
+		position: relative;
+		background: #221f1b;
+		border: 1px solid rgba(236,229,218,0.10);
+		border-radius: 9px;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		transition: border-color 120ms;
 		cursor: pointer;
 	}
-	.card-sheen {
-		position: absolute; inset: 0; pointer-events: none;
-		background: conic-gradient(from 220deg at 30% 30%,
-			rgba(168,200,228,0.20),
-			rgba(255,255,255,0.10),
-			rgba(120,140,160,0.18),
-			rgba(168,200,228,0.20));
-		mix-blend-mode: color-dodge;
-		filter: blur(8px) saturate(120%);
-		transition: opacity 220ms ease, transform 80ms linear;
-		z-index: 1;
+	.card:hover { border-color: rgba(236,229,218,0.17); }
+
+	.card-eyebrow {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 12px 14px 0;
 	}
-	.card-scanlines {
-		position: absolute; inset: 0; pointer-events: none;
-		background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.04) 0 1px, transparent 1px 2px);
-		mix-blend-mode: overlay; opacity: 0.4; z-index: 2;
+	.card-cat {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 10px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: #766d60;
+	}
+	.card-id {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 10px;
+		color: #766d60;
 	}
 
-	.card-top-row { position: relative; z-index: 3; display: flex; justify-content: space-between; align-items: center; }
-	.card-id { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: #a8c8e4; }
-	.card-cat { font-size: 9px; letter-spacing: 0.30em; color: #8a909a; }
-
+	/* Art placeholder */
 	.card-art {
-		position: relative; z-index: 3; height: 104px; border-radius: 8px; overflow: hidden;
-		display: flex; align-items: center; justify-content: center;
-		background: radial-gradient(120% 90% at 30% 20%,
-			oklch(0.55 0.08 215) 0%,
-			oklch(0.32 0.06 215) 55%,
-			oklch(0.18 0.04 215) 100%);
-		box-shadow: inset 0 0 50px rgba(0,0,0,0.40);
+		position: relative;
+		height: 132px;
+		margin: 10px 14px 0;
+		border-radius: 6px;
+		border: 1px solid rgba(236,229,218,0.08);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
 	}
-	.card-art-scanlines {
-		position: absolute; inset: 0;
-		background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.07) 0 1px, transparent 1px 3px);
-		mix-blend-mode: overlay; opacity: 0.5; pointer-events: none;
+	.card-art-trame {
+		position: absolute;
+		inset: 0;
+		opacity: 0.08;
+		background: repeating-linear-gradient(45deg, #ece5da 0 1px, transparent 1px 9px);
 	}
-	.card-glyph {
-		position: relative; z-index: 1;
-		font-family: 'Major Mono Display', monospace; font-size: 58px;
-		color: rgba(255,255,255,0.94); text-shadow: 0 4px 22px rgba(0,0,0,0.45);
+	.card-art-label {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 10px;
+		letter-spacing: 0.08em;
+		text-align: center;
+		line-height: 1.5;
+		color: rgba(236,229,218,0.35);
+		position: relative;
 	}
-	.card-rarity-badge {
-		position: absolute; bottom: 7px; right: 7px; z-index: 2;
-		font-size: 8px; letter-spacing: 0.22em; padding: 2px 7px;
-		border: 1px solid rgba(255,255,255,0.45); border-radius: 3px;
-		background: rgba(0,0,0,0.35); color: #fff;
-		font-family: 'JetBrains Mono', monospace;
+	.card-art-img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.card-direct {
+		position: absolute;
+		top: 7px;
+		left: 8px;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 9px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		padding: 2px 7px;
+		border-radius: 3px;
+		color: #191714;
+		background: #86b3a4;
+		font-weight: 600;
+	}
+	.card-sold {
+		position: absolute;
+		top: 7px;
+		right: 8px;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 9px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		padding: 2px 7px;
+		border-radius: 3px;
+		color: #ece5da;
+		background: rgba(215, 156, 134, 0.85);
+		font-weight: 600;
+	}
+	.card-rarity {
+		position: absolute;
+		bottom: 7px;
+		right: 8px;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 9px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		padding: 2px 7px;
+		border: 1px solid rgba(236,229,218,0.20);
+		border-radius: 3px;
+		color: rgba(236,229,218,0.55);
+		background: rgba(0,0,0,0.25);
 	}
 
-	.card-meta { position: relative; z-index: 3; }
-	.name-price-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
-	.card-name { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; color: #e8eaed; margin: 0 0 2px; }
-	.card-series { font-size: 10.5px; color: #8a909a; margin: 0; }
-	.price-label { font-size: 9px; letter-spacing: 0.20em; color: #5a606a; margin: 0; font-family: 'JetBrains Mono', monospace; }
-	.price-val { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 600; color: #a8c8e4; line-height: 1; margin: 0; }
+	.card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
 
-	.chip-row { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
-	.chip {
-		font-size: 9px; letter-spacing: 0.16em; padding: 3px 7px;
-		border: 1px solid rgba(255,255,255,0.07); border-radius: 5px;
-		background: rgba(255,255,255,0.04); color: #8a909a;
-		font-family: 'JetBrains Mono', monospace;
+	.card-name-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+	.card-name {
+		font-family: 'Newsreader', Georgia, serif;
+		font-size: 19px;
+		color: #ece5da;
+		margin: 0 0 3px;
+		line-height: 1.1;
 	}
-	.buy-btn {
-		background: linear-gradient(135deg, #a8c8e4, #6a7280);
-		color: #0e1014; border: none; padding: 6px 11px; border-radius: 5px;
-		font-size: 9.5px; letter-spacing: 0.22em; font-weight: 700; cursor: pointer;
-		font-family: 'Space Grotesk', sans-serif; transition: filter 150ms;
+	.card-series {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 11px;
+		color: #766d60;
+		margin: 0;
 	}
-	.buy-btn:hover { filter: brightness(1.08); }
+	.card-chips { flex-shrink: 0; }
 
-	/* Ticker */
+	.card-divider { border: none; border-top: 1px solid rgba(236,229,218,0.08); }
+
+	.card-price-row { display: flex; justify-content: space-between; align-items: flex-end; }
+	.card-price-label {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 10px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: #766d60;
+		margin-bottom: 3px;
+	}
+	.card-price {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 21px;
+		color: #ece5da;
+		font-weight: 500;
+		line-height: 1;
+	}
+	.card-spark-col { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+	.card-delta {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+	}
+
+	.card-cta {
+		display: block;
+		text-align: center;
+		text-decoration: none;
+		box-sizing: border-box;
+		width: 100%;
+		padding: 9px;
+		border-radius: 6px;
+		border: 1px solid rgba(236,229,218,0.12);
+		background: transparent;
+		color: #a39a8c;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: border-color 120ms, color 120ms, background 120ms;
+		margin-top: auto;
+	}
+	.card-cta:hover {
+		border-color: #86b3a4;
+		color: #86b3a4;
+		background: rgba(134,179,164,0.04);
+	}
+	/* Lien étendu : toute la carte est cliquable via le CTA */
+	.card-cta::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	/* ── Ticker ── */
 	.ticker {
-		display: flex; align-items: center; gap: 18px;
-		border-top: 1px solid rgba(255,255,255,0.07);
-		padding: 12px 0; margin-top: 4px; overflow: hidden;
-		font-family: 'JetBrains Mono', monospace; font-size: 11px;
-		position: relative; z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 18px;
+		border-top: 1px solid rgba(236,229,218,0.10);
+		padding: 12px 0;
+		overflow: hidden;
 	}
 	.ticker-live {
-		flex-shrink: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.28em;
-		color: #a8c8e4; text-shadow: 0 0 12px rgba(168,200,228,0.5);
-		animation: holoPulse 1.8s ease-in-out infinite;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex-shrink: 0;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 11px;
+		font-weight: 600;
+		color: #a39a8c;
+		letter-spacing: 0.04em;
+	}
+	.ticker-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #86c099;
+		display: inline-block;
 	}
 	.ticker-track { flex: 1; overflow: hidden; }
-	.ticker-inner { display: flex; animation: holoTicker 30s linear infinite; width: max-content; }
-	.ticker-item { display: inline-flex; gap: 9px; margin-right: 34px; align-items: center; white-space: nowrap; }
+	.ticker-inner {
+		display: flex;
+		animation: ticker 30s linear infinite;
+		width: max-content;
+	}
+	.ticker-item {
+		display: inline-flex;
+		gap: 10px;
+		margin-right: 32px;
+		align-items: center;
+		white-space: nowrap;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+	}
+	.ticker-id { color: #86b3a4; }
+	.ticker-name { color: #766d60; }
+	.ticker-price { color: #ece5da; }
+
+	@keyframes ticker {
+		from { transform: translateX(0); }
+		to   { transform: translateX(-50%); }
+	}
 </style>

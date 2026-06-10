@@ -17,6 +17,6 @@
 		font-size: 10px;
 		font-weight: 600;
 		letter-spacing: 0.18em;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 	}
 </style>

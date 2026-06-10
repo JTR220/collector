@@ -10,7 +10,7 @@
 		font-size: 11px;
 		letter-spacing: 0.34em;
 		margin-bottom: 10px;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		text-transform: uppercase;
 	}
 </style>

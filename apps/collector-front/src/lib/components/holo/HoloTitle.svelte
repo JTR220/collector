@@ -9,7 +9,7 @@
 
 <style>
 	.title {
-		font-family: 'Major Mono Display', monospace;
+		font-family: 'Newsreader', Georgia, serif;
 		line-height: 0.95;
 		margin: 0;
 		letter-spacing: -0.02em;

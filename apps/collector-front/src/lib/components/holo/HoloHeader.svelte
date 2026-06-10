@@ -124,13 +124,13 @@
 		text-decoration: none;
 	}
 	.logo-glyph {
-		font-family: 'Major Mono Display', monospace;
+		font-family: 'Newsreader', Georgia, serif;
 		font-size: 20px;
 		color: #a8c8e4;
 		text-shadow: 0 0 12px rgba(168,200,228,0.5);
 	}
 	.logo-word {
-		font-family: 'Space Grotesk', sans-serif;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-weight: 700;
 		font-size: 13px;
 		letter-spacing: 0.20em;
@@ -189,7 +189,7 @@
 		color: #5a606a;
 	}
 	.pill-val {
-		font-family: 'JetBrains Mono', monospace;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 14px;
 		font-weight: 600;
 	}
@@ -209,7 +209,7 @@
 		color: #8a909a;
 	}
 	.coin-val {
-		font-family: 'JetBrains Mono', monospace;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 16px;
 		font-weight: 600;
 		letter-spacing: 0.06em;
@@ -233,7 +233,7 @@
 		box-shadow:
 			0 0 0 1px rgba(168,200,228,0.12),
 			0 12px 32px -8px rgba(0,0,0,0.7);
-		font-family: 'Space Grotesk', sans-serif;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 11px;
 		font-weight: 400;
 		line-height: 1.5;
@@ -276,7 +276,7 @@
 	.user-info { display: flex; flex-direction: column; line-height: 1; }
 	.user-label { font-size: 9px; letter-spacing: 0.22em; color: #5a606a; }
 	.user-name {
-		font-family: 'Space Grotesk', sans-serif;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px; font-weight: 600;
 		color: #a8c8e4; max-width: 120px;
 		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
