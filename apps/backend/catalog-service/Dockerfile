@@ -1,6 +1,6 @@
 # Étape 5 — build multi-stage : toolchain Go isolée, image finale distroless
 # static (pas de shell, pas de gestionnaire de paquets, ~2 Mo de base) en non-root.
-FROM golang:1.25 AS builder
+FROM golang:1.26 AS builder
 
 WORKDIR /src
 
