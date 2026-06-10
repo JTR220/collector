@@ -102,7 +102,7 @@
             SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           with:
             args: >
-              -Dsonar.projectKey=JTR220_collector_${{ matrix.service }}
+              -Dsonar.projectKey=JTR220_collector
               -Dsonar.organization=jtr220
               -Dsonar.sources=.
               -Dsonar.go.coverage.reportPaths=coverage.out
