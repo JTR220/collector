@@ -80,11 +80,13 @@ export const fetchMyStats = (token: string) => request<PlayerStats>('/me/stats',
 export const fetchMyDropEntries = (token: string) => request<DropEntry[]>('/me/entries', token);
 
 export const createDropEntry = (token: string, articleId: number, kind: DropEntryKind) =>
-	request<{ entry: DropEntry; xp?: number; seatsLeft?: number; dropStatus?: string; already?: boolean }>(
-		`/article/${articleId}/entry`,
-		token,
-		{ method: 'POST', body: JSON.stringify({ kind }) }
-	);
+	request<{
+		entry: DropEntry;
+		xp?: number;
+		seatsLeft?: number;
+		dropStatus?: string;
+		already?: boolean;
+	}>(`/article/${articleId}/entry`, token, { method: 'POST', body: JSON.stringify({ kind }) });
 
 export const fetchMyWishlist = (token: string) => request<WishlistItem[]>('/me/wishlist', token);
 

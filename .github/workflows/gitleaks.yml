@@ -1,0 +1,31 @@
+# Étape 3 — Détection de secrets (gitleaks)
+#
+# Workflow dédié : il tourne sur TOUS les push et PR, quel que soit le chemin
+# modifié (backend, frontend, infra…), et scanne tout l'historique Git.
+# Un secret commité = compromission potentielle totale → job bloquant.
+#
+# En complément côté GitHub : activer Secret Scanning + Push Protection
+# (Settings → Code security and analysis), gratuit sur les repos publics.
+
+name: Secret Scan
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historique complet : un secret supprimé reste dans l'historique
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

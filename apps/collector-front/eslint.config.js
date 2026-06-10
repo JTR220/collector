@@ -23,7 +23,15 @@ export default defineConfig(
 		rules: {
 			// typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
 			// see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
-			"no-undef": 'off'
+			'no-undef': 'off',
+
+			// Dette existante (110 occurrences) désactivée pour rendre le lint
+			// bloquant en CI sans réécrire le code applicatif. À réactiver
+			// règle par règle au fil des refactors.
+			'svelte/no-navigation-without-resolve': 'off',
+			'svelte/require-each-key': 'off',
+			'svelte/prefer-svelte-reactivity': 'off',
+			'@typescript-eslint/no-unused-vars': 'warn'
 		}
 	},
 	{

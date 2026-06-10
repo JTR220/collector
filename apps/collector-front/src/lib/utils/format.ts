@@ -1,5 +1,9 @@
 export const eur = (n: number) =>
-	new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+	new Intl.NumberFormat('fr-FR', {
+		style: 'currency',
+		currency: 'EUR',
+		maximumFractionDigits: 0
+	}).format(n);
 
 export const eurC = (n: number) =>
 	new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);

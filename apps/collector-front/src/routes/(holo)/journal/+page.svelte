@@ -53,10 +53,17 @@
 
 	type DiaryKind = 'acquis' | 'trade' | 'wishlist' | 'noté' | 'vendu';
 	const kindColor: Record<DiaryKind, string> = {
-		acquis: '#86b3a4', trade: '#a39a8c', wishlist: '#86b3a4', 'noté': '#a39a8c', vendu: '#d79c86'
+		acquis: '#86b3a4',
+		trade: '#a39a8c',
+		wishlist: '#86b3a4',
+		noté: '#a39a8c',
+		vendu: '#d79c86'
 	};
 	const tabKind: Record<string, DiaryKind | null> = {
-		Feed: null, Collection: 'acquis', Notes: 'noté', Trades: 'trade'
+		Feed: null,
+		Collection: 'acquis',
+		Notes: 'noté',
+		Trades: 'trade'
 	};
 
 	const matchSearch = (name: string | undefined) =>
@@ -73,20 +80,22 @@
 	const filteredWishlist = $derived(wishlist.filter((w) => matchSearch(w.article?.name)));
 
 	// Pièces fétiches : dernières acquisitions, complétées par le catalogue (sans doublon)
-	const favs = $derived((() => {
-		const acquired = journal
-			.filter((j) => j.kind === 'acquis' && j.article)
-			.map((j) => j.article as ArticleAPI);
-		const seen = new Set<number>();
-		const list: ArticleAPI[] = [];
-		for (const a of [...acquired, ...articles]) {
-			if (seen.has(a.ID)) continue;
-			seen.add(a.ID);
-			list.push(a);
-			if (list.length === 4) break;
-		}
-		return list;
-	})());
+	const favs = $derived(
+		(() => {
+			const acquired = journal
+				.filter((j) => j.kind === 'acquis' && j.article)
+				.map((j) => j.article as ArticleAPI);
+			const seen = new Set<number>();
+			const list: ArticleAPI[] = [];
+			for (const a of [...acquired, ...articles]) {
+				if (seen.has(a.ID)) continue;
+				seen.add(a.ID);
+				list.push(a);
+				if (list.length === 4) break;
+			}
+			return list;
+		})()
+	);
 
 	async function like(entry: JournalEntry) {
 		if (!$auth.token) return;
@@ -129,18 +138,42 @@
 	}
 
 	const popularLists = [
-		{ title: 'Top TCG Holo 1ère édition',    cat: 'TCG',          handle: 'holo_king',    count: 24 },
-		{ title: 'Consoles scellées all-time',    cat: 'Console',      handle: 'pack_ripper',  count: 18 },
-		{ title: 'Vinyles cultes année 2000',     cat: 'Vinyle',       handle: 'groove_atlas', count: 31 },
-		{ title: 'Designer toys édition limitée', cat: 'Designer Toy', handle: 'soho_pulse',   count: 12 }
+		{ title: 'Top TCG Holo 1ère édition', cat: 'TCG', handle: 'holo_king', count: 24 },
+		{ title: 'Consoles scellées all-time', cat: 'Console', handle: 'pack_ripper', count: 18 },
+		{ title: 'Vinyles cultes année 2000', cat: 'Vinyle', handle: 'groove_atlas', count: 31 },
+		{ title: 'Designer toys édition limitée', cat: 'Designer Toy', handle: 'soho_pulse', count: 12 }
 	];
 
 	const friendActivity = [
-		{ handle: 'holo_king',    action: 'a acquis',          target: 'Charizard',           slug: 'PKM-001', rating: null },
-		{ handle: 'pack_ripper',  action: 'a noté ★★★★★',      target: 'Game Boy Color',      slug: 'GBC-014', rating: 5 },
-		{ handle: 'groove_atlas', action: 'a mis en wishlist', target: 'Daft Punk Discovery', slug: 'VNL-022', rating: null },
-		{ handle: 'arcade_twin',  action: 'a publié une note', target: 'Action Comics #1',    slug: 'CMX-007', rating: 3 },
-		{ handle: 'soho_pulse',   action: 'a vendu',           target: 'Bearbrick 1000%',     slug: 'FIG-101', rating: null }
+		{ handle: 'holo_king', action: 'a acquis', target: 'Charizard', slug: 'PKM-001', rating: null },
+		{
+			handle: 'pack_ripper',
+			action: 'a noté ★★★★★',
+			target: 'Game Boy Color',
+			slug: 'GBC-014',
+			rating: 5
+		},
+		{
+			handle: 'groove_atlas',
+			action: 'a mis en wishlist',
+			target: 'Daft Punk Discovery',
+			slug: 'VNL-022',
+			rating: null
+		},
+		{
+			handle: 'arcade_twin',
+			action: 'a publié une note',
+			target: 'Action Comics #1',
+			slug: 'CMX-007',
+			rating: 3
+		},
+		{
+			handle: 'soho_pulse',
+			action: 'a vendu',
+			target: 'Bearbrick 1000%',
+			slug: 'FIG-101',
+			rating: null
+		}
 	];
 
 	function friendLink(slug: string): string {
@@ -162,7 +195,9 @@
 <div class="tabs-bar">
 	<div class="tabs">
 		{#each tabs as tab}
-			<button class="tab-btn" class:tab-active={activeTab === tab} onclick={() => (activeTab = tab)}>{tab}</button>
+			<button class="tab-btn" class:tab-active={activeTab === tab} onclick={() => (activeTab = tab)}
+				>{tab}</button
+			>
 		{/each}
 	</div>
 	<input class="search-input" placeholder="Rechercher…" type="search" bind:value={search} />
@@ -179,7 +214,9 @@
 					</div>
 					<div class="fav-info">
 						<p class="fav-id">{article.slug}</p>
-						<div class="fav-stars">{'★'.repeat(article.rarityScore)}{'☆'.repeat(5 - article.rarityScore)}</div>
+						<div class="fav-stars">
+							{'★'.repeat(article.rarityScore)}{'☆'.repeat(5 - article.rarityScore)}
+						</div>
 						<p class="fav-name">{article.name}</p>
 						<p class="fav-sub">{article.year} · {article.grade}</p>
 					</div>
@@ -192,7 +229,11 @@
 <div class="body-grid">
 	<div>
 		{#if activeTab === 'Wishlist'}
-			<Kicker style="margin-bottom:14px">Ma wishlist · {filteredWishlist.length} pièce{filteredWishlist.length > 1 ? 's' : ''}</Kicker>
+			<Kicker style="margin-bottom:14px"
+				>Ma wishlist · {filteredWishlist.length} pièce{filteredWishlist.length > 1
+					? 's'
+					: ''}</Kicker
+			>
 			{#each filteredWishlist as item (item.ID)}
 				<div class="diary-entry">
 					<div class="diary-art">
@@ -210,7 +251,9 @@
 				</div>
 			{:else}
 				<p class="empty-msg">
-					{#if loading}Chargement…{:else}Wishlist vide — ajoutez des pièces depuis la <a href="/">vitrine</a>.{/if}
+					{#if loading}Chargement…{:else}Wishlist vide — ajoutez des pièces depuis la <a href="/"
+							>vitrine</a
+						>.{/if}
 				</p>
 			{/each}
 		{:else if activeTab === 'Listes'}
@@ -219,18 +262,28 @@
 				<a class="list-big-row" href={`/?cat=${encodeURIComponent(list.cat)}`}>
 					<div class="mini-covers">
 						{#each [0, 1, 2] as i}
-							<div class="mini-cover" style="background:radial-gradient(120% 90% at 30% 20%,#3a5a4a,#221f1b);margin-left:{i > 0 ? '-14px' : '0'};z-index:{3 - i}"></div>
+							<div
+								class="mini-cover"
+								style="background:radial-gradient(120% 90% at 30% 20%,#3a5a4a,#221f1b);margin-left:{i >
+								0
+									? '-14px'
+									: '0'};z-index:{3 - i}"
+							></div>
 						{/each}
 					</div>
 					<div>
 						<p class="list-title">{list.title}</p>
-						<p class="list-meta">par @{list.handle} · {list.count} pièces · voir la catégorie {list.cat} →</p>
+						<p class="list-meta">
+							par @{list.handle} · {list.count} pièces · voir la catégorie {list.cat} →
+						</p>
 					</div>
 				</a>
 			{/each}
 		{:else}
 			<Kicker style="margin-bottom:14px">
-				{activeTab === 'Feed' ? 'Mon journal' : activeTab} · {diary.length} entrée{diary.length > 1 ? 's' : ''}
+				{activeTab === 'Feed' ? 'Mon journal' : activeTab} · {diary.length} entrée{diary.length > 1
+					? 's'
+					: ''}
 			</Kicker>
 			{#each diary as entry (entry.ID)}
 				{@const color = kindColor[entry.kind as DiaryKind] ?? '#a39a8c'}
@@ -247,10 +300,14 @@
 
 					<div class="diary-content">
 						<GChip {color}>{entry.kind}</GChip>
-						<a class="entry-name" href={`/lot/${entry.articleId}`}>{entry.article?.name ?? `#${entry.articleId}`}</a>
+						<a class="entry-name" href={`/lot/${entry.articleId}`}
+							>{entry.article?.name ?? `#${entry.articleId}`}</a
+						>
 						<p class="entry-sub">{entry.article?.series ?? ''} · {eur(entry.article?.prix ?? 0)}</p>
 						{#if entry.rating}
-							<div class="entry-stars">{'★'.repeat(entry.rating)}{'☆'.repeat(5 - entry.rating)}</div>
+							<div class="entry-stars">
+								{'★'.repeat(entry.rating)}{'☆'.repeat(5 - entry.rating)}
+							</div>
 						{/if}
 						{#if entry.note}
 							<p class="entry-note">«&nbsp;{entry.note}&nbsp;»</p>
@@ -285,7 +342,13 @@
 					<a class="list-row" href={`/?cat=${encodeURIComponent(list.cat)}`}>
 						<div class="mini-covers">
 							{#each [0, 1, 2] as i}
-								<div class="mini-cover" style="background:radial-gradient(120% 90% at 30% 20%,#3a5a4a,#221f1b);margin-left:{i > 0 ? '-14px' : '0'};z-index:{3 - i}"></div>
+								<div
+									class="mini-cover"
+									style="background:radial-gradient(120% 90% at 30% 20%,#3a5a4a,#221f1b);margin-left:{i >
+									0
+										? '-14px'
+										: '0'};z-index:{3 - i}"
+								></div>
 							{/each}
 						</div>
 						<div>
@@ -339,7 +402,11 @@
 		gap: 12px;
 		flex-wrap: wrap;
 	}
-	.tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+	.tabs {
+		display: flex;
+		gap: 2px;
+		flex-wrap: wrap;
+	}
 	.tab-btn {
 		padding: 6px 14px;
 		background: none;
@@ -350,13 +417,21 @@
 		font-size: 13px;
 		font-weight: 500;
 		color: #766d60;
-		transition: color 120ms, border-color 120ms;
+		transition:
+			color 120ms,
+			border-color 120ms;
 	}
-	.tab-btn:hover { color: #a39a8c; }
-	.tab-active { color: #ece5da !important; border-bottom-color: #86b3a4 !important; font-weight: 600; }
+	.tab-btn:hover {
+		color: #a39a8c;
+	}
+	.tab-active {
+		color: #ece5da !important;
+		border-bottom-color: #86b3a4 !important;
+		font-weight: 600;
+	}
 	.search-input {
 		padding: 7px 14px;
-		border: 1px solid rgba(236,229,218,0.10);
+		border: 1px solid rgba(236, 229, 218, 0.1);
 		border-radius: 7px;
 		background: #221f1b;
 		color: #ece5da;
@@ -366,8 +441,12 @@
 		min-width: 160px;
 		transition: border-color 120ms;
 	}
-	.search-input:focus { border-color: rgba(134,179,164,0.40); }
-	.search-input::placeholder { color: #766d60; }
+	.search-input:focus {
+		border-color: rgba(134, 179, 164, 0.4);
+	}
+	.search-input::placeholder {
+		color: #766d60;
+	}
 
 	/* Fav grid */
 	.fav-grid {
@@ -376,14 +455,25 @@
 		gap: 12px;
 		margin-top: 12px;
 	}
-	@media (max-width: 900px) { .fav-grid { grid-template-columns: repeat(2, 1fr); } }
-	.fav-card { display: flex; flex-direction: column; gap: 0; text-decoration: none; }
-	.fav-card:hover .fav-name { color: #86b3a4; }
+	@media (max-width: 900px) {
+		.fav-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	.fav-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+		text-decoration: none;
+	}
+	.fav-card:hover .fav-name {
+		color: #86b3a4;
+	}
 	.fav-art {
 		height: 120px;
 		border-radius: 8px;
 		background: radial-gradient(120% 90% at 30% 20%, #3a5a4a 0%, #221f1b 100%);
-		border: 1px solid rgba(236,229,218,0.08);
+		border: 1px solid rgba(236, 229, 218, 0.08);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -392,16 +482,22 @@
 	.fav-glyph {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 52px;
-		color: rgba(236,229,218,0.80);
+		color: rgba(236, 229, 218, 0.8);
 	}
-	.fav-info { padding: 8px 0 4px; }
+	.fav-info {
+		padding: 8px 0 4px;
+	}
 	.fav-id {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 10px;
 		color: #86b3a4;
 		margin: 0;
 	}
-	.fav-stars { font-size: 13px; color: #a39a8c; margin: 2px 0; }
+	.fav-stars {
+		font-size: 13px;
+		color: #a39a8c;
+		margin: 2px 0;
+	}
 	.fav-name {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 14px;
@@ -424,17 +520,24 @@
 		grid-template-columns: 1.45fr 1fr;
 		gap: 18px;
 	}
-	@media (max-width: 900px) { .body-grid { grid-template-columns: 1fr; } }
+	@media (max-width: 900px) {
+		.body-grid {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	/* Diary */
 	.diary-entry {
 		display: flex;
 		align-items: flex-start;
 		gap: 14px;
-		border-top: 1px solid rgba(236,229,218,0.07);
+		border-top: 1px solid rgba(236, 229, 218, 0.07);
 		padding: 16px 0;
 	}
-	.diary-entry:first-of-type { border-top: none; padding-top: 0; }
+	.diary-entry:first-of-type {
+		border-top: none;
+		padding-top: 0;
+	}
 	.diary-date {
 		display: flex;
 		flex-direction: column;
@@ -462,7 +565,7 @@
 		flex-shrink: 0;
 		border-radius: 8px;
 		background: radial-gradient(120% 90% at 30% 20%, #3a5a4a 0%, #221f1b 100%);
-		border: 1px solid rgba(236,229,218,0.08);
+		border: 1px solid rgba(236, 229, 218, 0.08);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -470,9 +573,11 @@
 	.diary-glyph {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 32px;
-		color: rgba(236,229,218,0.80);
+		color: rgba(236, 229, 218, 0.8);
 	}
-	.diary-content { flex: 1; }
+	.diary-content {
+		flex: 1;
+	}
 	.entry-name {
 		display: block;
 		font-family: 'Newsreader', Georgia, serif;
@@ -483,14 +588,20 @@
 		line-height: 1.15;
 		text-decoration: none;
 	}
-	.entry-name:hover { color: #86b3a4; }
+	.entry-name:hover {
+		color: #86b3a4;
+	}
 	.entry-sub {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 10px;
 		color: #766d60;
 		margin: 0;
 	}
-	.entry-stars { font-size: 14px; color: #a39a8c; margin: 4px 0; }
+	.entry-stars {
+		font-size: 14px;
+		color: #a39a8c;
+		margin: 4px 0;
+	}
 	.entry-note {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 13px;
@@ -518,9 +629,16 @@
 		cursor: pointer;
 		transition: color 120ms;
 	}
-	.action-btn:hover { color: #86b3a4; }
-	.action-link { color: #766d60; text-decoration: none; }
-	.action-link:hover { color: #a39a8c; }
+	.action-btn:hover {
+		color: #86b3a4;
+	}
+	.action-link {
+		color: #766d60;
+		text-decoration: none;
+	}
+	.action-link:hover {
+		color: #a39a8c;
+	}
 	.entry-xp {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 10px;
@@ -533,26 +651,47 @@
 		padding: 20px 0;
 		line-height: 1.6;
 	}
-	.empty-msg a { color: #86b3a4; }
+	.empty-msg a {
+		color: #86b3a4;
+	}
 
 	/* Aside */
-	.list-stack { display: flex; flex-direction: column; gap: 12px; }
-	.list-row { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-	.list-row:hover .list-title { color: #86b3a4; }
+	.list-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.list-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		text-decoration: none;
+	}
+	.list-row:hover .list-title {
+		color: #86b3a4;
+	}
 	.list-big-row {
 		display: flex;
 		align-items: center;
 		gap: 14px;
 		padding: 14px;
-		border: 1px solid rgba(236,229,218,0.10);
+		border: 1px solid rgba(236, 229, 218, 0.1);
 		border-radius: 9px;
 		text-decoration: none;
 		margin-bottom: 10px;
 		transition: border-color 120ms;
 	}
-	.list-big-row:hover { border-color: rgba(134,179,164,0.4); }
-	.list-big-row:hover .list-title { color: #86b3a4; }
-	.mini-covers { display: flex; position: relative; flex-shrink: 0; }
+	.list-big-row:hover {
+		border-color: rgba(134, 179, 164, 0.4);
+	}
+	.list-big-row:hover .list-title {
+		color: #86b3a4;
+	}
+	.mini-covers {
+		display: flex;
+		position: relative;
+		flex-shrink: 0;
+	}
 	.mini-cover {
 		width: 32px;
 		height: 32px;
@@ -574,9 +713,21 @@
 		margin: 2px 0 0;
 	}
 
-	.friend-stack { display: flex; flex-direction: column; gap: 10px; }
-	.friend-row { display: flex; align-items: center; gap: 8px; }
-	.friend-text { font-size: 12px; flex: 1; line-height: 1.4; }
+	.friend-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.friend-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.friend-text {
+		font-size: 12px;
+		flex: 1;
+		line-height: 1.4;
+	}
 	.friend-handle {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 11px;
@@ -592,11 +743,23 @@
 		color: #ece5da;
 		text-decoration: none;
 	}
-	.friend-target:hover { color: #86b3a4; }
-	.friend-stars { color: #a39a8c; }
+	.friend-target:hover {
+		color: #86b3a4;
+	}
+	.friend-stars {
+		color: #a39a8c;
+	}
 
-	.rating-stack { display: flex; flex-direction: column; gap: 7px; }
-	.rating-row { display: flex; align-items: center; gap: 8px; }
+	.rating-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 7px;
+	}
+	.rating-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
 	.rating-stars {
 		font-size: 13px;
 		color: #a39a8c;

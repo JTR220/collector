@@ -1,0 +1,23 @@
+# Étape 11 — staging : sync AUTOMATIQUE. Un commit de la CI sur l'overlay
+# staging est appliqué sans intervention. selfHeal réaligne tout drift manuel
+# (kubectl edit sauvage) sur Git ; prune supprime les ressources orphelines.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: collector-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/JTR220/collector.git
+    targetRevision: main
+    path: infra/k8s/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: collector-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

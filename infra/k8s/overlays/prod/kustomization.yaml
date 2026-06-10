@@ -1,0 +1,66 @@
+# Overlay PROD — sync MANUEL dans Argo CD (le clic "Sync" est la validation
+# de mise en production). Promotion = copier le digest validé en staging dans
+# ce fichier, via une PR (protection de branche recommandée sur main).
+#
+# NB : l'image collector-front embarque les URLs d'API compilées au build
+# (VITE_*). Tant qu'elles ne sont pas lues au runtime ($env/dynamic/public),
+# un vrai déploiement prod du front nécessite un build dédié avec les hosts
+# prod — voir docs/DEVSECOPS.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: collector-prod
+
+resources:
+  - ../../base
+  - ingress.yaml
+  # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
+  # - sealed-collector-secrets.yaml
+
+configMapGenerator:
+  - name: collector-config
+    literals:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=collector
+      - DB_USER=postgres
+      - FRONTEND_ORIGIN=http://collector.local
+
+# Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
+#   - name: ghcr.io/jtr220/collector/auth-service
+#     digest: sha256:abc123...
+images:
+  - name: ghcr.io/jtr220/collector/auth-service
+    newTag: bootstrap
+  - name: ghcr.io/jtr220/collector/catalog-service
+    newTag: bootstrap
+  - name: ghcr.io/jtr220/collector/collector-front
+    newTag: bootstrap
+
+patches:
+  # Plus de replicas et de ressources en prod.
+  # catalog-service reste à 1 replica : son volume uploads est en ReadWriteOnce.
+  - target:
+      kind: Deployment
+      name: auth-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi
+  - target:
+      kind: Deployment
+      name: collector-front
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Deployment
+      name: catalog-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi

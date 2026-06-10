@@ -1,4 +1,10 @@
-FROM node:22.12-alpine
+# Étape 5 — image de PRODUCTION : build multi-stage SvelteKit (adapter-node),
+# image finale minimale en non-root. Pour le dev local via docker-compose,
+# utiliser Dockerfile.dev (serveur Vite avec HMR).
+#
+# Les variables VITE_* sont compilées dans le bundle AU BUILD : cette image
+# est donc liée à un environnement (build args injectés par la CI).
+FROM node:22.12-alpine AS builder
 
 WORKDIR /app
 
@@ -7,10 +13,27 @@ RUN npm ci
 
 COPY . .
 
-ENV HOST=0.0.0.0
-ENV PORT=5173
-ENV VITE_CATALOG_API_BASE_URL=http://localhost:8081
+ARG VITE_AUTH_API_BASE_URL=http://localhost:8080
+ARG VITE_CATALOG_API_BASE_URL=http://localhost:8081
+ENV VITE_AUTH_API_BASE_URL=${VITE_AUTH_API_BASE_URL} \
+    VITE_CATALOG_API_BASE_URL=${VITE_CATALOG_API_BASE_URL}
 
-EXPOSE 5173
+RUN npm run build && npm prune --omit=dev
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+FROM node:22.12-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
+
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3000
+
+USER node
+
+CMD ["node", "build"]

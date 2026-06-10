@@ -1,0 +1,44 @@
+# Étape 4 (complément SCA) — Dependabot : ouvre automatiquement des PR de mise à
+# jour quand une dépendance est corrigée. La veille de sécurité devient une
+# simple revue de PR.
+
+version: 2
+updates:
+  # Modules Go (un module par microservice)
+  - package-ecosystem: gomod
+    directories:
+      - /apps/backend/auth-service
+      - /apps/backend/catalog-service
+      - /apps/backend/notification-service
+      - /apps/backend/price-tracker-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Frontend SvelteKit (npm)
+  - package-ecosystem: npm
+    directory: /apps/collector-front
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # Actions GitHub utilisées dans les workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Images de base des Dockerfiles (golang, distroless, node, postgres…)
+  - package-ecosystem: docker
+    directories:
+      - /apps/backend/auth-service
+      - /apps/backend/catalog-service
+      - /apps/backend/notification-service
+      - /apps/backend/price-tracker-service
+      - /apps/collector-front
+    schedule:
+      interval: weekly

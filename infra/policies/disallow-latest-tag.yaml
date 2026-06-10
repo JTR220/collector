@@ -1,0 +1,42 @@
+# Étape 14 — interdit le tag "latest" et les images sans tag : impossible de
+# savoir quelle version tourne, rollback hasardeux. La règle d'or du registre
+# (étape 9) devient inviolable.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Interdiction du tag latest
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Audit # → Enforce une fois validé
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - collector-staging
+                - collector-prod
+      validate:
+        message: "Une image doit être référencée par un tag explicite ou un digest."
+        pattern:
+          spec:
+            containers:
+              - image: "*:* | *@*"
+    - name: disallow-latest
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - collector-staging
+                - collector-prod
+      validate:
+        message: "Le tag :latest est interdit (versions intraçables)."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"

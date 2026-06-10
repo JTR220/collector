@@ -1,0 +1,18 @@
+# Image de DÉVELOPPEMENT uniquement (serveur Vite + HMR), utilisée par
+# apps/docker-compose.yml. L'image de production est ./Dockerfile.
+FROM node:22.12-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+ENV HOST=0.0.0.0
+ENV PORT=5173
+ENV VITE_CATALOG_API_BASE_URL=http://localhost:8081
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

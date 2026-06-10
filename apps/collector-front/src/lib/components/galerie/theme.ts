@@ -20,11 +20,11 @@ export const T = {
 	down: '#d79c86',
 	star: '#cda95e',
 	// Art placeholders
-	artL: 0.30,
+	artL: 0.3,
 	artC: 0.045,
-	artL2: 0.24,
+	artL2: 0.24
 } as const;
 
 export const SERIF = "'Newsreader', Georgia, serif";
-export const SANS  = "'Hanken Grotesk', system-ui, sans-serif";
-export const MONO  = "'IBM Plex Mono', ui-monospace, monospace";
+export const SANS = "'Hanken Grotesk', system-ui, sans-serif";
+export const MONO = "'IBM Plex Mono', ui-monospace, monospace";

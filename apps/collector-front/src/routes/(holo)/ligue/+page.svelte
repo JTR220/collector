@@ -29,12 +29,12 @@
 	});
 
 	const tiers = [
-		{ label: 'Bronze',  active: false, done: true  },
-		{ label: 'Argent',  active: false, done: true  },
-		{ label: 'Or',      active: true,  done: true  },
+		{ label: 'Bronze', active: false, done: true },
+		{ label: 'Argent', active: false, done: true },
+		{ label: 'Or', active: true, done: true },
 		{ label: 'Diamant', active: false, done: false },
-		{ label: 'Master',  active: false, done: false },
-		{ label: 'Légende', active: false, done: false },
+		{ label: 'Master', active: false, done: false },
+		{ label: 'Légende', active: false, done: false }
 	];
 
 	const myIndex = $derived(league.findIndex((r) => r.me));
@@ -45,15 +45,20 @@
 	);
 	const gapToTop7 = $derived(
 		myIndex >= 0 && league.length > 7
-			? (myIndex < 7 ? (myRow!.xp - league[7].xp) : (league[6].xp - myRow!.xp))
+			? myIndex < 7
+				? myRow!.xp - league[7].xp
+				: league[6].xp - myRow!.xp
 			: 0
 	);
 
 	const mini = $derived([
-		{ label: 'Position',    value: myIndex >= 0 ? `${myIndex + 1}e / ${league.length}` : '—' },
-		{ label: 'XP totale',   value: myRow ? myRow.xp.toLocaleString('fr-FR') : '—' },
-		{ label: myIndex >= 0 && myIndex < 7 ? 'Avance top 7' : 'Écart top 7', value: `${gapToTop7 >= 0 ? '+' : ''}${gapToTop7} XP` },
-		{ label: 'Fin dans',    value: '2 j 14 h' },
+		{ label: 'Position', value: myIndex >= 0 ? `${myIndex + 1}e / ${league.length}` : '—' },
+		{ label: 'XP totale', value: myRow ? myRow.xp.toLocaleString('fr-FR') : '—' },
+		{
+			label: myIndex >= 0 && myIndex < 7 ? 'Avance top 7' : 'Écart top 7',
+			value: `${gapToTop7 >= 0 ? '+' : ''}${gapToTop7} XP`
+		},
+		{ label: 'Fin dans', value: '2 j 14 h' }
 	]);
 
 	// Sparkline synthétique dérivée de l'XP (progression sur 7 jours)
@@ -77,20 +82,21 @@
 	}
 
 	const rewards = [
-		{ range: 'Top 1',  desc: '5 000 XP + Badge Légende' },
-		{ range: 'Top 3',  desc: '3 000 XP + Badge Master'  },
-		{ range: 'Top 7',  desc: '1 500 XP + Promotion'     },
-		{ range: '8–23',   desc: '500 XP · maintien'        },
-		{ range: 'Bas 7',  desc: 'Relégation · −200 XP'     },
+		{ range: 'Top 1', desc: '5 000 XP + Badge Légende' },
+		{ range: 'Top 3', desc: '3 000 XP + Badge Master' },
+		{ range: 'Top 7', desc: '1 500 XP + Promotion' },
+		{ range: '8–23', desc: '500 XP · maintien' },
+		{ range: 'Bas 7', desc: 'Relégation · −200 XP' }
 	];
 
-	const W = 280, H = 130;
+	const W = 280,
+		H = 130;
 	const rivalPath = $derived(rival ? sparkPath(fakeSpark(rival.xp), W, H) : '');
-	const mePath    = $derived(myRow ? sparkPath(fakeSpark(myRow.xp), W, H) : '');
+	const mePath = $derived(myRow ? sparkPath(fakeSpark(myRow.xp), W, H) : '');
 
 	function sepColor(kind: string) {
 		if (kind === 'promo') return '#86b3a4';
-		if (kind === 'rel')   return '#d79c86';
+		if (kind === 'rel') return '#d79c86';
 		return '#766d60';
 	}
 </script>
@@ -150,7 +156,12 @@
 	<GPanel style="overflow:hidden">
 		<div class="board-header-row">
 			<Kicker>Classement Ligue Or · {league.length} chasseurs</Kicker>
-			<span class="board-ts">à jour · {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+			<span class="board-ts"
+				>à jour · {new Date().toLocaleTimeString('fr-FR', {
+					hour: '2-digit',
+					minute: '2-digit'
+				})}</span
+			>
 		</div>
 		<div class="board-cols">
 			<span style="width:32px;text-align:center">#</span>
@@ -167,7 +178,9 @@
 			<div
 				class="board-row"
 				class:board-me={row.me}
-				style={row.me ? 'background:rgba(255,255,255,0.05);border:1px solid rgba(134,179,164,0.35)' : 'border:1px solid transparent'}
+				style={row.me
+					? 'background:rgba(255,255,255,0.05);border:1px solid rgba(134,179,164,0.35)'
+					: 'border:1px solid transparent'}
 			>
 				<span class="board-rank" style="color:{row.me ? '#86b3a4' : '#a39a8c'}">{i + 1}</span>
 				<span class="board-name" style="font-weight:{row.me ? 600 : 400}">
@@ -179,7 +192,13 @@
 				</span>
 				<span class="board-level">niv. {row.level}</span>
 				<span class="board-spark">
-					<GSpark values={fakeSpark(row.xp)} color={row.me ? '#86b3a4' : '#766d60'} w={100} h={22} dot={false} />
+					<GSpark
+						values={fakeSpark(row.xp)}
+						color={row.me ? '#86b3a4' : '#766d60'}
+						w={100}
+						h={22}
+						dot={false}
+					/>
 				</span>
 				<span class="board-xp">{row.xp.toLocaleString('fr-FR')}</span>
 				<span class="board-delta" style="color:{row.delta >= 0 ? '#86c099' : '#d79c86'}">
@@ -199,22 +218,48 @@
 		<GPanel>
 			<Kicker>Course XP · 7 derniers jours</Kicker>
 			<div class="chart-wrap">
-				<svg viewBox="0 0 {W} {H}" width="100%" height={H} preserveAspectRatio="none" style="display:block;margin-top:12px">
-					{#each [0,1,2,3,4] as i}
-						<line x1="0" y1={H*i/4} x2={W} y2={H*i/4} stroke="rgba(236,229,218,0.06)" stroke-width="0.5"/>
+				<svg
+					viewBox="0 0 {W} {H}"
+					width="100%"
+					height={H}
+					preserveAspectRatio="none"
+					style="display:block;margin-top:12px"
+				>
+					{#each [0, 1, 2, 3, 4] as i}
+						<line
+							x1="0"
+							y1={(H * i) / 4}
+							x2={W}
+							y2={(H * i) / 4}
+							stroke="rgba(236,229,218,0.06)"
+							stroke-width="0.5"
+						/>
 					{/each}
-					<line x1="0" y1="32" x2={W} y2="32" stroke="#86b3a4" stroke-dasharray="3 4" stroke-width="1" opacity="0.6"/>
-					<path d={rivalPath} stroke="#766d60" stroke-width="1.4" fill="none"/>
-					<path d={mePath}    stroke="#86b3a4" stroke-width="2"   fill="none"/>
+					<line
+						x1="0"
+						y1="32"
+						x2={W}
+						y2="32"
+						stroke="#86b3a4"
+						stroke-dasharray="3 4"
+						stroke-width="1"
+						opacity="0.6"
+					/>
+					<path d={rivalPath} stroke="#766d60" stroke-width="1.4" fill="none" />
+					<path d={mePath} stroke="#86b3a4" stroke-width="2" fill="none" />
 				</svg>
 				<div class="chart-days">
-					{#each ['L','M','M','J','V','S','D'] as d}
+					{#each ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as d}
 						<span>{d}</span>
 					{/each}
 				</div>
 				<div class="chart-legend">
-					<span class="legend-item"><span class="legend-line" style="background:#86b3a4"></span>vous · +120/j</span>
-					<span class="legend-item"><span class="legend-line" style="background:#766d60"></span>rival · +50/j</span>
+					<span class="legend-item"
+						><span class="legend-line" style="background:#86b3a4"></span>vous · +120/j</span
+					>
+					<span class="legend-item"
+						><span class="legend-line" style="background:#766d60"></span>rival · +50/j</span
+					>
 				</div>
 			</div>
 		</GPanel>
@@ -227,12 +272,16 @@
 					<GAvatar initials={rival.name.slice(0, 2).toUpperCase()} size={50} square />
 					<div class="rival-info">
 						<div class="rival-name">@{rival.name}</div>
-						<div class="rival-meta">niveau {rival.level} · {league.indexOf(rival) + 1}<sup>e</sup> place</div>
+						<div class="rival-meta">
+							niveau {rival.level} · {league.indexOf(rival) + 1}<sup>e</sup> place
+						</div>
 						<p class="rival-desc">
 							{#if myRow.xp >= rival.xp}
-								Vous menez <strong style="color:#86c099">+{myRow.xp - rival.xp} XP</strong>. Gardez le rythme.
+								Vous menez <strong style="color:#86c099">+{myRow.xp - rival.xp} XP</strong>. Gardez
+								le rythme.
 							{:else}
-								Il vous manque <strong style="color:#d79c86">{rival.xp - myRow.xp} XP</strong> pour le dépasser.
+								Il vous manque <strong style="color:#d79c86">{rival.xp - myRow.xp} XP</strong> pour le
+								dépasser.
 							{/if}
 						</p>
 					</div>
@@ -252,8 +301,13 @@
 			<Kicker>Récompenses de fin de ligue</Kicker>
 			<div class="rewards">
 				{#each rewards as r, i}
-					<div class="reward-row" style="border-top:{i>0?'1px solid rgba(236,229,218,0.10)':'none'}">
-						<span class="reward-range" style="color:{i===4?'#d79c86':'#86b3a4'}">{r.range}</span>
+					<div
+						class="reward-row"
+						style="border-top:{i > 0 ? '1px solid rgba(236,229,218,0.10)' : 'none'}"
+					>
+						<span class="reward-range" style="color:{i === 4 ? '#d79c86' : '#86b3a4'}"
+							>{r.range}</span
+						>
 						<span class="reward-desc">{r.desc}</span>
 					</div>
 				{/each}
@@ -271,7 +325,11 @@
 		padding: 24px 0 20px;
 		align-items: center;
 	}
-	@media (max-width: 768px) { .hero { grid-template-columns: 1fr; } }
+	@media (max-width: 768px) {
+		.hero {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	.hero-title {
 		font-family: 'Newsreader', Georgia, serif;
@@ -298,8 +356,8 @@
 	.mini-card {
 		padding: 10px 14px;
 		border-radius: 8px;
-		border: 1px solid rgba(236,229,218,0.10);
-		background: rgba(255,255,255,0.05);
+		border: 1px solid rgba(236, 229, 218, 0.1);
+		background: rgba(255, 255, 255, 0.05);
 		min-width: 110px;
 	}
 	.mini-label {
@@ -359,8 +417,8 @@
 		height: 130px;
 		border-radius: 50%;
 		border: 2px solid #86b3a4;
-		background: rgba(255,255,255,0.05);
-		box-shadow: 0 0 0 8px rgba(255,255,255,0.03);
+		background: rgba(255, 255, 255, 0.05);
+		box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.03);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -388,7 +446,11 @@
 		gap: 14px;
 		margin-top: 8px;
 	}
-	@media (max-width: 900px) { .board-section { grid-template-columns: 1fr; } }
+	@media (max-width: 900px) {
+		.board-section {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	.board-header-row {
 		display: flex;
@@ -406,7 +468,7 @@
 		align-items: center;
 		gap: 10px;
 		padding: 0 8px 8px;
-		border-bottom: 1px solid rgba(236,229,218,0.10);
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 10px;
 		letter-spacing: 0.12em;
@@ -427,8 +489,13 @@
 		color: #766d60;
 		padding: 14px 8px;
 	}
-	.board-me-link { color: inherit; text-decoration: none; }
-	.board-me-link:hover { text-decoration: underline; }
+	.board-me-link {
+		color: inherit;
+		text-decoration: none;
+	}
+	.board-me-link:hover {
+		text-decoration: underline;
+	}
 	.challenge-msg {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12px;
@@ -490,9 +557,15 @@
 	}
 
 	/* ── Sidebar ── */
-	.sidebar { display: flex; flex-direction: column; gap: 14px; }
+	.sidebar {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
 
-	.chart-wrap { margin-top: 0; }
+	.chart-wrap {
+		margin-top: 0;
+	}
 	.chart-days {
 		display: flex;
 		justify-content: space-between;
@@ -510,8 +583,18 @@
 		font-size: 12px;
 		color: #a39a8c;
 	}
-	.legend-item { display: flex; align-items: center; gap: 8px; }
-	.legend-line { width: 14px; height: 2px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.legend-line {
+		width: 14px;
+		height: 2px;
+		border-radius: 2px;
+		display: inline-block;
+		flex-shrink: 0;
+	}
 
 	.rival-row {
 		display: flex;
@@ -519,7 +602,10 @@
 		align-items: flex-start;
 		margin-top: 10px;
 	}
-	.rival-info { flex: 1; min-width: 0; }
+	.rival-info {
+		flex: 1;
+		min-width: 0;
+	}
 	.rival-name {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 17px;
@@ -555,21 +641,32 @@
 		color: #191714;
 		transition: filter 120ms;
 	}
-	.btn-primary:hover { filter: brightness(1.08); }
+	.btn-primary:hover {
+		filter: brightness(1.08);
+	}
 	.btn-ghost {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12px;
 		padding: 9px 16px;
 		border-radius: 7px;
-		border: 1px solid rgba(236,229,218,0.10);
+		border: 1px solid rgba(236, 229, 218, 0.1);
 		cursor: pointer;
 		background: transparent;
 		color: #a39a8c;
-		transition: border-color 120ms, color 120ms;
+		transition:
+			border-color 120ms,
+			color 120ms;
 	}
-	.btn-ghost:hover { border-color: rgba(236,229,218,0.22); color: #ece5da; }
+	.btn-ghost:hover {
+		border-color: rgba(236, 229, 218, 0.22);
+		color: #ece5da;
+	}
 
-	.rewards { display: flex; flex-direction: column; margin-top: 8px; }
+	.rewards {
+		display: flex;
+		flex-direction: column;
+		margin-top: 8px;
+	}
 	.reward-row {
 		display: flex;
 		gap: 12px;

@@ -15,19 +15,24 @@
 	);
 
 	const nav = [
-		{ label: 'Vitrine',  href: '/' },
-		{ label: 'Vendre',   href: '/vendre' },
-		{ label: 'Marché',   href: '/marche' },
-		{ label: 'Profil',   href: '/profil' },
-		{ label: 'Quêtes',   href: '/quetes' },
-		{ label: 'Ligue',    href: '/ligue' },
-		{ label: 'Drops',    href: '/drops' },
-		{ label: 'Journal',  href: '/journal' }
+		{ label: 'Vitrine', href: '/' },
+		{ label: 'Vendre', href: '/vendre' },
+		{ label: 'Marché', href: '/marche' },
+		{ label: 'Profil', href: '/profil' },
+		{ label: 'Quêtes', href: '/quetes' },
+		{ label: 'Ligue', href: '/ligue' },
+		{ label: 'Drops', href: '/drops' },
+		{ label: 'Journal', href: '/journal' }
 	];
 
 	const initials = $derived(
 		$auth.user?.name
-			? $auth.user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+			? $auth.user.name
+					.split(' ')
+					.map((w: string) => w[0])
+					.join('')
+					.toUpperCase()
+					.slice(0, 2)
 			: 'NK'
 	);
 
@@ -77,7 +82,7 @@
 		justify-content: space-between;
 		gap: 24px;
 		padding-bottom: 16px;
-		border-bottom: 1px solid rgba(236,229,218,0.10);
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
 		margin-bottom: 0;
 		flex-wrap: wrap;
 	}
@@ -105,7 +110,9 @@
 		letter-spacing: 0.01em;
 		color: #ece5da;
 	}
-	.logo-dim { color: #766d60; }
+	.logo-dim {
+		color: #766d60;
+	}
 
 	/* Nav */
 	.g-nav {
@@ -120,9 +127,13 @@
 		text-decoration: none;
 		border-bottom: 1.5px solid transparent;
 		padding-bottom: 4px;
-		transition: color 120ms, border-color 120ms;
+		transition:
+			color 120ms,
+			border-color 120ms;
 	}
-	.g-nav-link:hover { color: #ece5da; }
+	.g-nav-link:hover {
+		color: #ece5da;
+	}
 	.g-nav-link.active {
 		color: #ece5da;
 		font-weight: 600;
@@ -160,14 +171,14 @@
 	.g-sep {
 		width: 1px;
 		height: 20px;
-		background: rgba(236,229,218,0.10);
+		background: rgba(236, 229, 218, 0.1);
 	}
 	.g-avatar {
 		width: 34px;
 		height: 34px;
 		border-radius: 50%;
-		border: 1px solid rgba(236,229,218,0.16);
-		background: rgba(255,255,255,0.05);
+		border: 1px solid rgba(236, 229, 218, 0.16);
+		background: rgba(255, 255, 255, 0.05);
 		color: #86b3a4;
 		display: flex;
 		align-items: center;
@@ -178,15 +189,20 @@
 	}
 	.g-logout {
 		background: none;
-		border: 1px solid rgba(236,229,218,0.10);
+		border: 1px solid rgba(236, 229, 218, 0.1);
 		border-radius: 6px;
 		padding: 4px 8px;
 		font-size: 13px;
 		color: #a39a8c;
 		cursor: pointer;
-		transition: color 120ms, border-color 120ms;
+		transition:
+			color 120ms,
+			border-color 120ms;
 	}
-	.g-logout:hover { color: #ece5da; border-color: rgba(236,229,218,0.22); }
+	.g-logout:hover {
+		color: #ece5da;
+		border-color: rgba(236, 229, 218, 0.22);
+	}
 	.g-login-btn {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12.5px;
@@ -198,5 +214,7 @@
 		text-decoration: none;
 		transition: filter 120ms;
 	}
-	.g-login-btn:hover { filter: brightness(1.08); }
+	.g-login-btn:hover {
+		filter: brightness(1.08);
+	}
 </style>

@@ -1,0 +1,20 @@
+# Étape 14 — les policies Kyverno du repo (infra/policies) : vérification des
+# signatures cosign, interdiction de :latest, non-root, ressources obligatoires.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/JTR220/collector.git
+    targetRevision: main
+    path: infra/policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -4,9 +4,7 @@
 
 <span
 	class="g-chip"
-	style={color
-		? `color:${color};border-color:${color}44;background:${color}12`
-		: ''}
+	style={color ? `color:${color};border-color:${color}44;background:${color}12` : ''}
 >
 	{@render children?.()}
 </span>
@@ -19,8 +17,8 @@
 		color: #a39a8c;
 		padding: 3px 8px;
 		border-radius: 4px;
-		border: 1px solid rgba(236,229,218,0.10);
-		background: rgba(255,255,255,0.05);
+		border: 1px solid rgba(236, 229, 218, 0.1);
+		background: rgba(255, 255, 255, 0.05);
 		white-space: nowrap;
 	}
 </style>

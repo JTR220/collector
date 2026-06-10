@@ -1,0 +1,389 @@
+# Pipeline DevSecOps backend — voir docs/DEVSECOPS.md pour le mapping complet des étapes.
+#
+# push main : lint/tests → SAST → SCA → build image → scan Trivy → push GHCR
+#             → SBOM → signature cosign → commit du digest dans infra/ (GitOps)
+# pull request : tout sauf push/signature/GitOps (l'image est buildée et scannée, jamais poussée)
+
+name: Backend DevSecOps CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/backend/**"
+      - ".github/workflows/backend.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 1 — Tests automatisés et lint (go test -race, go vet, golangci-lint)
+  # ────────────────────────────────────────────────────────────────────────────
+  lint-test:
+    name: Tests & Lint (${{ matrix.service }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - catalog-service
+
+    defaults:
+      run:
+        working-directory: apps/backend/${{ matrix.service }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/${{ matrix.service }}/go.mod
+          cache: true
+          cache-dependency-path: apps/backend/${{ matrix.service }}/go.sum
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go formatting errors detected:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Go Vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: apps/backend/${{ matrix.service }}
+
+      - name: Run Tests (avec détecteur de data races)
+        run: |
+          go test -race \
+            -covermode=atomic \
+            -coverprofile=coverage.out \
+            ./...
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ matrix.service }}
+          path: apps/backend/${{ matrix.service }}/coverage.out
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 2 (bis) — Analyse qualité SonarCloud (un seul scan pour tout le backend :
+  # deux scans avec le même projectKey s'écraseraient mutuellement)
+  # ────────────────────────────────────────────────────────────────────────────
+  sonarcloud:
+    name: SonarCloud
+    needs: lint-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-auth-service
+          path: apps/backend/auth-service
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-catalog-service
+          path: apps/backend/catalog-service
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=JTR220_collector
+            -Dsonar.organization=jtr220
+            -Dsonar.sources=apps/backend
+            -Dsonar.exclusions=**/*_test.go
+            -Dsonar.tests=apps/backend
+            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.go.coverage.reportPaths=apps/backend/auth-service/coverage.out,apps/backend/catalog-service/coverage.out
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 2 — SAST : gosec (bloquant, rapport SARIF dans l'onglet Security)
+  # ────────────────────────────────────────────────────────────────────────────
+  sast:
+    name: SAST gosec (${{ matrix.service }})
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - catalog-service
+
+    defaults:
+      run:
+        working-directory: apps/backend/${{ matrix.service }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/${{ matrix.service }}/go.mod
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run gosec (bloquant)
+        run: gosec -fmt=sarif -out=gosec.sarif ./...
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: apps/backend/${{ matrix.service }}/gosec.sarif
+          category: gosec-${{ matrix.service }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 4 — SCA : govulncheck (analyse d'appel : n'alerte que si la fonction
+  # vulnérable est réellement atteignable depuis le code)
+  # ────────────────────────────────────────────────────────────────────────────
+  sca:
+    name: SCA govulncheck (${{ matrix.service }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - catalog-service
+
+    defaults:
+      run:
+        working-directory: apps/backend/${{ matrix.service }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/backend/${{ matrix.service }}/go.mod
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck (bloquant)
+        run: govulncheck ./...
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étapes 5-9 — hadolint, build multi-stage, scan Trivy AVANT push,
+  # push GHCR taggé par SHA, SBOM syft, signature + attestation cosign keyless
+  # ────────────────────────────────────────────────────────────────────────────
+  image:
+    name: Image (${{ matrix.service }})
+    needs: [lint-test, sast, sca]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write # cosign keyless via OIDC
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - catalog-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Étape 5 — lint du Dockerfile
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/backend/${{ matrix.service }}/Dockerfile
+
+      - name: Compute image name (lowercase)
+        run: echo "IMAGE=${REGISTRY}/${GITHUB_REPOSITORY,,}/${{ matrix.service }}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (local, jamais poussé avant scan)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/backend/${{ matrix.service }}
+          load: true
+          tags: ${{ env.IMAGE }}:scan
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      # Étape 6 — scan de l'image complète, bloquant sur CRITICAL/HIGH
+      - name: Trivy image scan (bloquant CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:scan
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+      # Étape 9 — push vers GHCR, taggé par SHA de commit (jamais "latest")
+      - name: Login GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        if: github.event_name == 'push'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+
+      - name: Push
+        if: github.event_name == 'push'
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/backend/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+
+      # Étape 7 — SBOM SPDX générée depuis l'image poussée
+      - name: Generate SBOM (syft)
+        if: github.event_name == 'push'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.service }}.spdx.json
+          artifact-name: sbom-${{ matrix.service }}.spdx.json
+
+      # Étape 8 — signature keyless (OIDC GitHub → Rekor) + attestation SBOM
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (cosign keyless)
+        if: github.event_name == 'push'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Attest SBOM (cosign)
+        if: github.event_name == 'push'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate "sbom-${{ matrix.service }}.spdx.json" "${IMAGE}@${DIGEST}"
+
+      - name: Export digest for GitOps job
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p /tmp/digests
+          echo "${IMAGE}@${{ steps.push.outputs.digest }}" > "/tmp/digests/${{ matrix.service }}"
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: digest-${{ matrix.service }}
+          path: /tmp/digests/${{ matrix.service }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 10/11 — GitOps : la CI commit le nouveau digest dans l'overlay staging,
+  # Argo CD détecte le commit et synchronise le cluster. La CI n'a AUCUN accès
+  # au cluster. (Push par GITHUB_TOKEN → ne redéclenche pas de workflow.)
+  # ────────────────────────────────────────────────────────────────────────────
+  update-manifests:
+    name: GitOps — déploiement staging
+    if: github.event_name == 'push'
+    needs: image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    concurrency:
+      group: gitops-update-manifests # partagé avec la CI frontend pour éviter les push concurrents
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Pin new image digests in staging overlay
+        working-directory: infra/k8s/overlays/staging
+        run: |
+          for f in /tmp/digests/*; do
+            ref="$(cat "$f")"
+            name="${ref%@*}"
+            echo "→ ${ref}"
+            kustomize edit set image "${name}=${ref}"
+          done
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s/overlays/staging/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "Manifests déjà à jour, rien à committer."
+            exit 0
+          fi
+          git commit -m "ci(gitops): deploy backend ${GITHUB_SHA::7} to staging"
+          git pull --rebase origin main
+          git push origin main

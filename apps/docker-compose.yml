@@ -60,6 +60,9 @@ services:
   collector-front:
     build:
       context: ./collector-front
+      # Dockerfile = image de production (adapter-node) buildée par la CI ;
+      # en local on garde le serveur de dev Vite avec HMR.
+      dockerfile: Dockerfile.dev
     container_name: collector-front
     restart: unless-stopped
     depends_on:

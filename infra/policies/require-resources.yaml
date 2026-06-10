@@ -1,0 +1,33 @@
+# Étape 14 — requests/limits obligatoires : sans elles, un pod peut saturer
+# son nœud (memory leak = OOM du voisin) et le scheduler place à l'aveugle.
+# Pré-requis aussi pour l'analyse canary (étape 13).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+  annotations:
+    policies.kyverno.io/title: Requests et limits obligatoires
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: Audit # → Enforce une fois validé
+  background: true
+  rules:
+    - name: require-requests-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - collector-staging
+                - collector-prod
+      validate:
+        message: "CPU/memory requests et memory limits sont obligatoires."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+                  limits:
+                    memory: "?*"

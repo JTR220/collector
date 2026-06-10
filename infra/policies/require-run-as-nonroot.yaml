@@ -1,0 +1,36 @@
+# Étape 14 — interdit les conteneurs root : un conteneur root facilite
+# l'évasion vers le nœud Kubernetes. Filet de sécurité derrière le USER
+# nonroot des Dockerfiles (défense en profondeur : chaque couche suppose que
+# les précédentes peuvent être contournées).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-run-as-nonroot
+  annotations:
+    policies.kyverno.io/title: Conteneurs non-root obligatoires
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Audit # → Enforce une fois validé
+  background: true
+  rules:
+    - name: run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - collector-staging
+                - collector-prod
+      validate:
+        message: "runAsNonRoot: true est obligatoire (pod ou conteneur)."
+        anyPattern:
+          - spec:
+              securityContext:
+                runAsNonRoot: true
+              containers:
+                - =(securityContext):
+                    =(runAsNonRoot): "true"
+          - spec:
+              containers:
+                - securityContext:
+                    runAsNonRoot: true

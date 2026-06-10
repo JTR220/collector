@@ -1,0 +1,53 @@
+# Canary simple à deux paliers (25 % / pause manuelle / 100 %) sur
+# catalog-service. Voir README.md pour l'activation.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: catalog-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-service
+  # référence le Deployment existant : pas de duplication de manifest
+  workloadRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: catalog-service
+    scaleDown: progressively
+  strategy:
+    canary:
+      steps:
+        - setWeight: 25
+        - pause: {} # promotion manuelle : kubectl argo rollouts promote catalog-service
+        - setWeight: 100
+      # ── Analyse automatique (à activer quand /metrics sera exposé) ──
+      # analysis:
+      #   templates:
+      #     - templateName: success-rate
+      #   args:
+      #     - name: service-name
+      #       value: catalog-service
+---
+# Squelette d'AnalysisTemplate Prometheus : promotion si < 5 % d'erreurs 5xx.
+# Inactif tant que les services Go n'exposent pas de métriques HTTP.
+# apiVersion: argoproj.io/v1alpha1
+# kind: AnalysisTemplate
+# metadata:
+#   name: success-rate
+# spec:
+#   args:
+#     - name: service-name
+#   metrics:
+#     - name: success-rate
+#       interval: 1m
+#       count: 5
+#       successCondition: result[0] >= 0.95
+#       failureLimit: 1
+#       provider:
+#         prometheus:
+#           address: http://monitoring-kube-prometheus-prometheus.monitoring:9090
+#           query: |
+#             sum(rate(http_requests_total{service="{{args.service-name}}",code!~"5.."}[2m]))
+#             /
+#             sum(rate(http_requests_total{service="{{args.service-name}}"}[2m]))

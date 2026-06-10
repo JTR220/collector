@@ -7,6 +7,13 @@
 </script>
 
 <svg {width} {height} style="display:block;overflow:visible">
-	<path d={path} fill="none" stroke={color} stroke-width="3" opacity="0.2" style="filter:blur(3px)" />
+	<path
+		d={path}
+		fill="none"
+		stroke={color}
+		stroke-width="3"
+		opacity="0.2"
+		style="filter:blur(3px)"
+	/>
 	<path d={path} fill="none" stroke={color} stroke-width="1.5" opacity="0.85" />
 </svg>

@@ -13,9 +13,8 @@
 		position: relative;
 		min-height: 100vh;
 		background:
-			radial-gradient(60% 50% at 20% 0%,  rgba(170,196,224,0.08) 0%, transparent 60%),
-			radial-gradient(50% 50% at 90% 100%, rgba(120,140,160,0.05) 0%, transparent 55%),
-			#0e1014;
+			radial-gradient(60% 50% at 20% 0%, rgba(170, 196, 224, 0.08) 0%, transparent 60%),
+			radial-gradient(50% 50% at 90% 100%, rgba(120, 140, 160, 0.05) 0%, transparent 55%), #0e1014;
 		color: #e8eaed;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		padding: 22px 30px 24px;

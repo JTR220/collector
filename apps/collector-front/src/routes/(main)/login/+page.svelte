@@ -68,10 +68,10 @@
 			<span class="brand-name">Collector<span class="brand-dim">.shop</span></span>
 		</div>
 		<div class="page-left-body">
-			<h2 class="page-tagline">La maison des<br/>collectionneurs.</h2>
+			<h2 class="page-tagline">La maison des<br />collectionneurs.</h2>
 			<p class="page-desc">
-				Cartes, consoles, comics, vinyles — évaluez, échangez,
-				et grimpez dans la ligue des meilleurs chasseurs.
+				Cartes, consoles, comics, vinyles — évaluez, échangez, et grimpez dans la ligue des
+				meilleurs chasseurs.
 			</p>
 			<div class="page-stats">
 				<div class="page-stat">
@@ -96,7 +96,7 @@
 				{mode === 'login' ? 'Connexion' : 'Inscription'}
 			</div>
 			<h1 class="card-title">
-				{#if mode === 'login'}Accès<br/>Galerie{:else}Nouveau<br/>Compte{/if}
+				{#if mode === 'login'}Accès<br />Galerie{:else}Nouveau<br />Compte{/if}
 			</h1>
 			<p class="card-subtitle">
 				{mode === 'login'
@@ -111,20 +111,46 @@
 				<div class="msg msg-success">{success}</div>
 			{/if}
 
-			<form onsubmit={(e) => { e.preventDefault(); submit(); }}>
+			<form
+				onsubmit={(e) => {
+					e.preventDefault();
+					submit();
+				}}
+			>
 				{#if mode === 'register'}
 					<div class="field">
 						<label class="field-label" for="name">Nom</label>
-						<input id="name" class="field-input" type="text" bind:value={name} placeholder="Votre nom" required />
+						<input
+							id="name"
+							class="field-input"
+							type="text"
+							bind:value={name}
+							placeholder="Votre nom"
+							required
+						/>
 					</div>
 				{/if}
 				<div class="field">
 					<label class="field-label" for="email">Email</label>
-					<input id="email" class="field-input" type="email" bind:value={email} placeholder="collector@example.com" required />
+					<input
+						id="email"
+						class="field-input"
+						type="email"
+						bind:value={email}
+						placeholder="collector@example.com"
+						required
+					/>
 				</div>
 				<div class="field">
 					<label class="field-label" for="password">Mot de passe</label>
-					<input id="password" class="field-input" type="password" bind:value={password} placeholder="••••••••" required />
+					<input
+						id="password"
+						class="field-input"
+						type="password"
+						bind:value={password}
+						placeholder="••••••••"
+						required
+					/>
 				</div>
 				<button type="submit" class="submit-btn" disabled={loading}>
 					{#if loading}
@@ -139,9 +165,13 @@
 
 			<button
 				class="toggle-btn"
-				onclick={() => { mode = mode === 'login' ? 'register' : 'login'; error = ''; success = ''; }}
+				onclick={() => {
+					mode = mode === 'login' ? 'register' : 'login';
+					error = '';
+					success = '';
+				}}
 			>
-				{mode === 'login' ? 'Pas de compte ? · S\'inscrire' : 'Déjà un compte ? · Se connecter'}
+				{mode === 'login' ? "Pas de compte ? · S'inscrire" : 'Déjà un compte ? · Se connecter'}
 			</button>
 		</div>
 	</div>
@@ -154,17 +184,25 @@
 		grid-template-columns: 1fr 1fr;
 		background: #191714;
 	}
-	@media (max-width: 768px) { .page { grid-template-columns: 1fr; } }
+	@media (max-width: 768px) {
+		.page {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	/* ── Left panel ── */
 	.page-left {
 		background: #211e1a;
-		border-right: 1px solid rgba(236,229,218,0.10);
+		border-right: 1px solid rgba(236, 229, 218, 0.1);
 		display: flex;
 		flex-direction: column;
 		padding: 40px 48px;
 	}
-	@media (max-width: 768px) { .page-left { display: none; } }
+	@media (max-width: 768px) {
+		.page-left {
+			display: none;
+		}
+	}
 
 	.brand {
 		display: flex;
@@ -184,9 +222,14 @@
 		font-size: 20px;
 		color: #ece5da;
 	}
-	.brand-dim { color: #766d60; }
+	.brand-dim {
+		color: #766d60;
+	}
 
-	.page-left-body { margin-top: auto; padding-bottom: 40px; }
+	.page-left-body {
+		margin-top: auto;
+		padding-bottom: 40px;
+	}
 	.page-tagline {
 		font-family: 'Newsreader', Georgia, serif;
 		font-weight: 500;
@@ -203,8 +246,16 @@
 		max-width: 400px;
 		margin: 0 0 32px;
 	}
-	.page-stats { display: flex; flex-direction: column; gap: 16px; }
-	.page-stat { display: flex; flex-direction: column; gap: 2px; }
+	.page-stats {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.page-stat {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
 	.page-stat-val {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 22px;
@@ -264,11 +315,21 @@
 		margin-bottom: 16px;
 		line-height: 1.4;
 	}
-	.msg-error   { border-color: rgba(215,156,134,0.3); background: rgba(215,156,134,0.06); color: #d79c86; }
-	.msg-success { border-color: rgba(134,192,153,0.3); background: rgba(134,192,153,0.06); color: #86c099; }
+	.msg-error {
+		border-color: rgba(215, 156, 134, 0.3);
+		background: rgba(215, 156, 134, 0.06);
+		color: #d79c86;
+	}
+	.msg-success {
+		border-color: rgba(134, 192, 153, 0.3);
+		background: rgba(134, 192, 153, 0.06);
+		color: #86c099;
+	}
 
 	/* Champs */
-	.field { margin-bottom: 14px; }
+	.field {
+		margin-bottom: 14px;
+	}
 	.field-label {
 		display: block;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
@@ -280,21 +341,25 @@
 	}
 	.field-input {
 		width: 100%;
-		background: rgba(255,255,255,0.04);
-		border: 1px solid rgba(236,229,218,0.12);
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(236, 229, 218, 0.12);
 		border-radius: 7px;
 		padding: 11px 14px;
 		color: #ece5da;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 14px;
 		outline: none;
-		transition: border-color 150ms, box-shadow 150ms;
+		transition:
+			border-color 150ms,
+			box-shadow 150ms;
 		box-sizing: border-box;
 	}
-	.field-input::placeholder { color: rgba(236,229,218,0.2); }
+	.field-input::placeholder {
+		color: rgba(236, 229, 218, 0.2);
+	}
 	.field-input:focus {
-		border-color: rgba(134,179,164,0.5);
-		box-shadow: 0 0 0 3px rgba(134,179,164,0.08);
+		border-color: rgba(134, 179, 164, 0.5);
+		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
 	}
 
 	/* Bouton */
@@ -311,28 +376,39 @@
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		cursor: pointer;
-		transition: filter 150ms, opacity 150ms;
+		transition:
+			filter 150ms,
+			opacity 150ms;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		min-height: 46px;
 	}
-	.submit-btn:hover:not(:disabled) { filter: brightness(1.08); }
-	.submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+	.submit-btn:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
+	.submit-btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
 
 	.spinner {
 		width: 16px;
 		height: 16px;
-		border: 2px solid rgba(25,23,20,0.3);
+		border: 2px solid rgba(25, 23, 20, 0.3);
 		border-top-color: #191714;
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
-	@keyframes spin { to { transform: rotate(360deg); } }
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
 
 	.divider {
 		border: none;
-		border-top: 1px solid rgba(236,229,218,0.08);
+		border-top: 1px solid rgba(236, 229, 218, 0.08);
 		margin: 22px 0 16px;
 	}
 
@@ -349,5 +425,7 @@
 		width: 100%;
 		text-align: center;
 	}
-	.toggle-btn:hover { color: #86b3a4; }
+	.toggle-btn:hover {
+		color: #86b3a4;
+	}
 </style>

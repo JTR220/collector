@@ -18,7 +18,7 @@
 <style>
 	.panel {
 		background: linear-gradient(180deg, #181a20 0%, #0d0f13 100%);
-		border: 1px solid rgba(255,255,255,0.07);
+		border: 1px solid rgba(255, 255, 255, 0.07);
 		border-radius: 12px;
 		padding: 18px;
 		position: relative;
@@ -31,7 +31,7 @@
 		inset: 0;
 		background: repeating-linear-gradient(
 			to bottom,
-			rgba(255,255,255,0.025) 0 1px,
+			rgba(255, 255, 255, 0.025) 0 1px,
 			transparent 1px 3px
 		);
 		mix-blend-mode: overlay;

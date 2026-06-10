@@ -1,0 +1,46 @@
+# Étape 14 (× étape 8) — la signature cosign ne vaut que si quelqu'un la
+# vérifie : toute image collector non signée par la CI GitHub Actions de ce
+# repo est refusée à l'admission. "Ce qui n'est pas né dans ta CI ne tourne
+# pas" (référentiel SLSA).
+#
+# Démarrer en Audit (alertes dans les PolicyReports), passer en Enforce une
+# fois les faux positifs purgés :
+#   kubectl get policyreport -A
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-collector-images
+  annotations:
+    policies.kyverno.io/title: Vérification des signatures cosign
+    policies.kyverno.io/severity: critical
+    policies.kyverno.io/description: >-
+      Refuse toute image ghcr.io/jtr220/collector/* qui n'a pas été signée en
+      keyless par un workflow GitHub Actions du repo JTR220/collector.
+      Ferme l'attaque par substitution d'image dans le registre.
+spec:
+  validationFailureAction: Audit # → Enforce une fois validé
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  rules:
+    - name: verify-cosign-keyless
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces:
+                - collector-staging
+                - collector-prod
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/jtr220/collector/*"
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    subject: "https://github.com/JTR220/collector/.github/workflows/*"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor:
+                      url: https://rekor.sigstore.dev

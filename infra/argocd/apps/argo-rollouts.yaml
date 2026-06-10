@@ -1,0 +1,25 @@
+# Étape 13 — Argo Rollouts : controller pour les déploiements progressifs
+# (canary, blue-green). Exemple de Rollout canary pour catalog-service dans
+# infra/k8s/addons/rollouts/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.x
+    helm:
+      releaseName: argo-rollouts
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector-front
+  labels:
+    app: collector-front
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector-front
+  template:
+    metadata:
+      labels:
+        app: collector-front
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        # utilisateur "node" de l'image node:alpine
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collector-front
+          # tag/digest épinglé par les overlays (CI → staging, PR → prod)
+          # NB : les URLs d'API (VITE_*) sont compilées dans le bundle au build
+          image: ghcr.io/jtr220/collector/collector-front
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

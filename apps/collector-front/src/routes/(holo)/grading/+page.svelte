@@ -4,19 +4,47 @@
 	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
 	const steps = [
-		{ n: '01', t: 'Réception sécurisée', d: 'Votre pièce arrive sous boîtier antichoc tracé. Photos d’état à la réception, horodatées et archivées.' },
-		{ n: '02', t: 'Authentification', d: 'Vérification d’authenticité par nos experts partenaires : impression, hologrammes, numéros de série, provenance.' },
-		{ n: '03', t: 'Notation PSA / CGC', d: 'La pièce est notée selon le barème du grader choisi : centrage, coins, bords, surface. Note de 1 à 10.' },
-		{ n: '04', t: 'Mise sous slab', d: 'Encapsulation scellée avec étiquette certifiée. La note est définitive et consultable en ligne.' },
-		{ n: '05', t: 'Mise en vente', d: 'Le lot rejoint la vitrine avec sa cote actualisée. Vous suivez son delta de prix en temps réel.' }
+		{
+			n: '01',
+			t: 'Réception sécurisée',
+			d: 'Votre pièce arrive sous boîtier antichoc tracé. Photos d’état à la réception, horodatées et archivées.'
+		},
+		{
+			n: '02',
+			t: 'Authentification',
+			d: 'Vérification d’authenticité par nos experts partenaires : impression, hologrammes, numéros de série, provenance.'
+		},
+		{
+			n: '03',
+			t: 'Notation PSA / CGC',
+			d: 'La pièce est notée selon le barème du grader choisi : centrage, coins, bords, surface. Note de 1 à 10.'
+		},
+		{
+			n: '04',
+			t: 'Mise sous slab',
+			d: 'Encapsulation scellée avec étiquette certifiée. La note est définitive et consultable en ligne.'
+		},
+		{
+			n: '05',
+			t: 'Mise en vente',
+			d: 'Le lot rejoint la vitrine avec sa cote actualisée. Vous suivez son delta de prix en temps réel.'
+		}
 	];
 
 	const scale = [
-		{ grade: 'PSA 10 · Gem Mint', pct: 100, desc: 'Parfaite. Centrage 55/45 max, aucun défaut visible.' },
+		{
+			grade: 'PSA 10 · Gem Mint',
+			pct: 100,
+			desc: 'Parfaite. Centrage 55/45 max, aucun défaut visible.'
+		},
 		{ grade: 'PSA 9 · Mint', pct: 90, desc: 'Un défaut mineur toléré (léger point d’impression).' },
 		{ grade: 'PSA 8 · NM-Mint', pct: 80, desc: 'Coins nets, légère usure de surface possible.' },
 		{ grade: 'PSA 7 · Near Mint', pct: 70, desc: 'Légère usure visible de près, rien de majeur.' },
-		{ grade: 'PSA 6 et moins', pct: 50, desc: 'Usure franche : plis, rayures, blanchiment des bords.' }
+		{
+			grade: 'PSA 6 et moins',
+			pct: 50,
+			desc: 'Usure franche : plis, rayures, blanchiment des bords.'
+		}
 	];
 </script>
 
@@ -26,9 +54,9 @@
 	<Kicker color="#86b3a4">Guide · authentification &amp; notation</Kicker>
 	<h1 class="hero-title">Comment fonctionne<br />le grading.</h1>
 	<p class="hero-lede">
-		Chaque lot vendu sur Collector.shop est authentifié puis noté par un organisme
-		indépendant (PSA pour les cartes, CGC pour les comics). Voici le parcours d'une pièce,
-		de la réception à la mise en vente.
+		Chaque lot vendu sur Collector.shop est authentifié puis noté par un organisme indépendant (PSA
+		pour les cartes, CGC pour les comics). Voici le parcours d'une pièce, de la réception à la mise
+		en vente.
 	</p>
 </section>
 
@@ -61,7 +89,10 @@
 </div>
 
 <style>
-	.hero { padding: 24px 0 26px; max-width: 640px; }
+	.hero {
+		padding: 24px 0 26px;
+		max-width: 640px;
+	}
 	.hero-title {
 		font-family: 'Newsreader', Georgia, serif;
 		font-weight: 500;
@@ -82,8 +113,16 @@
 		grid-template-columns: repeat(3, 1fr);
 		gap: 12px;
 	}
-	@media (max-width: 900px) { .steps-grid { grid-template-columns: repeat(2, 1fr); } }
-	@media (max-width: 580px) { .steps-grid { grid-template-columns: 1fr; } }
+	@media (max-width: 900px) {
+		.steps-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 580px) {
+		.steps-grid {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	.step-n {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -106,8 +145,17 @@
 		margin: 0;
 	}
 
-	.scale-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
-	.scale-row { display: flex; align-items: center; gap: 14px; }
+	.scale-list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 14px;
+	}
+	.scale-row {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+	}
 	.scale-grade {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 12px;
@@ -122,9 +170,18 @@
 		width: 280px;
 		flex-shrink: 0;
 	}
-	@media (max-width: 768px) { .scale-desc { display: none; } }
+	@media (max-width: 768px) {
+		.scale-desc {
+			display: none;
+		}
+	}
 
-	.cta-row { display: flex; align-items: center; gap: 20px; margin-top: 24px; }
+	.cta-row {
+		display: flex;
+		align-items: center;
+		gap: 20px;
+		margin-top: 24px;
+	}
 	.btn-primary {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
@@ -136,7 +193,9 @@
 		text-decoration: none;
 		transition: filter 120ms;
 	}
-	.btn-primary:hover { filter: brightness(1.08); }
+	.btn-primary:hover {
+		filter: brightness(1.08);
+	}
 	.btn-link {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
@@ -144,5 +203,7 @@
 		text-decoration: underline;
 		text-underline-offset: 3px;
 	}
-	.btn-link:hover { color: #ece5da; }
+	.btn-link:hover {
+		color: #ece5da;
+	}
 </style>

@@ -17,11 +17,13 @@
 		justify-content: center;
 		overflow: hidden;
 		flex-shrink: 0;
-		background: radial-gradient(120% 90% at 30% 20%,
+		background: radial-gradient(
+			120% 90% at 30% 20%,
 			oklch(0.55 0.08 215) 0%,
 			oklch(0.32 0.06 215) 55%,
-			oklch(0.18 0.04 215) 100%);
-		box-shadow: inset 0 0 40px rgba(0,0,0,0.4);
+			oklch(0.18 0.04 215) 100%
+		);
+		box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
 	}
 	.scanlines {
 		pointer-events: none;
@@ -29,7 +31,7 @@
 		inset: 0;
 		background: repeating-linear-gradient(
 			to bottom,
-			rgba(255,255,255,0.07) 0 1px,
+			rgba(255, 255, 255, 0.07) 0 1px,
 			transparent 1px 3px
 		);
 		mix-blend-mode: overlay;
@@ -40,7 +42,7 @@
 		z-index: 1;
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 48px;
-		color: rgba(255,255,255,0.94);
-		text-shadow: 0 4px 22px rgba(0,0,0,0.45);
+		color: rgba(255, 255, 255, 0.94);
+		text-shadow: 0 4px 22px rgba(0, 0, 0, 0.45);
 	}
 </style>

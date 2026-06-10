@@ -36,10 +36,16 @@
 	});
 
 	const kindByStatus: Record<string, DropEntryKind> = {
-		live: 'purchase', next: 'raffle', soon: 'reminder', sold: 'waitlist'
+		live: 'purchase',
+		next: 'raffle',
+		soon: 'reminder',
+		sold: 'waitlist'
 	};
 	const enteredLabel: Record<DropEntryKind, string> = {
-		purchase: '✓ Acheté', raffle: '✓ Inscrit au raffle', reminder: '✓ Rappel actif', waitlist: '✓ En liste d’attente'
+		purchase: '✓ Acheté',
+		raffle: '✓ Inscrit au raffle',
+		reminder: '✓ Rappel actif',
+		waitlist: '✓ En liste d’attente'
 	};
 
 	function isEntered(article: ArticleAPI, kind: DropEntryKind) {
@@ -72,8 +78,8 @@
 
 	const featured = $derived(
 		articles.find((a) => a.dropStatus === 'next') ??
-		articles.find((a) => a.dropStatus === 'live') ??
-		null
+			articles.find((a) => a.dropStatus === 'live') ??
+			null
 	);
 
 	const dropAt = (() => {
@@ -84,18 +90,33 @@
 	})();
 	let remaining = $state(0);
 	let timerId: ReturnType<typeof setInterval>;
-	function tick() { remaining = Math.max(0, dropAt.getTime() - Date.now()); }
-	onMount(() => { tick(); timerId = setInterval(tick, 1000); });
+	function tick() {
+		remaining = Math.max(0, dropAt.getTime() - Date.now());
+	}
+	onMount(() => {
+		tick();
+		timerId = setInterval(tick, 1000);
+	});
 	onDestroy(() => clearInterval(timerId));
-	const days  = $derived(Math.floor(remaining / 86400_000));
+	const days = $derived(Math.floor(remaining / 86400_000));
 	const hours = $derived(Math.floor((remaining % 86400_000) / 3600_000));
-	const mins  = $derived(Math.floor((remaining % 3600_000) / 60_000));
-	const secs  = $derived(Math.floor((remaining % 60_000) / 1000));
+	const mins = $derived(Math.floor((remaining % 3600_000) / 60_000));
+	const secs = $derived(Math.floor((remaining % 60_000) / 1000));
 	const pad = (n: number) => String(n).padStart(2, '0');
 
 	type DropStatus = 'live' | 'next' | 'sold' | 'soon';
-	const statusLabel: Record<DropStatus, string> = { live: 'Live', next: 'Prochain', sold: 'Épuisé', soon: 'Bientôt' };
-	const statusColor: Record<DropStatus, string> = { live: '#86b3a4', next: '#a39a8c', sold: '#766d60', soon: '#a39a8c' };
+	const statusLabel: Record<DropStatus, string> = {
+		live: 'Live',
+		next: 'Prochain',
+		sold: 'Épuisé',
+		soon: 'Bientôt'
+	};
+	const statusColor: Record<DropStatus, string> = {
+		live: '#86b3a4',
+		next: '#a39a8c',
+		sold: '#766d60',
+		soon: '#a39a8c'
+	};
 </script>
 
 <svelte:head><title>Drops · Collector.shop</title></svelte:head>
@@ -107,7 +128,9 @@
 {:else if featured}
 	<div class="hero-grid">
 		<div>
-			<Kicker color="#86b3a4">{featured.dropId} · {statusLabel[featured.dropStatus as DropStatus]} ouvert</Kicker>
+			<Kicker color="#86b3a4"
+				>{featured.dropId} · {statusLabel[featured.dropStatus as DropStatus]} ouvert</Kicker
+			>
 			<h1 class="hero-title">{featured.name}</h1>
 			<p class="hero-sub">{featured.series} · {featured.grade} · Livraison sous 48 h</p>
 
@@ -128,7 +151,9 @@
 				>
 					{isEntered(featured, kindByStatus[featured.dropStatus])
 						? enteredLabel[kindByStatus[featured.dropStatus]]
-						: featured.dropStatus === 'live' ? 'Acheter maintenant' : 'Entrer dans le raffle'}
+						: featured.dropStatus === 'live'
+							? 'Acheter maintenant'
+							: 'Entrer dans le raffle'}
 				</button>
 				<button
 					class="btn-ghost"
@@ -172,7 +197,10 @@
 					<GChip color={statusColor[status]}>{statusLabel[status]}</GChip>
 				</div>
 
-				<div class="card-art" style={status === 'sold' ? 'filter:grayscale(1) brightness(0.5)' : ''}>
+				<div
+					class="card-art"
+					style={status === 'sold' ? 'filter:grayscale(1) brightness(0.5)' : ''}
+				>
 					<span class="card-glyph">{article.glyph}</span>
 				</div>
 
@@ -182,7 +210,7 @@
 				{#if status !== 'sold'}
 					<div class="card-seats">
 						{#if article.seatsLeft > 0}
-							<GMeter value={article.seatsLeft / article.seatsTotal * 100} height={3} />
+							<GMeter value={(article.seatsLeft / article.seatsTotal) * 100} height={3} />
 							<span class="seats-label">{article.seatsLeft}/{article.seatsTotal} restants</span>
 						{/if}
 					</div>
@@ -200,19 +228,35 @@
 				</div>
 
 				{#if status === 'live'}
-					<button class="cal-cta cta-live" disabled={busy || isEntered(article, 'purchase')} onclick={() => act(article, 'purchase')}>
+					<button
+						class="cal-cta cta-live"
+						disabled={busy || isEntered(article, 'purchase')}
+						onclick={() => act(article, 'purchase')}
+					>
 						{isEntered(article, 'purchase') ? '✓ Acheté' : 'Acheter'}
 					</button>
 				{:else if status === 'next'}
-					<button class="cal-cta cta-next" disabled={busy || isEntered(article, 'raffle')} onclick={() => act(article, 'raffle')}>
+					<button
+						class="cal-cta cta-next"
+						disabled={busy || isEntered(article, 'raffle')}
+						onclick={() => act(article, 'raffle')}
+					>
 						{isEntered(article, 'raffle') ? '✓ Inscrit' : 'Entrer raffle'}
 					</button>
 				{:else if status === 'sold'}
-					<button class="cal-cta cta-soon" disabled={busy || isEntered(article, 'waitlist')} onclick={() => act(article, 'waitlist')}>
+					<button
+						class="cal-cta cta-soon"
+						disabled={busy || isEntered(article, 'waitlist')}
+						onclick={() => act(article, 'waitlist')}
+					>
 						{isEntered(article, 'waitlist') ? '✓ En liste' : 'Rejoindre WL'}
 					</button>
 				{:else}
-					<button class="cal-cta cta-soon" disabled={busy || isEntered(article, 'reminder')} onclick={() => act(article, 'reminder')}>
+					<button
+						class="cal-cta cta-soon"
+						disabled={busy || isEntered(article, 'reminder')}
+						onclick={() => act(article, 'reminder')}
+					>
 						{isEntered(article, 'reminder') ? '✓ Rappel actif' : '+ Rappel'}
 					</button>
 				{/if}
@@ -230,7 +274,9 @@
 		color: #766d60;
 		letter-spacing: 0.12em;
 	}
-	.state-msg.error { color: #d79c86; }
+	.state-msg.error {
+		color: #d79c86;
+	}
 
 	/* Hero */
 	.hero-grid {
@@ -240,7 +286,11 @@
 		margin-bottom: 32px;
 		align-items: center;
 	}
-	@media (max-width: 768px) { .hero-grid { grid-template-columns: 1fr; } }
+	@media (max-width: 768px) {
+		.hero-grid {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	.hero-title {
 		font-family: 'Newsreader', Georgia, serif;
@@ -257,13 +307,17 @@
 		margin: 0 0 20px;
 	}
 
-	.countdown { display: flex; gap: 10px; margin-bottom: 20px; }
+	.countdown {
+		display: flex;
+		gap: 10px;
+		margin-bottom: 20px;
+	}
 	.cd-box {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		padding: 10px 16px;
-		border: 1px solid rgba(236,229,218,0.08);
+		border: 1px solid rgba(236, 229, 218, 0.08);
 		border-radius: 8px;
 		background: #221f1b;
 	}
@@ -283,7 +337,12 @@
 		margin-top: 3px;
 	}
 
-	.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+	.hero-actions {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+		margin-bottom: 14px;
+	}
 	.btn-primary {
 		flex: 1;
 		padding: 12px 22px;
@@ -298,20 +357,27 @@
 		cursor: pointer;
 		transition: filter 120ms;
 	}
-	.btn-primary:hover { filter: brightness(1.08); }
+	.btn-primary:hover {
+		filter: brightness(1.08);
+	}
 	.btn-ghost {
 		padding: 12px 16px;
 		border-radius: 7px;
-		border: 1px solid rgba(236,229,218,0.14);
+		border: 1px solid rgba(236, 229, 218, 0.14);
 		background: transparent;
 		color: #a39a8c;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: border-color 120ms, color 120ms;
+		transition:
+			border-color 120ms,
+			color 120ms;
 	}
-	.btn-ghost:hover { border-color: rgba(236,229,218,0.28); color: #ece5da; }
+	.btn-ghost:hover {
+		border-color: rgba(236, 229, 218, 0.28);
+		color: #ece5da;
+	}
 	.hero-meta {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 11px;
@@ -327,12 +393,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border: 1px solid rgba(236,229,218,0.10);
+		border: 1px solid rgba(236, 229, 218, 0.1);
 	}
 	.hero-glyph {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 130px;
-		color: rgba(236,229,218,0.85);
+		color: rgba(236, 229, 218, 0.85);
 		position: relative;
 		z-index: 1;
 	}
@@ -347,14 +413,24 @@
 	}
 
 	/* Calendar */
-	.section-head { margin-bottom: 14px; }
+	.section-head {
+		margin-bottom: 14px;
+	}
 	.calendar-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
 		gap: 12px;
 	}
-	@media (max-width: 900px) { .calendar-grid { grid-template-columns: repeat(2, 1fr); } }
-	@media (max-width: 580px) { .calendar-grid { grid-template-columns: 1fr; } }
+	@media (max-width: 900px) {
+		.calendar-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 580px) {
+		.calendar-grid {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	.card-head {
 		display: flex;
@@ -388,7 +464,7 @@
 	.card-glyph {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 44px;
-		color: rgba(236,229,218,0.80);
+		color: rgba(236, 229, 218, 0.8);
 	}
 
 	.card-name {
@@ -401,20 +477,25 @@
 		line-height: 1.2;
 		text-decoration: none;
 	}
-	.card-name:hover { color: #86b3a4; }
+	.card-name:hover {
+		color: #86b3a4;
+	}
 
 	.toast {
 		padding: 10px 14px;
 		border-radius: 7px;
-		border: 1px solid rgba(134,179,164,0.3);
-		background: rgba(134,179,164,0.06);
+		border: 1px solid rgba(134, 179, 164, 0.3);
+		background: rgba(134, 179, 164, 0.06);
 		color: #86b3a4;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
 		margin-bottom: 14px;
 	}
 
-	.cal-cta:disabled { opacity: 0.6; cursor: default; }
+	.cal-cta:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
 	.card-series {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 11px;
@@ -422,7 +503,9 @@
 		margin: 0 0 8px;
 	}
 
-	.card-seats { margin-bottom: 8px; }
+	.card-seats {
+		margin-bottom: 8px;
+	}
 	.seats-label {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 10px;
@@ -452,7 +535,9 @@
 		color: #ece5da;
 		margin: 0;
 	}
-	.price-val.resell { color: #86b3a4; }
+	.price-val.resell {
+		color: #86b3a4;
+	}
 
 	.cal-cta {
 		width: 100%;
@@ -465,10 +550,27 @@
 		cursor: pointer;
 		transition: filter 120ms;
 	}
-	.cta-live { background: #86b3a4; color: #191714; }
-	.cta-live:hover { filter: brightness(1.08); }
-	.cta-next { background: rgba(236,229,218,0.10); color: #ece5da; border: 1px solid rgba(236,229,218,0.14); }
-	.cta-next:hover { background: rgba(236,229,218,0.16); }
-	.cta-soon { background: transparent; border: 1px solid rgba(134,179,164,0.28); color: #86b3a4; }
-	.cta-soon:hover { background: rgba(134,179,164,0.08); }
+	.cta-live {
+		background: #86b3a4;
+		color: #191714;
+	}
+	.cta-live:hover {
+		filter: brightness(1.08);
+	}
+	.cta-next {
+		background: rgba(236, 229, 218, 0.1);
+		color: #ece5da;
+		border: 1px solid rgba(236, 229, 218, 0.14);
+	}
+	.cta-next:hover {
+		background: rgba(236, 229, 218, 0.16);
+	}
+	.cta-soon {
+		background: transparent;
+		border: 1px solid rgba(134, 179, 164, 0.28);
+		color: #86b3a4;
+	}
+	.cta-soon:hover {
+		background: rgba(134, 179, 164, 0.08);
+	}
 </style>

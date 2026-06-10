@@ -121,7 +121,9 @@
 {:else if tab === 'annonces'}
 	{#if listings.length === 0}
 		<GPanel>
-			<p class="empty">Aucune annonce pour le moment. <a href="/vendre">Mettez votre première pièce en vente →</a></p>
+			<p class="empty">
+				Aucune annonce pour le moment. <a href="/vendre">Mettez votre première pièce en vente →</a>
+			</p>
 		</GPanel>
 	{:else}
 		<div class="mk-list">
@@ -130,7 +132,8 @@
 				<GPanel>
 					<div class="row">
 						<a class="thumb" href={`/lot/${article.ID}`}>
-							{#if img}<img src={img} alt={article.name} />{:else}<span>{article.glyph || '◈'}</span>{/if}
+							{#if img}<img src={img} alt={article.name} />{:else}<span>{article.glyph || '◈'}</span
+								>{/if}
 						</a>
 						<div class="row-main">
 							<a class="row-name" href={`/lot/${article.ID}`}>{article.name}</a>
@@ -141,7 +144,11 @@
 							{article.sold ? 'Vendu' : 'En vente'}
 						</GChip>
 						{#if !article.sold}
-							<button class="btn-danger" disabled={busyId === article.ID} onclick={() => removeListing(article.ID)}>
+							<button
+								class="btn-danger"
+								disabled={busyId === article.ID}
+								onclick={() => removeListing(article.ID)}
+							>
 								Retirer
 							</button>
 						{/if}
@@ -168,28 +175,46 @@
 				<GPanel>
 					<div class="row">
 						<a class="thumb" href={`/lot/${order.articleId}`}>
-							{#if img}<img src={img} alt={order.article?.name} />{:else}<span>{order.article?.glyph || '◈'}</span>{/if}
+							{#if img}<img src={img} alt={order.article?.name} />{:else}<span
+									>{order.article?.glyph || '◈'}</span
+								>{/if}
 						</a>
 						<div class="row-main">
-							<a class="row-name" href={`/lot/${order.articleId}`}>{order.article?.name ?? `Lot #${order.articleId}`}</a>
+							<a class="row-name" href={`/lot/${order.articleId}`}
+								>{order.article?.name ?? `Lot #${order.articleId}`}</a
+							>
 							<span class="row-sub">
 								Commande #{order.ID} ·
-								{tab === 'ventes' ? `acheteur #${order.buyerId}` : `vendeur @${order.article?.seller ?? order.sellerId}`}
+								{tab === 'ventes'
+									? `acheteur #${order.buyerId}`
+									: `vendeur @${order.article?.seller ?? order.sellerId}`}
 							</span>
 						</div>
 						<span class="row-price">{eur(order.price + order.fraisPort)}</span>
 						<GChip color={statusColor[order.status]}>{ORDER_STATUS_LABELS[order.status]}</GChip>
 
 						{#if tab === 'ventes' && order.status === 'paid'}
-							<button class="btn-act" disabled={busyId === order.ID} onclick={() => setStatus(order, 'shipped', 'ventes')}>
+							<button
+								class="btn-act"
+								disabled={busyId === order.ID}
+								onclick={() => setStatus(order, 'shipped', 'ventes')}
+							>
 								Marquer expédiée
 							</button>
 						{:else if tab === 'achats' && order.status === 'shipped'}
-							<button class="btn-act" disabled={busyId === order.ID} onclick={() => setStatus(order, 'delivered', 'achats')}>
+							<button
+								class="btn-act"
+								disabled={busyId === order.ID}
+								onclick={() => setStatus(order, 'delivered', 'achats')}
+							>
 								Confirmer réception
 							</button>
 						{:else if tab === 'achats' && order.status === 'paid'}
-							<button class="btn-danger" disabled={busyId === order.ID} onclick={() => setStatus(order, 'cancelled', 'achats')}>
+							<button
+								class="btn-danger"
+								disabled={busyId === order.ID}
+								onclick={() => setStatus(order, 'cancelled', 'achats')}
+							>
 								Annuler
 							</button>
 						{/if}
@@ -201,7 +226,9 @@
 {/if}
 
 <style>
-	.mk-head { margin-bottom: 18px; }
+	.mk-head {
+		margin-bottom: 18px;
+	}
 	.mk-title-row {
 		display: flex;
 		align-items: center;
@@ -227,7 +254,9 @@
 		text-decoration: none;
 		transition: filter 120ms;
 	}
-	.btn-primary:hover { filter: brightness(1.08); }
+	.btn-primary:hover {
+		filter: brightness(1.08);
+	}
 
 	.mk-tabs {
 		display: flex;
@@ -245,10 +274,18 @@
 		font-size: 13px;
 		color: #a39a8c;
 		cursor: pointer;
-		transition: color 120ms, border-color 120ms;
+		transition:
+			color 120ms,
+			border-color 120ms;
 	}
-	.mk-tab:hover { color: #ece5da; }
-	.mk-tab.active { color: #ece5da; font-weight: 600; border-bottom-color: #86b3a4; }
+	.mk-tab:hover {
+		color: #ece5da;
+	}
+	.mk-tab.active {
+		color: #ece5da;
+		font-weight: 600;
+		border-bottom-color: #86b3a4;
+	}
 	.mk-count {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 11px;
@@ -280,10 +317,21 @@
 		color: #a39a8c;
 		margin: 4px 0;
 	}
-	.empty a { color: #86b3a4; }
+	.empty a {
+		color: #86b3a4;
+	}
 
-	.mk-list { display: flex; flex-direction: column; gap: 10px; }
-	.row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+	.mk-list {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		flex-wrap: wrap;
+	}
 	.thumb {
 		width: 56px;
 		height: 56px;
@@ -297,20 +345,32 @@
 		flex-shrink: 0;
 		text-decoration: none;
 	}
-	.thumb img { width: 100%; height: 100%; object-fit: cover; }
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
 	.thumb span {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 22px;
 		color: rgba(236, 229, 218, 0.85);
 	}
-	.row-main { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 2px; }
+	.row-main {
+		flex: 1;
+		min-width: 160px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
 	.row-name {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 17px;
 		color: #ece5da;
 		text-decoration: none;
 	}
-	.row-name:hover { color: #86b3a4; }
+	.row-name:hover {
+		color: #86b3a4;
+	}
 	.row-sub {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 11px;
@@ -333,7 +393,9 @@
 		cursor: pointer;
 		transition: background 120ms;
 	}
-	.btn-act:hover:not(:disabled) { background: rgba(134, 179, 164, 0.08); }
+	.btn-act:hover:not(:disabled) {
+		background: rgba(134, 179, 164, 0.08);
+	}
 	.btn-danger {
 		padding: 8px 14px;
 		border-radius: 6px;
@@ -345,7 +407,12 @@
 		cursor: pointer;
 		transition: background 120ms;
 	}
-	.btn-danger:hover:not(:disabled) { background: rgba(215, 156, 134, 0.08); }
+	.btn-danger:hover:not(:disabled) {
+		background: rgba(215, 156, 134, 0.08);
+	}
 	.btn-act:disabled,
-	.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn-danger:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 </style>

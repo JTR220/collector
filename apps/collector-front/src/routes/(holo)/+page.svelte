@@ -31,9 +31,7 @@
 
 	const filtered = $derived(
 		articles.filter(
-			(a) =>
-				(!filterCat || a.category.name === filterCat) &&
-				(!filterMax || a.prix <= filterMax)
+			(a) => (!filterCat || a.category.name === filterCat) && (!filterMax || a.prix <= filterMax)
 		)
 	);
 
@@ -41,22 +39,28 @@
 		goto(filterCat === cat ? '/' : `/?cat=${encodeURIComponent(cat)}`, { noScroll: true });
 	}
 
-	const meters = $derived((() => {
-		const counts: Record<string, number> = {};
-		for (const a of articles) counts[a.category.name] = (counts[a.category.name] ?? 0) + 1;
-		const total = articles.length || 1;
-		return Object.entries(counts).map(([label, val]) => ({
-			label,
-			value: Math.round((val / total) * 100),
-			count: val
-		}));
-	})());
+	const meters = $derived(
+		(() => {
+			const counts: Record<string, number> = {};
+			for (const a of articles) counts[a.category.name] = (counts[a.category.name] ?? 0) + 1;
+			const total = articles.length || 1;
+			return Object.entries(counts).map(([label, val]) => ({
+				label,
+				value: Math.round((val / total) * 100),
+				count: val
+			}));
+		})()
+	);
 
 	// Hue dérivée du nom de catégorie pour le placeholder art
 	function categoryHue(name: string): number {
 		const map: Record<string, number> = {
-			TCG: 18, Console: 48, Comics: 220, Vinyle: 350,
-			'Designer Toy': 280, Horlogerie: 195
+			TCG: 18,
+			Console: 48,
+			Comics: 220,
+			Vinyle: 350,
+			'Designer Toy': 280,
+			Horlogerie: 195
 		};
 		return map[name] ?? (name.charCodeAt(0) * 47) % 360;
 	}
@@ -64,7 +68,16 @@
 	// Sparkline fictive dérivée du prix (pour la démo)
 	function demoSpark(prix: number, delta: number): number[] {
 		const base = prix / (1 + delta / 100);
-		return [base*0.88, base*0.91, base*0.94, base*0.97, base, prix*0.98, prix*0.99, prix];
+		return [
+			base * 0.88,
+			base * 0.91,
+			base * 0.94,
+			base * 0.97,
+			base,
+			prix * 0.98,
+			prix * 0.99,
+			prix
+		];
 	}
 </script>
 
@@ -74,10 +87,10 @@
 <section class="hero">
 	<div>
 		<Kicker>Saison 03 — sélection de la semaine</Kicker>
-		<h1 class="hero-title">Holo rares<br/>&amp; scellés.</h1>
+		<h1 class="hero-title">Holo rares<br />&amp; scellés.</h1>
 		<p class="hero-lede">
-			Pièces vérifiées · grading PSA / CGC · livraison tracée sous boîtier antichoc.
-			Chaque lot est authentifié avant mise en ligne.
+			Pièces vérifiées · grading PSA / CGC · livraison tracée sous boîtier antichoc. Chaque lot est
+			authentifié avant mise en ligne.
 		</p>
 		<div class="hero-ctas">
 			<a href="/drops" class="btn-primary">Parcourir la sélection</a>
@@ -90,11 +103,11 @@
 		<Kicker>Catégories</Kicker>
 		<div class="meters-list">
 			{#if meters.length === 0}
-				{#each ['TCG','Console','Comics','Vinyles'] as cat, i}
+				{#each ['TCG', 'Console', 'Comics', 'Vinyles'] as cat, i}
 					<div class="meter-row">
 						<span class="meter-label">{cat}</span>
-						<div style="flex:1"><GMeter value={[42,28,18,12][i]} /></div>
-						<span class="meter-count">{[42,28,18,12][i]}</span>
+						<div style="flex:1"><GMeter value={[42, 28, 18, 12][i]} /></div>
+						<span class="meter-count">{[42, 28, 18, 12][i]}</span>
 					</div>
 				{/each}
 			{:else}
@@ -154,7 +167,7 @@
 					style="background:linear-gradient(155deg, oklch(0.30 0.045 {hue}) 0%, oklch(0.24 0.045 {hue}) 100%)"
 				>
 					<div class="card-art-trame" aria-hidden="true"></div>
-					<span class="card-art-label">photo produit<br/>{article.slug || `#${article.ID}`}</span>
+					<span class="card-art-label">photo produit<br />{article.slug || `#${article.ID}`}</span>
 					{#if img}
 						<img
 							class="card-art-img"
@@ -193,7 +206,9 @@
 						</div>
 						<div class="card-spark-col">
 							<GSpark values={spark} color={up ? '#86c099' : '#d79c86'} w={80} h={24} dot={false} />
-							<span class="card-delta" style="color:{up ? '#86c099' : '#d79c86'}">{pct(article.delta)}</span>
+							<span class="card-delta" style="color:{up ? '#86c099' : '#d79c86'}"
+								>{pct(article.delta)}</span
+							>
 						</div>
 					</div>
 
@@ -216,7 +231,9 @@
 						<span class="ticker-id">{article.slug || `#${article.ID}`}</span>
 						<span class="ticker-name">{article.name}</span>
 						<span class="ticker-price">{eur(article.prix)}</span>
-						<span style="color:{article.delta >= 0 ? '#86c099' : '#d79c86'}">{pct(article.delta)}</span>
+						<span style="color:{article.delta >= 0 ? '#86c099' : '#d79c86'}"
+							>{pct(article.delta)}</span
+						>
 					</span>
 				{/each}
 			</div>
@@ -233,7 +250,12 @@
 		padding: 30px 0 26px;
 		align-items: start;
 	}
-	@media (max-width: 768px) { .hero { grid-template-columns: 1fr; gap: 24px; } }
+	@media (max-width: 768px) {
+		.hero {
+			grid-template-columns: 1fr;
+			gap: 24px;
+		}
+	}
 
 	.hero-title {
 		font-family: 'Newsreader', Georgia, serif;
@@ -252,7 +274,12 @@
 		margin-bottom: 24px;
 		max-width: 480px;
 	}
-	.hero-ctas { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+	.hero-ctas {
+		display: flex;
+		align-items: center;
+		gap: 20px;
+		flex-wrap: wrap;
+	}
 	.btn-primary {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
@@ -264,7 +291,9 @@
 		text-decoration: none;
 		transition: filter 120ms;
 	}
-	.btn-primary:hover { filter: brightness(1.08); }
+	.btn-primary:hover {
+		filter: brightness(1.08);
+	}
 	.btn-link {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
@@ -272,10 +301,21 @@
 		text-decoration: underline;
 		text-underline-offset: 3px;
 	}
-	.btn-link:hover { color: #ece5da; }
+	.btn-link:hover {
+		color: #ece5da;
+	}
 
-	.meters-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-	.meter-row { display: flex; align-items: center; gap: 12px; }
+	.meters-list {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 14px;
+	}
+	.meter-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
 	.meter-btn {
 		background: none;
 		border: none;
@@ -287,9 +327,15 @@
 		text-align: left;
 		transition: background 120ms;
 	}
-	.meter-btn:hover { background: rgba(255,255,255,0.04); }
-	.meter-active { background: rgba(134,179,164,0.08); }
-	.meter-active .meter-label { color: #86b3a4; }
+	.meter-btn:hover {
+		background: rgba(255, 255, 255, 0.04);
+	}
+	.meter-active {
+		background: rgba(134, 179, 164, 0.08);
+	}
+	.meter-active .meter-label {
+		color: #86b3a4;
+	}
 
 	.filter-bar {
 		display: flex;
@@ -297,9 +343,9 @@
 		justify-content: space-between;
 		gap: 12px;
 		padding: 9px 14px;
-		border: 1px solid rgba(134,179,164,0.28);
+		border: 1px solid rgba(134, 179, 164, 0.28);
 		border-radius: 7px;
-		background: rgba(134,179,164,0.05);
+		background: rgba(134, 179, 164, 0.05);
 		margin-bottom: 16px;
 	}
 	.filter-label {
@@ -313,7 +359,9 @@
 		color: #a39a8c;
 		text-decoration: none;
 	}
-	.filter-clear:hover { color: #ece5da; }
+	.filter-clear:hover {
+		color: #ece5da;
+	}
 	.meter-label {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12px;
@@ -342,8 +390,8 @@
 	.state-error {
 		padding: 12px 16px;
 		border-radius: 7px;
-		background: rgba(215,156,134,0.06);
-		border: 1px solid rgba(215,156,134,0.3);
+		background: rgba(215, 156, 134, 0.06);
+		border: 1px solid rgba(215, 156, 134, 0.3);
 		color: #d79c86;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
@@ -357,14 +405,22 @@
 		gap: 18px;
 		padding: 4px 0 24px;
 	}
-	@media (max-width: 900px) { .grid-section { grid-template-columns: repeat(2, 1fr); } }
-	@media (max-width: 580px) { .grid-section { grid-template-columns: 1fr; } }
+	@media (max-width: 900px) {
+		.grid-section {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+	@media (max-width: 580px) {
+		.grid-section {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	/* ── Carte ── */
 	.card {
 		position: relative;
 		background: #221f1b;
-		border: 1px solid rgba(236,229,218,0.10);
+		border: 1px solid rgba(236, 229, 218, 0.1);
 		border-radius: 9px;
 		overflow: hidden;
 		display: flex;
@@ -372,7 +428,9 @@
 		transition: border-color 120ms;
 		cursor: pointer;
 	}
-	.card:hover { border-color: rgba(236,229,218,0.17); }
+	.card:hover {
+		border-color: rgba(236, 229, 218, 0.17);
+	}
 
 	.card-eyebrow {
 		display: flex;
@@ -399,7 +457,7 @@
 		height: 132px;
 		margin: 10px 14px 0;
 		border-radius: 6px;
-		border: 1px solid rgba(236,229,218,0.08);
+		border: 1px solid rgba(236, 229, 218, 0.08);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -417,7 +475,7 @@
 		letter-spacing: 0.08em;
 		text-align: center;
 		line-height: 1.5;
-		color: rgba(236,229,218,0.35);
+		color: rgba(236, 229, 218, 0.35);
 		position: relative;
 	}
 	.card-art-img {
@@ -464,15 +522,26 @@
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		padding: 2px 7px;
-		border: 1px solid rgba(236,229,218,0.20);
+		border: 1px solid rgba(236, 229, 218, 0.2);
 		border-radius: 3px;
-		color: rgba(236,229,218,0.55);
-		background: rgba(0,0,0,0.25);
+		color: rgba(236, 229, 218, 0.55);
+		background: rgba(0, 0, 0, 0.25);
 	}
 
-	.card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+	.card-body {
+		padding: 12px 14px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		flex: 1;
+	}
 
-	.card-name-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+	.card-name-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 8px;
+	}
 	.card-name {
 		font-family: 'Newsreader', Georgia, serif;
 		font-size: 19px;
@@ -486,11 +555,20 @@
 		color: #766d60;
 		margin: 0;
 	}
-	.card-chips { flex-shrink: 0; }
+	.card-chips {
+		flex-shrink: 0;
+	}
 
-	.card-divider { border: none; border-top: 1px solid rgba(236,229,218,0.08); }
+	.card-divider {
+		border: none;
+		border-top: 1px solid rgba(236, 229, 218, 0.08);
+	}
 
-	.card-price-row { display: flex; justify-content: space-between; align-items: flex-end; }
+	.card-price-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+	}
 	.card-price-label {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 10px;
@@ -506,7 +584,12 @@
 		font-weight: 500;
 		line-height: 1;
 	}
-	.card-spark-col { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+	.card-spark-col {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 3px;
+	}
 	.card-delta {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 11px;
@@ -520,20 +603,23 @@
 		width: 100%;
 		padding: 9px;
 		border-radius: 6px;
-		border: 1px solid rgba(236,229,218,0.12);
+		border: 1px solid rgba(236, 229, 218, 0.12);
 		background: transparent;
 		color: #a39a8c;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12px;
 		font-weight: 500;
 		cursor: pointer;
-		transition: border-color 120ms, color 120ms, background 120ms;
+		transition:
+			border-color 120ms,
+			color 120ms,
+			background 120ms;
 		margin-top: auto;
 	}
 	.card-cta:hover {
 		border-color: #86b3a4;
 		color: #86b3a4;
-		background: rgba(134,179,164,0.04);
+		background: rgba(134, 179, 164, 0.04);
 	}
 	/* Lien étendu : toute la carte est cliquable via le CTA */
 	.card-cta::after {
@@ -547,7 +633,7 @@
 		display: flex;
 		align-items: center;
 		gap: 18px;
-		border-top: 1px solid rgba(236,229,218,0.10);
+		border-top: 1px solid rgba(236, 229, 218, 0.1);
 		padding: 12px 0;
 		overflow: hidden;
 	}
@@ -569,7 +655,10 @@
 		background: #86c099;
 		display: inline-block;
 	}
-	.ticker-track { flex: 1; overflow: hidden; }
+	.ticker-track {
+		flex: 1;
+		overflow: hidden;
+	}
 	.ticker-inner {
 		display: flex;
 		animation: ticker 30s linear infinite;
@@ -584,12 +673,22 @@
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 11px;
 	}
-	.ticker-id { color: #86b3a4; }
-	.ticker-name { color: #766d60; }
-	.ticker-price { color: #ece5da; }
+	.ticker-id {
+		color: #86b3a4;
+	}
+	.ticker-name {
+		color: #766d60;
+	}
+	.ticker-price {
+		color: #ece5da;
+	}
 
 	@keyframes ticker {
-		from { transform: translateX(0); }
-		to   { transform: translateX(-50%); }
+		from {
+			transform: translateX(0);
+		}
+		to {
+			transform: translateX(-50%);
+		}
 	}
 </style>

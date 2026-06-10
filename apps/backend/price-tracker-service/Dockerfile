@@ -1,23 +1,25 @@
-FROM golang:1.23-alpine AS builder
-WORKDIR /app
+# Étape 5 — build multi-stage : toolchain Go isolée, image finale distroless
+# static (pas de shell, pas de gestionnaire de paquets, ~2 Mo de base) en non-root.
+FROM golang:1.23 AS builder
+
+WORKDIR /src
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o price-tracker ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/price-tracker ./cmd/main.go
 
-# ── Runtime image ───────────────────────────────────────────
-FROM alpine:3.20
-RUN apk --no-cache add ca-certificates tzdata
+# static-debian12 suffit : binaire statique (CGO désactivé), CA certs et tzdata inclus.
+# Pas de HEALTHCHECK : distroless n'a pas de wget, les probes Kubernetes s'en chargent.
+FROM gcr.io/distroless/static-debian12:nonroot
+
 WORKDIR /app
 
-COPY --from=builder /app/price-tracker .
+COPY --from=builder /out/price-tracker /app/price-tracker
 
 EXPOSE 8082
 
-HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:8082/api/v1/health || exit 1
+USER nonroot:nonroot
 
-USER 1000:1000
-ENTRYPOINT ["./price-tracker"]
+ENTRYPOINT ["/app/price-tracker"]

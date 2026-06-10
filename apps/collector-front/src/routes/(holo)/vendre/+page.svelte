@@ -51,10 +51,7 @@
 	}
 
 	const canSubmit = $derived(
-		name.trim().length > 0 &&
-			description.trim().length > 0 &&
-			(prix ?? 0) > 0 &&
-			categoryId > 0
+		name.trim().length > 0 && description.trim().length > 0 && (prix ?? 0) > 0 && categoryId > 0
 	);
 
 	async function submit(e: SubmitEvent) {
@@ -96,8 +93,8 @@
 	<Kicker color="#86b3a4">Espace vendeur</Kicker>
 	<h1 class="sell-title">Mettre une pièce en vente</h1>
 	<p class="sell-lede">
-		Votre annonce est publiée en vente directe sur la vitrine. Ajoutez une photo nette :
-		les pièces avec photo se vendent mieux (et la quête photo vous attend). +60 XP à la publication.
+		Votre annonce est publiée en vente directe sur la vitrine. Ajoutez une photo nette : les pièces
+		avec photo se vendent mieux (et la quête photo vous attend). +60 XP à la publication.
 	</p>
 </div>
 
@@ -113,9 +110,16 @@
 			{#if photoPreview}
 				<img class="photo-preview" src={photoPreview} alt="Aperçu de la pièce" />
 			{:else}
-				<span class="photo-hint">+ Choisir une image<br /><small>jpg, png ou webp · 5 Mo max</small></span>
+				<span class="photo-hint"
+					>+ Choisir une image<br /><small>jpg, png ou webp · 5 Mo max</small></span
+				>
 			{/if}
-			<input type="file" accept=".jpg,.jpeg,.png,.webp" class="photo-input" onchange={onPhotoChange} />
+			<input
+				type="file"
+				accept=".jpg,.jpeg,.png,.webp"
+				class="photo-input"
+				onchange={onPhotoChange}
+			/>
 		</label>
 	</GPanel>
 
@@ -129,7 +133,12 @@
 			</label>
 			<label class="field">
 				<span>Description *</span>
-				<textarea bind:value={description} rows="3" placeholder="État, provenance, défauts éventuels…" required></textarea>
+				<textarea
+					bind:value={description}
+					rows="3"
+					placeholder="État, provenance, défauts éventuels…"
+					required
+				></textarea>
 			</label>
 			<div class="field-row">
 				<label class="field">
@@ -183,7 +192,9 @@
 </form>
 
 <style>
-	.sell-head { margin-bottom: 20px; }
+	.sell-head {
+		margin-bottom: 20px;
+	}
 	.sell-title {
 		font-family: 'Newsreader', Georgia, serif;
 		font-weight: 500;
@@ -216,7 +227,11 @@
 		gap: 18px;
 		align-items: start;
 	}
-	@media (max-width: 768px) { .sell-grid { grid-template-columns: 1fr; } }
+	@media (max-width: 768px) {
+		.sell-grid {
+			grid-template-columns: 1fr;
+		}
+	}
 
 	/* Photo */
 	.photo-drop {
@@ -233,9 +248,17 @@
 		background: rgba(255, 255, 255, 0.02);
 		transition: border-color 120ms;
 	}
-	.photo-drop:hover { border-color: #86b3a4; }
-	.photo-drop.has-photo { border-style: solid; }
-	.photo-preview { width: 100%; height: 100%; object-fit: cover; }
+	.photo-drop:hover {
+		border-color: #86b3a4;
+	}
+	.photo-drop.has-photo {
+		border-style: solid;
+	}
+	.photo-preview {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
 	.photo-hint {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 13px;
@@ -243,14 +266,33 @@
 		text-align: center;
 		line-height: 1.8;
 	}
-	.photo-hint small { color: #766d60; font-size: 11px; }
-	.photo-input { display: none; }
+	.photo-hint small {
+		color: #766d60;
+		font-size: 11px;
+	}
+	.photo-input {
+		display: none;
+	}
 
 	/* Champs */
-	.fields { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
-	.field-row { display: flex; gap: 12px; }
-	.field-row .field { flex: 1; }
-	.field { display: flex; flex-direction: column; gap: 5px; }
+	.fields {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		margin-top: 12px;
+	}
+	.field-row {
+		display: flex;
+		gap: 12px;
+	}
+	.field-row .field {
+		flex: 1;
+	}
+	.field {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
 	.field span {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 10.5px;
@@ -272,9 +314,15 @@
 	}
 	.field input:focus,
 	.field textarea:focus,
-	.field select:focus { border-color: rgba(134, 179, 164, 0.5); }
-	.field textarea { resize: vertical; }
-	.field select option { background: #221f1b; }
+	.field select:focus {
+		border-color: rgba(134, 179, 164, 0.5);
+	}
+	.field textarea {
+		resize: vertical;
+	}
+	.field select option {
+		background: #221f1b;
+	}
 
 	.btn-primary {
 		margin-top: 4px;
@@ -287,8 +335,15 @@
 		font-size: 13px;
 		font-weight: 600;
 		cursor: pointer;
-		transition: filter 120ms, opacity 120ms;
+		transition:
+			filter 120ms,
+			opacity 120ms;
 	}
-	.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-	.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+	.btn-primary:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
+	.btn-primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 </style>

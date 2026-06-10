@@ -1,20 +1,35 @@
-name: Frontend CI
+# Pipeline DevSecOps frontend — voir docs/DEVSECOPS.md pour le mapping complet des étapes.
+
+name: Frontend DevSecOps CI
 
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/collector-front/**'
-      - '.github/workflows/frontend.yml'
+      - "apps/collector-front/**"
+      - ".github/workflows/frontend.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'apps/collector-front/**'
-      - '.github/workflows/frontend.yml'
+      - "apps/collector-front/**"
+      - ".github/workflows/frontend.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
 
 jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 1 — Lint (eslint + prettier), svelte-check et build
+  # ────────────────────────────────────────────────────────────────────────────
   quality:
-    name: Check & Build
+    name: Lint, Check & Build
     runs-on: ubuntu-latest
 
     defaults:
@@ -34,12 +49,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint (prettier + eslint)
+        run: npm run lint
+
       - name: Svelte check
         run: npm run check
 
       - name: Build
         run: npm run build
 
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 1 — Tests (vitest)
+  # ────────────────────────────────────────────────────────────────────────────
   tests:
     name: Frontend Tests
     runs-on: ubuntu-latest
@@ -66,3 +87,261 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 2 — SAST : Semgrep (XSS, prototype pollution, open redirect…)
+  # Rapport SARIF complet dans l'onglet Security + passe bloquante sur ERROR
+  # ────────────────────────────────────────────────────────────────────────────
+  sast:
+    name: SAST Semgrep
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    container:
+      image: semgrep/semgrep
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep scan (rapport SARIF complet)
+        run: semgrep scan --config auto --sarif --output semgrep.sarif apps/collector-front
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep-frontend
+
+      - name: Semgrep scan (bloquant sur sévérité ERROR)
+        run: semgrep scan --config auto --severity ERROR --error apps/collector-front
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 4 — SCA : Trivy fs sur le lockfile npm (bloquant CRITICAL/HIGH)
+  # + npm audit complet en informatif (centaines de packages transitifs)
+  # ────────────────────────────────────────────────────────────────────────────
+  sca:
+    name: SCA dépendances npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy fs scan (bloquant CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: apps/collector-front
+          format: sarif
+          output: trivy-front-deps.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-front-deps.sarif
+          category: trivy-frontend-deps
+
+      - name: npm audit (informatif)
+        if: always()
+        working-directory: apps/collector-front
+        run: npm audit --audit-level=high || true
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étapes 5-9 — hadolint, build multi-stage adapter-node, scan Trivy AVANT push,
+  # push GHCR taggé par SHA, SBOM syft, signature + attestation cosign keyless
+  #
+  # NB : les URLs d'API (VITE_*) sont compilées dans le bundle au build.
+  # L'image est buildée pour le staging ; la prod nécessiterait un build dédié
+  # (ou un refactor vers $env/dynamic/public — voir docs/DEVSECOPS.md).
+  # ────────────────────────────────────────────────────────────────────────────
+  image:
+    name: Image collector-front
+    needs: [quality, tests, sast, sca]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write # cosign keyless via OIDC
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Étape 5 — lint du Dockerfile
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/collector-front/Dockerfile
+
+      - name: Compute image name (lowercase)
+        run: echo "IMAGE=${REGISTRY}/${GITHUB_REPOSITORY,,}/collector-front" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (local, jamais poussé avant scan)
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/collector-front
+          load: true
+          tags: ${{ env.IMAGE }}:scan
+          build-args: |
+            VITE_AUTH_API_BASE_URL=http://auth.collector.staging.local
+            VITE_CATALOG_API_BASE_URL=http://api.collector.staging.local
+          cache-from: type=gha,scope=collector-front
+          cache-to: type=gha,mode=max,scope=collector-front
+
+      # Étape 6 — scan de l'image complète, bloquant sur CRITICAL/HIGH
+      - name: Trivy image scan (bloquant CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:scan
+          format: sarif
+          output: trivy-collector-front.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-collector-front.sarif
+          category: trivy-collector-front
+
+      # Étape 9 — push vers GHCR, taggé par SHA de commit (jamais "latest")
+      - name: Login GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        if: github.event_name == 'push'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+
+      - name: Push
+        if: github.event_name == 'push'
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/collector-front
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_AUTH_API_BASE_URL=http://auth.collector.staging.local
+            VITE_CATALOG_API_BASE_URL=http://api.collector.staging.local
+          cache-from: type=gha,scope=collector-front
+
+      # Étape 7 — SBOM SPDX générée depuis l'image poussée
+      - name: Generate SBOM (syft)
+        if: github.event_name == 'push'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-collector-front.spdx.json
+          artifact-name: sbom-collector-front.spdx.json
+
+      # Étape 8 — signature keyless (OIDC GitHub → Rekor) + attestation SBOM
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (cosign keyless)
+        if: github.event_name == 'push'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Attest SBOM (cosign)
+        if: github.event_name == 'push'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate "sbom-collector-front.spdx.json" "${IMAGE}@${DIGEST}"
+
+      - name: Export digest for GitOps job
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p /tmp/digests
+          echo "${IMAGE}@${{ steps.push.outputs.digest }}" > /tmp/digests/collector-front
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: digest-collector-front
+          path: /tmp/digests/collector-front
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Étape 10/11 — GitOps : commit du nouveau digest dans l'overlay staging.
+  # ────────────────────────────────────────────────────────────────────────────
+  update-manifests:
+    name: GitOps — déploiement staging
+    if: github.event_name == 'push'
+    needs: image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    concurrency:
+      group: gitops-update-manifests # partagé avec la CI backend pour éviter les push concurrents
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Pin new image digest in staging overlay
+        working-directory: infra/k8s/overlays/staging
+        run: |
+          for f in /tmp/digests/*; do
+            ref="$(cat "$f")"
+            name="${ref%@*}"
+            echo "→ ${ref}"
+            kustomize edit set image "${name}=${ref}"
+          done
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s/overlays/staging/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "Manifests déjà à jour, rien à committer."
+            exit 0
+          fi
+          git commit -m "ci(gitops): deploy frontend ${GITHUB_SHA::7} to staging"
+          git pull --rebase origin main
+          git push origin main

@@ -1,0 +1,43 @@
+# Étape 15 — Observabilité : kube-prometheus-stack (Prometheus, Grafana,
+# Alertmanager, exporters). Déployée par Argo CD : la boucle GitOps est fermée.
+#
+# Accès Grafana en local :
+#   kubectl port-forward -n monitoring svc/monitoring-grafana 3001:80
+#   (login admin / mot de passe : secret monitoring-grafana)
+#
+# Prochaine étape applicative : exposer /metrics dans les services Go
+# (prometheus/client_golang) + ServiceMonitor par service.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    # "*" = dernière version ; épingler une version précise après la première
+    # installation pour des upgrades maîtrisés.
+    targetRevision: "*"
+    helm:
+      releaseName: monitoring
+      values: |
+        prometheus:
+          prometheusSpec:
+            retention: 7d
+            # permet de découvrir les ServiceMonitors de tous les namespaces
+            serviceMonitorSelectorNilUsesHelmValues: false
+        grafana:
+          defaultDashboardsTimezone: Europe/Paris
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # CRDs très volumineuses (Prometheus, Alertmanager…)
+      - ServerSideApply=true
