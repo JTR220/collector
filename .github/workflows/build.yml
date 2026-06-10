@@ -1,147 +1,178 @@
-name: Global Backend DevSecOps CI
+  name: Global Backend DevSecOps CI
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/backend/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/backend/**'
+  on:
+    push:
+      branches: [main]
+      paths:
+        - "apps/backend/**"
+    pull_request:
+      branches: [main]
+      paths:
+        - "apps/backend/**"
 
-jobs:
-  build-test:
-    name: Build & Tests (${{ matrix.service }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        service: [auth-service, catalog-service]
+  permissions:
+    contents: read
+    security-events: write
 
-    defaults:
-      run:
-        working-directory: apps/backend/${{ matrix.service }}
+  concurrency:
+    group: backend-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
-    steps:
-      - uses: actions/checkout@v4
+  jobs:
+    build-test:
+      name: Build & Tests (${{ matrix.service }})
+      runs-on: ubuntu-latest
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/backend/${{ matrix.service }}/go.mod
-          cache: true
-          cache-dependency-path: apps/backend/${{ matrix.service }}/go.sum
+      strategy:
+        fail-fast: false
+        matrix:
+          service:
+            - auth-service
+            - catalog-service
 
-      - name: Go fmt check
-        run: |
-          if [ -n "$(gofmt -l .)" ]; then
-            echo "Formatage Go incorrect detecte"
-            exit 1
-          fi
+      defaults:
+        run:
+          working-directory: apps/backend/${{ matrix.service }}
 
-      - name: Go test with coverage
-        run: go test ./... -coverprofile=coverage.out
+      steps:
+        - uses: actions/checkout@v4
 
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-${{ matrix.service }}
-          path: apps/backend/${{ matrix.service }}/coverage.out
+        - name: Setup Go
+          uses: actions/setup-go@v5
+          with:
+            go-version-file: apps/backend/${{ matrix.service }}/go.mod
+            cache: true
+            cache-dependency-path: apps/backend/${{ matrix.service }}/go.sum
 
-  sonarcloud:
-    name: Code Quality (${{ matrix.service }})
-    needs: build-test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [auth-service, catalog-service]
+        - name: Check formatting
+          run: |
+            if [ -n "$(gofmt -l .)" ]; then
+              echo "Go formatting errors detected:"
+              gofmt -l .
+              exit 1
+            fi
 
-    defaults:
-      run:
-        working-directory: apps/backend/${{ matrix.service }}
+        - name: Go Vet
+          run: go vet ./...
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        - name: Run Tests
+          run: |
+            go test -race \
+              -covermode=atomic \
+              -coverprofile=coverage.out \
+              ./...
 
-      - name: Download coverage report
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-report-${{ matrix.service }}
-          path: apps/backend/${{ matrix.service }}
+        - name: Upload coverage
+          uses: actions/upload-artifact@v4
+          if: always()
+          with:
+            name: coverage-${{ matrix.service }}
+            path: apps/backend/${{ matrix.service }}/coverage.out
 
-      - name: SonarCloud Scan
-        uses: sonarsource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.projectKey=JTR220_collector_${{ matrix.service }}
-            -Dsonar.organization=jtr220
-            -Dsonar.sources=.
-            -Dsonar.go.coverage.reportPaths=coverage.out
-            -Dsonar.exclusions=**/*_test.go
+    sonarcloud:
+      name: SonarCloud (${{ matrix.service }})
+      needs: build-test
 
-  security-scans:
-    name: Security Scans (${{ matrix.service }})
-    needs: build-test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [auth-service, catalog-service]
+      runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: apps/backend/${{ matrix.service }}
+      strategy:
+        fail-fast: false
+        matrix:
+          service:
+            - auth-service
+            - catalog-service
 
-    steps:
-      - uses: actions/checkout@v4
+      defaults:
+        run:
+          working-directory: apps/backend/${{ matrix.service }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/backend/${{ matrix.service }}/go.mod
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
 
-      - name: Install security tools
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+        - uses: actions/download-artifact@v4
+          with:
+            name: coverage-${{ matrix.service }}
+            path: apps/backend/${{ matrix.service }}
 
-      - name: SAST (gosec JSON)
-        run: gosec -fmt=json -out=gosec-report.json ./...
+        - name: SonarCloud Scan
+          uses: sonarsource/sonarqube-scan-action@v6
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          with:
+            args: >
+              -Dsonar.projectKey=JTR220_collector_${{ matrix.service }}
+              -Dsonar.organization=jtr220
+              -Dsonar.sources=.
+              -Dsonar.go.coverage.reportPaths=coverage.out
+              -Dsonar.exclusions=**/*_test.go
 
-      - name: SAST (gosec SARIF)
-        if: always()
-        run: gosec -fmt=sarif -out=gosec.sarif ./... || true
+    security:
+      name: Security (${{ matrix.service }})
+      needs: build-test
 
-      - name: Upload SARIF to GitHub Security
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: apps/backend/${{ matrix.service }}/gosec.sarif
+      runs-on: ubuntu-latest
 
-      - name: SCA (govulncheck)
-        run: govulncheck -format json ./... > govulncheck-report.json
+      strategy:
+        fail-fast: false
+        matrix:
+          service:
+            - auth-service
+            - catalog-service
 
-      - name: Upload Security Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-reports-${{ matrix.service }}
-          path: |
-            apps/backend/${{ matrix.service }}/gosec-report.json
-            apps/backend/${{ matrix.service }}/gosec.sarif
-            apps/backend/${{ matrix.service }}/govulncheck-report.json
+      defaults:
+        run:
+          working-directory: apps/backend/${{ matrix.service }}
 
-  secrets-gitleaks:
-    name: Secret Scanning (Gitleaks)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      steps:
+        - uses: actions/checkout@v4
 
-      - uses: gitleaks/gitleaks-action@v2
+        - uses: actions/setup-go@v5
+          with:
+            go-version-file: apps/backend/${{ matrix.service }}/go.mod
+
+        - name: Install tools
+          run: |
+            go install github.com/securego/gosec/v2/cmd/gosec@latest
+            go install golang.org/x/vuln/cmd/govulncheck@latest
+
+        - name: Run gosec (JSON)
+          run: gosec -fmt=json -out=gosec-report.json ./...
+
+        - name: Run gosec (SARIF)
+          if: always()
+          run: |
+            gosec -fmt=sarif -out=gosec.sarif ./... || true
+
+        - name: Upload SARIF
+          if: always()
+          uses: github/codeql-action/upload-sarif@v4
+          with:
+            sarif_file: apps/backend/${{ matrix.service }}/gosec.sarif
+
+        - name: Run govulncheck
+          run: |
+            govulncheck -format json ./... > govulncheck-report.json
+
+        - name: Upload reports
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: security-${{ matrix.service }}
+            path: |
+              apps/backend/${{ matrix.service }}/gosec-report.json
+              apps/backend/${{ matrix.service }}/gosec.sarif
+              apps/backend/${{ matrix.service }}/govulncheck-report.json
+
+    gitleaks:
+      name: Secret Scan
+
+      runs-on: ubuntu-latest
+
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+        - uses: gitleaks/gitleaks-action@v2
