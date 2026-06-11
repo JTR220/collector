@@ -4,7 +4,7 @@
 #
 # Les variables VITE_* sont compilées dans le bundle AU BUILD : cette image
 # est donc liée à un environnement (build args injectés par la CI).
-FROM node:22.12-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -24,9 +24,16 @@ ENV VITE_AUTH_API_BASE_URL=${VITE_AUTH_API_BASE_URL} \
 
 RUN npm run build && npm prune --omit=dev
 
-FROM node:22.12-alpine
+FROM node:22-alpine
 
 WORKDIR /app
+
+# Durcissement : applique les patchs Alpine du jour et retire les outils de
+# build (npm, corepack, yarn) inutiles au runtime — `node build` suffit.
+# hadolint ignore=DL3017
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+       /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
