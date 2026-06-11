@@ -3,6 +3,7 @@ package controllers
 import (
 	"auth-service/models"
 	"auth-service/repository"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -69,7 +70,9 @@ func Login(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+		// notification-service attend un claim "sub" au format UUID
+		"sub": fmt.Sprintf("00000000-0000-0000-0000-%012x", user.ID),
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(secret))

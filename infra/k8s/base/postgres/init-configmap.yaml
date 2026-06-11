@@ -1,0 +1,15 @@
+# Cree les bases price-tracker / notification au premier init du volume postgres
+# (les scripts de /docker-entrypoint-initdb.d ne s'executent que sur un volume vierge).
+# Sur un cluster deja initialise : kubectl exec postgres-0 -- \
+#   psql -U postgres -c "CREATE DATABASE collector_price" \
+#   -c "CREATE DATABASE collector_notifications"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  labels:
+    app: postgres
+data:
+  init-dbs.sql: |
+    CREATE DATABASE collector_price;
+    CREATE DATABASE collector_notifications;

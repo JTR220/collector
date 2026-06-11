@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: price-tracker-service
+  labels:
+    app: price-tracker-service
+spec:
+  selector:
+    app: price-tracker-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

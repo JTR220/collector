@@ -1,9 +1,19 @@
 package config
 
 import (
+	"os"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
+
+// envOr renvoie la variable d'environnement si elle est définie, sinon def.
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
 
 type Config struct {
 	Server   ServerConfig
@@ -48,5 +58,17 @@ func Load() *Config {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		log.Fatal().Err(err).Msg("failed to load config")
 	}
+
+	// viper.AutomaticEnv() n'alimente pas Unmarshal de façon fiable : on applique
+	// explicitement les surcharges d'environnement par-dessus les valeurs par défaut.
+	cfg.Server.Port = envOr("PORT", cfg.Server.Port)
+	cfg.Database.DSN = envOr("DATABASE_DSN", cfg.Database.DSN)
+	cfg.RabbitMQ.URL = envOr("RABBITMQ_URL", cfg.RabbitMQ.URL)
+	cfg.RabbitMQ.ExchangeEvents = envOr("RABBITMQ_EXCHANGE_EVENTS", cfg.RabbitMQ.ExchangeEvents)
+	cfg.RabbitMQ.ExchangeAlerts = envOr("RABBITMQ_EXCHANGE_ALERTS", cfg.RabbitMQ.ExchangeAlerts)
+	cfg.RabbitMQ.QueuePriceNotif = envOr("RABBITMQ_QUEUE_PRICE_NOTIF", cfg.RabbitMQ.QueuePriceNotif)
+	cfg.RabbitMQ.QueueFraudNotif = envOr("RABBITMQ_QUEUE_FRAUD_NOTIF", cfg.RabbitMQ.QueueFraudNotif)
+	cfg.JWT.Secret = envOr("JWT_SECRET", cfg.JWT.Secret)
+
 	return &cfg
 }

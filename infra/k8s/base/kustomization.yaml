@@ -11,10 +11,17 @@ labels:
 resources:
   - postgres/statefulset.yaml
   - postgres/service.yaml
+  - postgres/init-configmap.yaml
+  - rabbitmq/statefulset.yaml
+  - rabbitmq/service.yaml
   - auth-service/deployment.yaml
   - auth-service/service.yaml
   - catalog-service/deployment.yaml
   - catalog-service/service.yaml
   - catalog-service/pvc.yaml
+  - price-tracker-service/deployment.yaml
+  - price-tracker-service/service.yaml
+  - notification-service/deployment.yaml
+  - notification-service/service.yaml
   - collector-front/deployment.yaml
   - collector-front/service.yaml

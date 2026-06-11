@@ -199,6 +199,8 @@ jobs:
           build-args: |
             VITE_AUTH_API_BASE_URL=http://auth.collector.staging.local
             VITE_CATALOG_API_BASE_URL=http://api.collector.staging.local
+            VITE_PRICE_TRACKER_API_BASE_URL=http://price.collector.staging.local
+            VITE_NOTIFICATION_API_BASE_URL=http://notifications.collector.staging.local
           cache-from: type=gha,scope=collector-front
           cache-to: type=gha,mode=max,scope=collector-front
 
@@ -251,6 +253,8 @@ jobs:
           build-args: |
             VITE_AUTH_API_BASE_URL=http://auth.collector.staging.local
             VITE_CATALOG_API_BASE_URL=http://api.collector.staging.local
+            VITE_PRICE_TRACKER_API_BASE_URL=http://price.collector.staging.local
+            VITE_NOTIFICATION_API_BASE_URL=http://notifications.collector.staging.local
           cache-from: type=gha,scope=collector-front
 
       # Étape 7 — SBOM SPDX générée depuis l'image poussée

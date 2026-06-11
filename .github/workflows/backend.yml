@@ -42,6 +42,8 @@ jobs:
         service:
           - auth-service
           - catalog-service
+          - price-tracker-service
+          - notification-service
 
     defaults:
       run:
@@ -115,6 +117,16 @@ jobs:
           name: coverage-catalog-service
           path: apps/backend/catalog-service
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-price-tracker-service
+          path: apps/backend/price-tracker-service
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-notification-service
+          path: apps/backend/notification-service
+
       - name: SonarCloud Scan
         uses: sonarsource/sonarqube-scan-action@v6
         env:
@@ -127,7 +139,7 @@ jobs:
             -Dsonar.exclusions=**/*_test.go
             -Dsonar.tests=apps/backend
             -Dsonar.test.inclusions=**/*_test.go
-            -Dsonar.go.coverage.reportPaths=apps/backend/auth-service/coverage.out,apps/backend/catalog-service/coverage.out
+            -Dsonar.go.coverage.reportPaths=apps/backend/auth-service/coverage.out,apps/backend/catalog-service/coverage.out,apps/backend/price-tracker-service/coverage.out,apps/backend/notification-service/coverage.out
 
   # ────────────────────────────────────────────────────────────────────────────
   # Étape 2 — SAST : gosec (bloquant, rapport SARIF dans l'onglet Security)
@@ -146,6 +158,8 @@ jobs:
         service:
           - auth-service
           - catalog-service
+          - price-tracker-service
+          - notification-service
 
     defaults:
       run:
@@ -185,6 +199,8 @@ jobs:
         service:
           - auth-service
           - catalog-service
+          - price-tracker-service
+          - notification-service
 
     defaults:
       run:
@@ -224,6 +240,8 @@ jobs:
         service:
           - auth-service
           - catalog-service
+          - price-tracker-service
+          - notification-service
 
     steps:
       - uses: actions/checkout@v4

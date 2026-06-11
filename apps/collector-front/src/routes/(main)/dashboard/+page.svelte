@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fetchAlerts, resolveAlert, type FraudAlertAPI } from '$lib/api/priceTracker';
+	import { fromEventUuid } from '$lib/utils/eventId';
 
 	const authApiUrl = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 	const catalogApiUrl = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
@@ -130,8 +132,38 @@
 		}
 	}
 
+	// --- Alertes fraude (price-tracker) ---
+	let fraudAlerts: FraudAlertAPI[] = [];
+	let fraudTrackerDown = false;
+
+	async function fetchFraudAlerts() {
+		try {
+			fraudAlerts = await fetchAlerts(true);
+			fraudTrackerDown = false;
+		} catch {
+			fraudAlerts = [];
+			fraudTrackerDown = true;
+		}
+	}
+
+	async function onResolveAlert(id: string) {
+		try {
+			await resolveAlert(id);
+			fraudAlerts = fraudAlerts.filter((a) => a.id !== id);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	const reasonLabels: Record<FraudAlertAPI['reason'], string> = {
+		SUSPICIOUS_SPIKE: 'Hausse suspecte',
+		FLOOD_PRICING: 'Modifications en rafale',
+		DUMPING: 'Prix anormalement bas'
+	};
+
 	onMount(() => {
 		fetchLiveData();
+		fetchFraudAlerts();
 	});
 
 	function coverageBadge(v: number) {
@@ -206,6 +238,55 @@
 					</button>
 				{/each}
 			</div>
+		</div>
+
+		<!-- Alertes fraude — price-tracker -->
+		<div class="mb-8">
+			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
+				Alertes fraude · <span class="text-orange-500">price-tracker</span>
+			</p>
+			{#if fraudTrackerDown}
+				<div
+					class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-400 shadow-sm"
+				>
+					price-tracker-service indisponible.
+				</div>
+			{:else if fraudAlerts.length === 0}
+				<div
+					class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm"
+				>
+					Aucune alerte non résolue. ✓
+				</div>
+			{:else}
+				<div class="grid gap-3">
+					{#each fraudAlerts as alert (alert.id)}
+						<div
+							class="flex flex-col gap-3 rounded-3xl border border-red-200 bg-red-50 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+						>
+							<div>
+								<p class="text-sm font-black tracking-wide text-red-700 uppercase">
+									{reasonLabels[alert.reason] ?? alert.reason}
+									<span class="ml-2 font-mono text-xs font-normal text-red-400">
+										article #{fromEventUuid(alert.item_id)}
+									</span>
+								</p>
+								<p class="mt-1 text-sm text-slate-600">{alert.detail}</p>
+								<p class="mt-1 font-mono text-xs text-slate-400">
+									{alert.old_price.toFixed(2)} € → {alert.new_price.toFixed(2)} € · {new Date(
+										alert.created_at
+									).toLocaleString('fr-FR')}
+								</p>
+							</div>
+							<button
+								onclick={() => onResolveAlert(alert.id)}
+								class="self-start rounded-2xl border border-red-300 bg-white px-4 py-2 text-xs font-bold tracking-widest text-red-700 uppercase shadow-sm transition hover:bg-red-100 sm:self-auto"
+							>
+								Résoudre
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- =============================== -->

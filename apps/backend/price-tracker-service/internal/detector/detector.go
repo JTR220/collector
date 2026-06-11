@@ -49,8 +49,6 @@ func (d *Detector) checkSpike(ctx context.Context, event *model.PriceUpdatedEven
 		return nil
 	}
 
-	deltaPercent := ((event.NewPrice - event.OldPrice) / event.OldPrice) * 100
-
 	// Cherche le prix de référence dans la fenêtre glissante
 	refWindow := time.Duration(d.rules.SpikeWindowHours) * time.Hour
 	refPrice, err := d.repo.GetLastPrice(ctx, event.ItemID, refWindow)

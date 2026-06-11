@@ -70,6 +70,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(corsMiddleware())
 
 	h := handler.New(repo)
 	h.RegisterRoutes(router)
@@ -116,4 +117,24 @@ func main() {
 	}
 
 	log.Info().Msg("price-tracker-service stopped")
+}
+
+// corsMiddleware reprend la convention du catalog-service (FRONTEND_ORIGIN).
+func corsMiddleware() gin.HandlerFunc {
+	allowedOrigin := os.Getenv("FRONTEND_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:5173"
+	}
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
 }

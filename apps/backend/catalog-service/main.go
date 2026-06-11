@@ -1,9 +1,11 @@
 package main
 
 import (
+	"catalog-service/events"
 	"catalog-service/repository"
 	"catalog-service/routes"
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -16,6 +18,9 @@ func main() {
 
 	repository.InitDB()
 	repository.SeedData()
+
+	events.Init(os.Getenv("RABBITMQ_URL"))
+	defer events.Current.Close()
 
 	router := routes.InitRouter()
 	err = router.Run(":8081")
