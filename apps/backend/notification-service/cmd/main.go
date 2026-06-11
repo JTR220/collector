@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot connect to postgres")
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	log.Info().Msg("connected to postgres")
 
 	repo := repository.New(db)
@@ -44,13 +44,13 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot connect to rabbitmq")
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ch, err := conn.Channel()
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot open rabbitmq channel")
 	}
-	defer ch.Close()
+	defer func() { _ = ch.Close() }()
 
 	if err := consumer.Setup(ch, &cfg.RabbitMQ); err != nil {
 		log.Fatal().Err(err).Msg("rabbitmq setup failed")

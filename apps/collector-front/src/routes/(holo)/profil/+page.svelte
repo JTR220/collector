@@ -53,7 +53,11 @@
 	}
 
 	const fmtDate = (iso: string) =>
-		new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+		new Date(iso).toLocaleDateString('fr-FR', {
+			day: '2-digit',
+			month: '2-digit',
+			year: 'numeric'
+		});
 </script>
 
 <svelte:head><title>PROFIL · Collector.shop</title></svelte:head>

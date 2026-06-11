@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
-	import { eur, pct, sparkPath } from '$lib/utils/format';
+	import { eur, pct } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GMeter from '$lib/components/galerie/GMeter.svelte';
 	import GChip from '$lib/components/galerie/GChip.svelte';

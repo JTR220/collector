@@ -75,9 +75,10 @@ describe('connectNotifications (reconnexion)', () => {
 		vi.useRealTimers();
 	});
 
-	it('ouvre une connexion vers ws://.../ws?token=', () => {
+	it('ouvre une connexion WebSocket vers /ws?token=', () => {
 		socket = connectNotifications('tok-xyz', () => {});
 		expect(FakeWebSocket.instances).toHaveLength(1);
+		// nosemgrep: javascript.lang.security.detect-insecure-websocket -- URL de dev attendue dans le test
 		expect(FakeWebSocket.instances[0].url).toBe('ws://localhost:8083/ws?token=tok-xyz');
 	});
 

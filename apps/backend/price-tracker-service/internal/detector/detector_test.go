@@ -1,7 +1,6 @@
 package detector_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -11,23 +10,6 @@ import (
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
 	"github.com/google/uuid"
 )
-
-// mockRepo allows testing without a real DB
-type mockRepo struct {
-	countResult int
-	lastPrice   float64
-}
-
-func (m *mockRepo) CountUpdatesInWindow(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-	return m.countResult, nil
-}
-
-func (m *mockRepo) GetLastPrice(_ context.Context, _ uuid.UUID, _ time.Duration) (float64, error) {
-	return m.lastPrice, nil
-}
-
-// We need a testable interface — in real code you'd define a RepoInterface
-// Here we test the detector with a real (embedded) detector logic
 
 func defaultRules() config.DetectionRules {
 	return config.DetectionRules{
