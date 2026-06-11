@@ -1,25 +1,34 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { page } from '$app/stores';
-	import { refreshStats } from '$lib/stores/stats';
+	import { auth } from '$lib/stores/auth';
+	import { notifications } from '$lib/stores/notifications';
 	import GFrame from '$lib/components/galerie/GFrame.svelte';
 	import GHeader from '$lib/components/galerie/GHeader.svelte';
 
 	let { children } = $props();
 
-	onMount(() => {
-		refreshStats();
+	// Connexion WebSocket notifications liee a la session : ouverte au login,
+	// fermee au logout ou en quittant le layout.
+	let currentToken: string | null = null;
+	const unsubAuth = auth.subscribe(($auth) => {
+		if ($auth.token === currentToken) return;
+		currentToken = $auth.token;
+		if ($auth.token) {
+			notifications.start($auth.token);
+		} else {
+			notifications.reset();
+		}
+	});
+
+	onDestroy(() => {
+		unsubAuth();
+		notifications.stop();
 	});
 
 	const routeToActive: Record<string, string> = {
 		'/': 'Vitrine',
-		'/vendre': 'Vendre',
-		'/marche': 'Marché',
-		'/profil': 'Profil',
-		'/quetes': 'Quêtes',
-		'/ligue': 'Ligue',
-		'/drops': 'Drops',
-		'/journal': 'Journal'
+		'/profil': 'Profil'
 	};
 
 	const active = $derived(routeToActive[$page.url.pathname] ?? 'Vitrine');

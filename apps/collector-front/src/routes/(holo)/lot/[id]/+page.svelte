@@ -3,17 +3,10 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
-	import { refreshStats } from '$lib/stores/stats';
 	import { fetchArticle, articleImage, type ArticleAPI } from '$lib/api/catalog';
-	import {
-		createDropEntry,
-		addToWishlist,
-		removeFromWishlist,
-		fetchMyWishlist,
-		createJournalEntry,
-		type DropEntryKind
-	} from '$lib/api/engagement';
-	import { buyArticle, uploadArticleImage, deleteListing } from '$lib/api/market';
+	import { addToWishlist, removeFromWishlist, fetchMyWishlist } from '$lib/api/wishlist';
+	import { buyArticle } from '$lib/api/market';
+	import { fetchPriceHistory } from '$lib/api/priceTracker';
 	import { eur, eurC, pct, sparkPath } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GChip from '$lib/components/galerie/GChip.svelte';
@@ -26,10 +19,7 @@
 	let actionMsg = $state<string | null>(null);
 	let actionBusy = $state(false);
 
-	// Formulaire d'avis
-	let rating = $state(0);
-	let note = $state('');
-	let reviewSent = $state(false);
+	let trackedPrices = $state<number[]>([]);
 
 	onMount(async () => {
 		try {
@@ -44,6 +34,16 @@
 		} finally {
 			loading = false;
 		}
+
+		// Historique temps reel du price-tracker (echec silencieux si indisponible)
+		if (article) {
+			try {
+				const hist = await fetchPriceHistory(article.ID);
+				trackedPrices = hist.map((h) => h.new_price);
+			} catch {
+				trackedPrices = [];
+			}
+		}
 	});
 
 	function requireAuth(): string | null {
@@ -52,28 +52,6 @@
 			return null;
 		}
 		return $auth.token;
-	}
-
-	async function enterDrop(kind: DropEntryKind) {
-		const token = requireAuth();
-		if (!token || !article) return;
-		actionBusy = true;
-		actionMsg = null;
-		try {
-			const res = await createDropEntry(token, article.ID, kind);
-			if (res.already) {
-				actionMsg = 'Vous êtes déjà inscrit à ce drop.';
-			} else {
-				if (res.seatsLeft != null) article.seatsLeft = res.seatsLeft;
-				if (res.dropStatus) article.dropStatus = res.dropStatus as ArticleAPI['dropStatus'];
-				actionMsg = `Inscription confirmée · +${res.xp ?? 0} XP`;
-				refreshStats();
-			}
-		} catch (e) {
-			actionMsg = e instanceof Error ? e.message : 'Erreur lors de l’inscription.';
-		} finally {
-			actionBusy = false;
-		}
 	}
 
 	async function toggleWishlist() {
@@ -88,8 +66,7 @@
 			} else {
 				const res = await addToWishlist(token, article.ID);
 				inWishlist = true;
-				actionMsg = res.already ? 'Déjà dans la wishlist.' : 'Ajouté à la wishlist · +30 XP';
-				refreshStats();
+				actionMsg = res.already ? 'Déjà dans la wishlist.' : 'Ajouté à la wishlist.';
 			}
 		} catch (e) {
 			actionMsg = e instanceof Error ? e.message : 'Erreur wishlist.';
@@ -98,23 +75,15 @@
 		}
 	}
 
-	// ── Marketplace : achat direct, photo, retrait d'annonce ──
-	const isDirect = $derived(article?.saleType === 'direct');
-	const isMine = $derived(
-		!!article && article.sellerId !== 0 && article.sellerId === $auth.user?.id
-	);
-
 	async function buyNow() {
 		const token = requireAuth();
 		if (!token || !article) return;
 		actionBusy = true;
 		actionMsg = null;
 		try {
-			const res = await buyArticle(token, article.ID);
+			await buyArticle(token, article.ID);
 			article.sold = true;
-			article.dropStatus = 'sold';
-			actionMsg = `Achat confirmé · +${res.xp} XP — suivez la commande dans votre marché.`;
-			refreshStats();
+			actionMsg = 'Achat confirmé — retrouvez la commande dans votre profil.';
 		} catch (e) {
 			actionMsg = e instanceof Error ? e.message : 'Erreur lors de l’achat.';
 		} finally {
@@ -122,66 +91,19 @@
 		}
 	}
 
-	let photoInput = $state<HTMLInputElement | null>(null);
-
-	async function sendPhoto() {
-		const token = requireAuth();
-		const file = photoInput?.files?.[0];
-		if (!token || !article || !file) return;
-		actionBusy = true;
-		actionMsg = null;
-		try {
-			const res = await uploadArticleImage(token, article.ID, file);
-			article.imageUrl = res.imageUrl;
-			actionMsg = 'Photo mise à jour.';
-			refreshStats();
-		} catch (e) {
-			actionMsg = e instanceof Error ? e.message : 'Erreur lors de l’upload.';
-		} finally {
-			actionBusy = false;
-			if (photoInput) photoInput.value = '';
-		}
-	}
-
-	async function removeListing() {
-		const token = requireAuth();
-		if (!token || !article) return;
-		actionBusy = true;
-		try {
-			await deleteListing(token, article.ID);
-			goto('/marche');
-		} catch (e) {
-			actionMsg = e instanceof Error ? e.message : 'Erreur lors du retrait.';
-			actionBusy = false;
-		}
-	}
-
-	async function sendReview() {
-		const token = requireAuth();
-		if (!token || !article || rating === 0) return;
-		actionBusy = true;
-		try {
-			await createJournalEntry(token, { articleId: article.ID, kind: 'noté', rating, note });
-			reviewSent = true;
-			actionMsg = 'Avis publié dans votre journal · +30 XP';
-			refreshStats();
-		} catch (e) {
-			actionMsg = e instanceof Error ? e.message : 'Erreur lors de la publication.';
-		} finally {
-			actionBusy = false;
-		}
-	}
-
-	const ctaByStatus: Record<string, { label: string; kind: DropEntryKind }> = {
-		live: { label: 'Acheter ce lot', kind: 'purchase' },
-		next: { label: 'Entrer dans le raffle', kind: 'raffle' },
-		soon: { label: '+ Rappel au lancement', kind: 'reminder' },
-		sold: { label: 'Rejoindre la liste d’attente', kind: 'waitlist' }
-	};
-
 	const W = 560;
 	const H = 140;
-	const historyPath = $derived(article ? sparkPath(article.priceHistory ?? [], W, H) : '');
+	// Serie du catalogue, prolongee par les changements captes par le price-tracker
+	const historySeries = $derived.by(() => {
+		const base = article?.priceHistory ?? [];
+		if (!trackedPrices.length) return base;
+		const merged = [...base];
+		for (const p of trackedPrices) {
+			if (merged[merged.length - 1] !== p) merged.push(p);
+		}
+		return merged;
+	});
+	const historyPath = $derived(article ? sparkPath(historySeries, W, H) : '');
 	const up = $derived((article?.delta ?? 0) >= 0);
 </script>
 
@@ -193,7 +115,6 @@
 	<p class="state-msg error">{error}</p>
 	<a class="back-link" href="/">← Retour à la vitrine</a>
 {:else}
-	{@const cta = ctaByStatus[article.dropStatus] ?? ctaByStatus.soon}
 	{@const img = articleImage(article)}
 	<a class="back-link" href="/">← Vitrine</a>
 
@@ -224,8 +145,6 @@
 			<div class="lot-chips">
 				<GChip>{article.grade}</GChip>
 				<GChip>{article.rarity}</GChip>
-				<GChip color={article.dropStatus === 'live' ? '#86b3a4' : '#a39a8c'}>{article.dropId}</GChip
-				>
 			</div>
 
 			<p class="lot-desc">{article.description}</p>
@@ -246,55 +165,18 @@
 				</div>
 			</div>
 
-			{#if article.seatsTotal > 0 && article.dropStatus !== 'sold'}
-				<p class="lot-seats">
-					{article.seatsLeft} / {article.seatsTotal} places restantes · drop du {article.dropDate}
-				</p>
-			{/if}
-
 			<div class="lot-actions">
-				{#if isDirect}
-					{#if article.sold}
-						<button class="btn-primary" disabled>Vendu</button>
-					{:else if isMine}
-						<button class="btn-ghost" disabled>Votre annonce</button>
-					{:else}
-						<button class="btn-primary" disabled={actionBusy} onclick={buyNow}>
-							Acheter maintenant · {eur(article.prix)}
-						</button>
-					{/if}
+				{#if article.sold}
+					<button class="btn-primary" disabled>Vendu</button>
 				{:else}
-					<button class="btn-primary" disabled={actionBusy} onclick={() => enterDrop(cta.kind)}>
-						{cta.label}
+					<button class="btn-primary" disabled={actionBusy} onclick={buyNow}>
+						Acheter maintenant · {eur(article.prix)}
 					</button>
 				{/if}
 				<button class="btn-ghost" disabled={actionBusy} onclick={toggleWishlist}>
 					{inWishlist ? '♥ Dans la wishlist' : '♡ Wishlist'}
 				</button>
 			</div>
-
-			{#if isMine}
-				<div class="owner-panel">
-					<Kicker>Gérer votre annonce</Kicker>
-					<div class="owner-actions">
-						<input
-							bind:this={photoInput}
-							type="file"
-							accept=".jpg,.jpeg,.png,.webp"
-							class="owner-file"
-							onchange={sendPhoto}
-						/>
-						<button class="btn-ghost" disabled={actionBusy} onclick={() => photoInput?.click()}>
-							{article.imageUrl ? 'Changer la photo' : '+ Ajouter une photo'}
-						</button>
-						{#if !article.sold}
-							<button class="btn-danger" disabled={actionBusy} onclick={removeListing}>
-								Retirer de la vente
-							</button>
-						{/if}
-					</div>
-				</div>
-			{/if}
 
 			{#if actionMsg}
 				<p class="action-msg">{actionMsg}</p>
@@ -333,42 +215,10 @@
 			<path d={historyPath} stroke={up ? '#86c099' : '#d79c86'} stroke-width="2" fill="none" />
 		</svg>
 		<div class="history-vals">
-			{#each article.priceHistory ?? [] as p}
+			{#each historySeries as p}
 				<span>{eur(p)}</span>
 			{/each}
 		</div>
-	</GPanel>
-
-	<!-- Avis -->
-	<GPanel style="margin-top:14px">
-		<Kicker>Noter cette pièce</Kicker>
-		{#if reviewSent}
-			<p class="review-done">
-				Merci, votre avis est publié dans votre <a href="/journal">journal</a>.
-			</p>
-		{:else}
-			<div class="review-stars">
-				{#each [1, 2, 3, 4, 5] as star}
-					<button
-						class="star-btn"
-						class:star-on={rating >= star}
-						onclick={() => (rating = star)}
-						aria-label="{star} étoiles"
-					>
-						{rating >= star ? '★' : '☆'}
-					</button>
-				{/each}
-			</div>
-			<textarea
-				class="review-input"
-				bind:value={note}
-				rows="3"
-				placeholder="État, emballage, communication du vendeur…"
-			></textarea>
-			<button class="btn-primary" disabled={rating === 0 || actionBusy} onclick={sendReview}
-				>Publier l'avis (+30 XP)</button
-			>
-		{/if}
 	</GPanel>
 {/if}
 
@@ -529,13 +379,6 @@
 		color: #86b3a4;
 	}
 
-	.lot-seats {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 11.5px;
-		color: #a39a8c;
-		margin-bottom: 14px;
-	}
-
 	.lot-actions {
 		display: flex;
 		gap: 10px;
@@ -580,37 +423,6 @@
 		color: #86b3a4;
 	}
 
-	.btn-danger {
-		padding: 12px 18px;
-		border-radius: 7px;
-		border: 1px solid rgba(215, 156, 134, 0.4);
-		background: transparent;
-		color: #d79c86;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		cursor: pointer;
-		transition:
-			border-color 120ms,
-			background 120ms;
-	}
-	.btn-danger:hover:not(:disabled) {
-		border-color: #d79c86;
-		background: rgba(215, 156, 134, 0.08);
-	}
-
-	.owner-panel {
-		margin-top: 18px;
-	}
-	.owner-actions {
-		display: flex;
-		gap: 10px;
-		margin-top: 10px;
-		flex-wrap: wrap;
-	}
-	.owner-file {
-		display: none;
-	}
-
 	.action-msg {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12.5px;
@@ -649,49 +461,5 @@
 		font-size: 10px;
 		color: #766d60;
 		margin-top: 6px;
-	}
-
-	.review-stars {
-		display: flex;
-		gap: 4px;
-		margin: 12px 0;
-	}
-	.star-btn {
-		background: none;
-		border: none;
-		font-size: 26px;
-		color: #766d60;
-		cursor: pointer;
-		padding: 0 2px;
-		transition: color 120ms;
-	}
-	.star-btn.star-on {
-		color: #86b3a4;
-	}
-	.review-input {
-		width: 100%;
-		box-sizing: border-box;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(236, 229, 218, 0.12);
-		border-radius: 7px;
-		padding: 11px 14px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		outline: none;
-		resize: vertical;
-		margin-bottom: 12px;
-	}
-	.review-input:focus {
-		border-color: rgba(134, 179, 164, 0.5);
-	}
-	.review-done {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		color: #86c099;
-		margin-top: 10px;
-	}
-	.review-done a {
-		color: #86b3a4;
 	}
 </style>

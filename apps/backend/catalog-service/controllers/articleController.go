@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"catalog-service/events"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"net/http"
@@ -83,15 +84,26 @@ func UpdateArticle(c *gin.Context) {
 		return
 	}
 
+	oldPrix := article.Prix
+
 	article.Name = input.Name
 	article.Description = input.Description
 	article.Prix = input.Prix
 	article.FraisPort = input.FraisPort
 	article.CategoryID = input.CategoryID
+	if input.Prix != oldPrix {
+		article.PriceHistory = append(article.PriceHistory, input.Prix)
+	}
 
 	if err := repository.DB.Save(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de mettre a jour l'article"})
 		return
+	}
+
+	// Seul un vrai changement de prix est publie : BuyArticle n'emet rien
+	// (un event old==new fausserait le detecteur spike/flood du price-tracker).
+	if input.Prix != oldPrix {
+		events.Current.PublishPriceUpdated(article.ID, article.SellerID, oldPrix, article.Prix)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

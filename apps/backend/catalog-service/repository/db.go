@@ -29,9 +29,7 @@ func InitDB() {
 
 	err = DB.AutoMigrate(
 		&models.Categorie{}, &models.Article{},
-		&models.UserStat{}, &models.DropEntry{}, &models.WishlistItem{},
-		&models.JournalEntry{}, &models.UserQuest{}, &models.LeagueBot{},
-		&models.Order{},
+		&models.WishlistItem{}, &models.Order{},
 	)
 	if err != nil {
 		log.Fatal("Echec lors de la creation des tables : ", err)
@@ -39,8 +37,7 @@ func InitDB() {
 }
 
 func SeedData() {
-	seedLeagueBots()
-	defer backfillMarketplace()
+	defer backfillArticleImages()
 
 	var count int64
 	DB.Model(&models.Article{}).Count(&count)
@@ -231,14 +228,9 @@ func SeedData() {
 	log.Printf("Seed termine : %d categories, %d articles inseres", len(categories), len(articles))
 }
 
-// backfillMarketplace complète les colonnes marketplace des articles existants :
-// les articles seedés deviennent des drops, et reçoivent une photo de démo
-// stable (picsum seedé par slug) tant qu'aucune vraie photo n'a été uploadée.
-func backfillMarketplace() {
-	DB.Model(&models.Article{}).
-		Where("sale_type IS NULL OR sale_type = ''").
-		Update("sale_type", "drop")
-
+// backfillArticleImages donne aux articles existants une photo de démo stable
+// (picsum seedé par slug) tant qu'aucune vraie photo n'a été uploadée.
+func backfillArticleImages() {
 	var articles []models.Article
 	DB.Where("image_url IS NULL OR image_url = ''").Find(&articles)
 	for i := range articles {
@@ -250,33 +242,6 @@ func backfillMarketplace() {
 		DB.Model(&articles[i]).Update("image_url", url)
 	}
 	if len(articles) > 0 {
-		log.Printf("Backfill marketplace : %d articles avec photo de demo", len(articles))
+		log.Printf("Backfill images : %d articles avec photo de demo", len(articles))
 	}
-}
-
-func seedLeagueBots() {
-	var count int64
-	DB.Model(&models.LeagueBot{}).Count(&count)
-	if count > 0 {
-		return
-	}
-
-	bots := []models.LeagueBot{
-		{Name: "holo_king", Level: 18, XP: 1600, Delta: 12},
-		{Name: "pack_ripper", Level: 16, XP: 1420, Delta: 8},
-		{Name: "arcade_twin", Level: 15, XP: 1310, Delta: 5},
-		{Name: "volt_tacticien", Level: 14, XP: 1190, Delta: 2},
-		{Name: "neon_ranger", Level: 11, XP: 1050, Delta: 1},
-		{Name: "dust_seeker", Level: 10, XP: 980, Delta: -1},
-		{Name: "chrome_fox", Level: 9, XP: 820, Delta: -2},
-		{Name: "rift_waltz", Level: 8, XP: 720, Delta: -4},
-		{Name: "static_mono", Level: 7, XP: 560, Delta: -8},
-	}
-	for i := range bots {
-		if err := DB.Create(&bots[i]).Error; err != nil {
-			log.Printf("Erreur creation bot ligue %s: %v", bots[i].Name, err)
-			return
-		}
-	}
-	log.Printf("Seed ligue : %d bots inseres", len(bots))
 }

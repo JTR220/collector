@@ -1,28 +1,16 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth';
-	import { playerStats } from '$lib/stores/stats';
 	import { goto } from '$app/navigation';
+	import GNotifBell from './GNotifBell.svelte';
 
 	type Props = {
 		active?: string;
 	};
 	let { active = 'Vitrine' }: Props = $props();
 
-	const level = $derived($playerStats?.level ?? 1);
-	const streak = $derived($playerStats?.streak ?? 0);
-	const credits = $derived(
-		$playerStats ? `${$playerStats.gems.toLocaleString('fr-FR')} gems` : '—'
-	);
-
 	const nav = [
 		{ label: 'Vitrine', href: '/' },
-		{ label: 'Vendre', href: '/vendre' },
-		{ label: 'Marché', href: '/marche' },
-		{ label: 'Profil', href: '/profil' },
-		{ label: 'Quêtes', href: '/quetes' },
-		{ label: 'Ligue', href: '/ligue' },
-		{ label: 'Drops', href: '/drops' },
-		{ label: 'Journal', href: '/journal' }
+		{ label: 'Profil', href: '/profil' }
 	];
 
 	const initials = $derived(
@@ -57,16 +45,8 @@
 	</nav>
 
 	<div class="g-user">
-		<div class="g-user-meta">
-			<span class="meta-label">Niveau {level}</span>
-			<span class="meta-val">série {streak} j</span>
-		</div>
-		<div class="g-sep"></div>
-		<div class="g-user-meta" style="text-align:right">
-			<span class="meta-label">Crédits</span>
-			<span class="meta-val meta-val-credits">{credits}</span>
-		</div>
 		{#if $auth.user}
+			<GNotifBell />
 			<div class="g-avatar">{initials}</div>
 			<button class="g-logout" onclick={logout} title="Se déconnecter">↩</button>
 		{:else}
@@ -146,32 +126,6 @@
 		align-items: center;
 		gap: 14px;
 		flex-shrink: 0;
-	}
-	.g-user-meta {
-		display: flex;
-		flex-direction: column;
-		line-height: 1.2;
-	}
-	.meta-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 10.5px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: #766d60;
-	}
-	.meta-val {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12.5px;
-		color: #a39a8c;
-	}
-	.meta-val-credits {
-		font-size: 13.5px;
-		color: #ece5da;
-	}
-	.g-sep {
-		width: 1px;
-		height: 20px;
-		background: rgba(236, 229, 218, 0.1);
 	}
 	.g-avatar {
 		width: 34px;

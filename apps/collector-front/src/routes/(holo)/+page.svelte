@@ -86,17 +86,12 @@
 <!-- Hero -->
 <section class="hero">
 	<div>
-		<Kicker>Saison 03 — sélection de la semaine</Kicker>
+		<Kicker>Sélection de la semaine</Kicker>
 		<h1 class="hero-title">Holo rares<br />&amp; scellés.</h1>
 		<p class="hero-lede">
 			Pièces vérifiées · grading PSA / CGC · livraison tracée sous boîtier antichoc. Chaque lot est
 			authentifié avant mise en ligne.
 		</p>
-		<div class="hero-ctas">
-			<a href="/drops" class="btn-primary">Parcourir la sélection</a>
-			<a href="/vendre" class="btn-link">Vendre une pièce →</a>
-			<a href="/grading" class="btn-link">Comment fonctionne le grading →</a>
-		</div>
 	</div>
 
 	<GPanel>
@@ -176,9 +171,6 @@
 							loading="lazy"
 							onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 						/>
-					{/if}
-					{#if article.saleType === 'direct'}
-						<span class="card-direct">vente directe</span>
 					{/if}
 					{#if article.sold}
 						<span class="card-sold">vendu</span>
@@ -273,36 +265,6 @@
 		line-height: 1.6;
 		margin-bottom: 24px;
 		max-width: 480px;
-	}
-	.hero-ctas {
-		display: flex;
-		align-items: center;
-		gap: 20px;
-		flex-wrap: wrap;
-	}
-	.btn-primary {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		font-weight: 600;
-		padding: 12px 22px;
-		border-radius: 7px;
-		background: #86b3a4;
-		color: #191714;
-		text-decoration: none;
-		transition: filter 120ms;
-	}
-	.btn-primary:hover {
-		filter: brightness(1.08);
-	}
-	.btn-link {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		color: #a39a8c;
-		text-decoration: underline;
-		text-underline-offset: 3px;
-	}
-	.btn-link:hover {
-		color: #ece5da;
 	}
 
 	.meters-list {
@@ -484,20 +446,6 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-	}
-	.card-direct {
-		position: absolute;
-		top: 7px;
-		left: 8px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 9px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		padding: 2px 7px;
-		border-radius: 3px;
-		color: #191714;
-		background: #86b3a4;
-		font-weight: 600;
 	}
 	.card-sold {
 		position: absolute;
