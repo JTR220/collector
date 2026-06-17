@@ -4,7 +4,7 @@
 #
 # Les variables VITE_* sont compilées dans le bundle AU BUILD : cette image
 # est donc liée à un environnement (build args injectés par la CI).
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ ENV VITE_AUTH_API_BASE_URL=${VITE_AUTH_API_BASE_URL} \
 
 RUN npm run build && npm prune --omit=dev
 
-FROM node:22-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 
