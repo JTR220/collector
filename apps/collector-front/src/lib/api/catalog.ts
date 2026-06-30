@@ -1,4 +1,5 @@
-export const BASE_URL = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
+import { env } from '$env/dynamic/public';
+export const BASE_URL = env.PUBLIC_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
 
 export type CategoryAPI = {
 	ID: number;

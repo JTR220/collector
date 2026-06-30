@@ -2,10 +2,9 @@
 # de mise en production). Promotion = copier le digest validé en staging dans
 # ce fichier, via une PR (protection de branche recommandée sur main).
 #
-# NB : l'image collector-front embarque les URLs d'API compilées au build
-# (VITE_*). Tant qu'elles ne sont pas lues au runtime ($env/dynamic/public),
-# un vrai déploiement prod du front nécessite un build dédié avec les hosts
-# prod — voir docs/DEVSECOPS.md.
+# Le front lit ses URLs d'API au runtime ($env/dynamic/public, PUBLIC_*) : la
+# MÊME image que staging est promue en prod, seule la ConfigMap
+# collector-front-config (ci-dessous) change pour pointer sur les hosts prod.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -25,6 +24,14 @@ configMapGenerator:
       - DB_NAME=collector
       - DB_USER=postgres
       - FRONTEND_ORIGIN=http://collector.local
+  # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
+  - name: collector-front-config
+    behavior: replace
+    literals:
+      - PUBLIC_AUTH_API_BASE_URL=http://auth.collector.local
+      - PUBLIC_CATALOG_API_BASE_URL=http://api.collector.local
+      - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://price.collector.local
+      - PUBLIC_NOTIFICATION_API_BASE_URL=http://notifications.collector.local
 
 # Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
 #   - name: ghcr.io/jtr220/collector/auth-service

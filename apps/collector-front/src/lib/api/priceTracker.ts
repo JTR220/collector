@@ -1,6 +1,7 @@
+import { env } from '$env/dynamic/public';
 import { toEventUuid } from '$lib/utils/eventId';
 
-const BASE_URL = import.meta.env.VITE_PRICE_TRACKER_API_BASE_URL ?? 'http://localhost:8082';
+const BASE_URL = env.PUBLIC_PRICE_TRACKER_API_BASE_URL ?? 'http://localhost:8082';
 
 export type PriceHistoryEntry = {
 	id: string;
