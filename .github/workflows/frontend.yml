@@ -161,9 +161,9 @@ jobs:
   # Étapes 5-9 — hadolint, build multi-stage adapter-node, scan Trivy AVANT push,
   # push GHCR taggé par SHA, SBOM syft, signature + attestation cosign keyless
   #
-  # NB : les URLs d'API (VITE_*) sont compilées dans le bundle au build.
-  # L'image est buildée pour le staging ; la prod nécessiterait un build dédié
-  # (ou un refactor vers $env/dynamic/public — voir docs/DEVSECOPS.md).
+  # NB : image agnostique de l'environnement — les URLs d'API sont lues au
+  # runtime via $env/dynamic/public (PUBLIC_*, ConfigMap collector-front-config).
+  # La MÊME image sert staging et prod ; seule la config de pod change.
   # ────────────────────────────────────────────────────────────────────────────
   image:
     name: Image collector-front
@@ -196,11 +196,9 @@ jobs:
           context: apps/collector-front
           load: true
           tags: ${{ env.IMAGE }}:scan
-          build-args: |
-            VITE_AUTH_API_BASE_URL=http://auth.collector.staging.local
-            VITE_CATALOG_API_BASE_URL=http://api.collector.staging.local
-            VITE_PRICE_TRACKER_API_BASE_URL=http://price.collector.staging.local
-            VITE_NOTIFICATION_API_BASE_URL=http://notifications.collector.staging.local
+          # Image agnostique de l'environnement : les URLs d'API sont lues au
+          # runtime (PUBLIC_* via la ConfigMap collector-front-config), plus
+          # aucun build-arg VITE_* à injecter ici.
           cache-from: type=gha,scope=collector-front
           cache-to: type=gha,mode=max,scope=collector-front
 
@@ -250,11 +248,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            VITE_AUTH_API_BASE_URL=http://auth.collector.staging.local
-            VITE_CATALOG_API_BASE_URL=http://api.collector.staging.local
-            VITE_PRICE_TRACKER_API_BASE_URL=http://price.collector.staging.local
-            VITE_NOTIFICATION_API_BASE_URL=http://notifications.collector.staging.local
           cache-from: type=gha,scope=collector-front
 
       # Étape 7 — SBOM SPDX générée depuis l'image poussée

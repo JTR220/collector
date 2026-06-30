@@ -1,6 +1,7 @@
+import { env } from '$env/dynamic/public';
 import { browser } from '$app/environment';
 
-const BASE_URL = import.meta.env.VITE_NOTIFICATION_API_BASE_URL ?? 'http://localhost:8083';
+const BASE_URL = env.PUBLIC_NOTIFICATION_API_BASE_URL ?? 'http://localhost:8083';
 
 export type NotificationType =
 	| 'PRICE_DROP'

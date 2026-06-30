@@ -11,7 +11,8 @@ COPY . .
 
 ENV HOST=0.0.0.0
 ENV PORT=5173
-ENV VITE_CATALOG_API_BASE_URL=http://localhost:8081
+# URLs d'API lues au runtime via $env/dynamic/public (préfixe PUBLIC_).
+ENV PUBLIC_CATALOG_API_BASE_URL=http://localhost:8081
 
 EXPOSE 5173
 

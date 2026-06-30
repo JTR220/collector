@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { env } from '$env/dynamic/public';
 	import { onMount } from 'svelte';
 	import type { Article, Category } from '$lib/types/catalog';
 
-	const catalogApiBaseUrl = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
+	const catalogApiBaseUrl = env.PUBLIC_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
 
 	type CategoryFormState = {
 		name: string;

@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { env } from '$env/dynamic/public';
 	import { onMount } from 'svelte';
 	import { fetchAlerts, resolveAlert, type FraudAlertAPI } from '$lib/api/priceTracker';
 	import { fromEventUuid } from '$lib/utils/eventId';
 
-	const authApiUrl = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8080';
-	const catalogApiUrl = import.meta.env.VITE_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
+	const authApiUrl = env.PUBLIC_AUTH_API_BASE_URL ?? 'http://localhost:8080';
+	const catalogApiUrl = env.PUBLIC_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
 
 	// --- Acteurs selon le cours (page 17) ---
 	type Actor = 'ceo' | 'cto' | 'pm';
