@@ -37,7 +37,7 @@ jobs:
         working-directory: apps/collector-front
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -70,7 +70,7 @@ jobs:
         working-directory: apps/collector-front
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -104,7 +104,7 @@ jobs:
       image: semgrep/semgrep
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Semgrep scan (rapport SARIF complet)
         run: semgrep scan --config auto --sarif --output semgrep.sarif apps/collector-front
@@ -132,7 +132,7 @@ jobs:
       security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Trivy fs scan (bloquant CRITICAL/HIGH)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -177,7 +177,7 @@ jobs:
       id-token: write # cosign keyless via OIDC
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Étape 5 — lint du Dockerfile
       - name: hadolint
@@ -305,7 +305,7 @@ jobs:
       group: gitops-update-manifests # partagé avec la CI backend pour éviter les push concurrents
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
