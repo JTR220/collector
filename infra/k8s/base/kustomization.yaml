@@ -25,3 +25,14 @@ resources:
   - notification-service/service.yaml
   - collector-front/deployment.yaml
   - collector-front/service.yaml
+
+# URLs d'API consommées au runtime par le front ($env/dynamic/public).
+# Valeurs localhost par défaut ; chaque overlay les remplace (behavior: replace)
+# par les hosts de son environnement.
+configMapGenerator:
+  - name: collector-front-config
+    literals:
+      - PUBLIC_AUTH_API_BASE_URL=http://localhost:8080
+      - PUBLIC_CATALOG_API_BASE_URL=http://localhost:8081
+      - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://localhost:8082
+      - PUBLIC_NOTIFICATION_API_BASE_URL=http://localhost:8083

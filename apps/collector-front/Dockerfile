@@ -2,8 +2,9 @@
 # image finale minimale en non-root. Pour le dev local via docker-compose,
 # utiliser Dockerfile.dev (serveur Vite avec HMR).
 #
-# Les variables VITE_* sont compilées dans le bundle AU BUILD : cette image
-# est donc liée à un environnement (build args injectés par la CI).
+# Les URLs d'API sont lues AU RUNTIME via $env/dynamic/public (PUBLIC_*) :
+# l'image est agnostique de l'environnement — une seule image pour staging et
+# prod, configurée par variables de pod (ConfigMap collector-front-config).
 FROM node:26-alpine AS builder
 
 WORKDIR /app
@@ -12,15 +13,6 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-
-ARG VITE_AUTH_API_BASE_URL=http://localhost:8080
-ARG VITE_CATALOG_API_BASE_URL=http://localhost:8081
-ARG VITE_PRICE_TRACKER_API_BASE_URL=http://localhost:8082
-ARG VITE_NOTIFICATION_API_BASE_URL=http://localhost:8083
-ENV VITE_AUTH_API_BASE_URL=${VITE_AUTH_API_BASE_URL} \
-    VITE_CATALOG_API_BASE_URL=${VITE_CATALOG_API_BASE_URL} \
-    VITE_PRICE_TRACKER_API_BASE_URL=${VITE_PRICE_TRACKER_API_BASE_URL} \
-    VITE_NOTIFICATION_API_BASE_URL=${VITE_NOTIFICATION_API_BASE_URL}
 
 RUN npm run build && npm prune --omit=dev
 

@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_AUTH_API_BASE_URL ?? 'http://localhost:8080';
+import { env } from '$env/dynamic/public';
+const BASE_URL = env.PUBLIC_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 
 export type MeResponse = { id: number; name: string; email: string };
 

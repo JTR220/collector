@@ -20,6 +20,14 @@ configMapGenerator:
   - DB_USER=postgres
   - FRONTEND_ORIGIN=http://collector.staging.local
   name: collector-config
+# Hosts d'API STAGING lus au runtime par le front (remplace les defaults base).
+- name: collector-front-config
+  behavior: replace
+  literals:
+  - PUBLIC_AUTH_API_BASE_URL=http://auth.collector.staging.local
+  - PUBLIC_CATALOG_API_BASE_URL=http://api.collector.staging.local
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://price.collector.staging.local
+  - PUBLIC_NOTIFICATION_API_BASE_URL=http://notifications.collector.staging.local
 
 # "bootstrap" est un placeholder : remplacé par un digest immuable
 # (image@sha256:...) au premier passage de la CI.

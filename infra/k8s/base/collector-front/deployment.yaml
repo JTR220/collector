@@ -25,8 +25,13 @@ spec:
       containers:
         - name: collector-front
           # tag/digest épinglé par les overlays (CI → staging, PR → prod)
-          # NB : les URLs d'API (VITE_*) sont compilées dans le bundle au build
+          # URLs d'API lues au runtime via $env/dynamic/public (PUBLIC_*) :
+          # une seule image, configurée par la ConfigMap collector-front-config
+          # (valeurs propres à chaque overlay : staging vs prod).
           image: ghcr.io/jtr220/collector/collector-front
+          envFrom:
+            - configMapRef:
+                name: collector-front-config
           ports:
             - name: http
               containerPort: 3000
