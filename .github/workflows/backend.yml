@@ -107,22 +107,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: coverage-auth-service
           path: apps/backend/auth-service
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: coverage-catalog-service
           path: apps/backend/catalog-service
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: coverage-price-tracker-service
           path: apps/backend/price-tracker-service
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: coverage-notification-service
           path: apps/backend/notification-service
@@ -375,7 +375,7 @@ jobs:
         with:
           ref: main
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: digest-*
           path: /tmp/digests
