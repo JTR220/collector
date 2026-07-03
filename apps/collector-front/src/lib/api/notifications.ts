@@ -4,11 +4,7 @@ import { browser } from '$app/environment';
 const BASE_URL = env.PUBLIC_NOTIFICATION_API_BASE_URL ?? 'http://localhost:8083';
 
 export type NotificationType =
-	| 'PRICE_DROP'
-	| 'PRICE_SPIKE'
-	| 'FRAUD_ALERT'
-	| 'NEW_ITEM'
-	| 'ITEM_SOLD';
+	'PRICE_DROP' | 'PRICE_SPIKE' | 'FRAUD_ALERT' | 'NEW_ITEM' | 'ITEM_SOLD';
 
 export type NotificationAPI = {
 	id: string;

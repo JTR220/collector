@@ -342,8 +342,7 @@
 						class="min-h-24 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 focus:border-orange-400 focus:ring-0"
 						bind:value={categoryForm.description}
 						placeholder="Consoles, cartouches, accessoires..."
-						required
-					></textarea>
+						required></textarea>
 					<button
 						class="w-full rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black tracking-[0.2em] text-white uppercase transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-orange-300"
 						type="submit"
@@ -371,8 +370,7 @@
 						class="min-h-28 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 focus:border-orange-400 focus:ring-0"
 						bind:value={articleForm.description}
 						placeholder="Description du collector..."
-						required
-					></textarea>
+						required></textarea>
 					<div class="grid gap-4 sm:grid-cols-2">
 						<input
 							class="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 focus:border-orange-400 focus:ring-0"
