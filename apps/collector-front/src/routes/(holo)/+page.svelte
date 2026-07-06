@@ -109,8 +109,8 @@
 		<Kicker>Marché</Kicker>
 		<h1 class="mh-title">Le marché des collectionneurs</h1>
 		<p class="mh-sub">
-			Achat direct entre membres · chaque lot authentifié · grading PSA / CGC. Trouvez la pièce,
-			ou mettez la vôtre en vente.
+			Achat direct entre membres · chaque lot authentifié · grading PSA / CGC. Trouvez la pièce, ou
+			mettez la vôtre en vente.
 		</p>
 	</div>
 	{#if $auth.user}
@@ -135,7 +135,10 @@
 		bind:value={filterCat}
 		ariaLabel="Catégorie"
 		placeholder="Toutes catégories"
-		options={[{ value: '', label: 'Toutes catégories' }, ...categories.map((c) => ({ value: c, label: c }))]}
+		options={[
+			{ value: '', label: 'Toutes catégories' },
+			...categories.map((c) => ({ value: c, label: c }))
+		]}
 	/>
 	<GSelect
 		bind:value={filterMax}

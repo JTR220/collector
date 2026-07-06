@@ -175,31 +175,31 @@
 				{mode === 'login' ? "Pas de compte ? · S'inscrire" : 'Déjà un compte ? · Se connecter'}
 			</button>
 
-				<div class="demo">
-					<span class="demo-label">Comptes de démo</span>
-					<button
-						type="button"
-						class="demo-row"
-						onclick={() => {
-							email = 'admin@collector.shop';
-							password = 'admin123';
-						}}
-					>
-						<span class="demo-role">Admin</span>
-						<span class="demo-creds">admin@collector.shop · admin123</span>
-					</button>
-					<button
-						type="button"
-						class="demo-row"
-						onclick={() => {
-							email = 'test@collector.shop';
-							password = 'test123';
-						}}
-					>
-						<span class="demo-role">Test</span>
-						<span class="demo-creds">test@collector.shop · test123</span>
-					</button>
-				</div>
+			<div class="demo">
+				<span class="demo-label">Comptes de démo</span>
+				<button
+					type="button"
+					class="demo-row"
+					onclick={() => {
+						email = 'admin@collector.shop';
+						password = 'admin123';
+					}}
+				>
+					<span class="demo-role">Admin</span>
+					<span class="demo-creds">admin@collector.shop · admin123</span>
+				</button>
+				<button
+					type="button"
+					class="demo-row"
+					onclick={() => {
+						email = 'test@collector.shop';
+						password = 'test123';
+					}}
+				>
+					<span class="demo-role">Test</span>
+					<span class="demo-creds">test@collector.shop · test123</span>
+				</button>
+			</div>
 		</div>
 	</div>
 </div>

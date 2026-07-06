@@ -118,12 +118,28 @@
 
 				<label class="field">
 					<span class="lbl">Prix (€) *</span>
-					<input class="in" type="number" min="0" step="0.01" bind:value={prix} placeholder="1290" required />
+					<input
+						class="in"
+						type="number"
+						min="0"
+						step="0.01"
+						bind:value={prix}
+						placeholder="1290"
+						required
+					/>
 				</label>
 
 				<label class="field">
 					<span class="lbl">Frais de port (€) *</span>
-					<input class="in" type="number" min="0" step="0.01" bind:value={fraisPort} placeholder="12" required />
+					<input
+						class="in"
+						type="number"
+						min="0"
+						step="0.01"
+						bind:value={fraisPort}
+						placeholder="12"
+						required
+					/>
 				</label>
 
 				<label class="field span-2">
@@ -132,8 +148,7 @@
 						class="in area"
 						bind:value={description}
 						placeholder="État, provenance, particularités, authentification…"
-						required
-					></textarea>
+						required></textarea>
 				</label>
 			</div>
 		</GPanel>

@@ -21,7 +21,12 @@
 	let root: HTMLDivElement;
 
 	const selected = $derived(options.find((o) => o.value === value));
-	const activeIndex = $derived(Math.max(0, options.findIndex((o) => o.value === value)));
+	const activeIndex = $derived(
+		Math.max(
+			0,
+			options.findIndex((o) => o.value === value)
+		)
+	);
 
 	function choose(o: Option) {
 		value = o.value;

@@ -95,9 +95,7 @@
 	}
 
 	function toggleToutSelectionner() {
-		selectionArticles = toutSelectionne
-			? new Set()
-			: new Set(articlesAffiches.map((a) => a.ID));
+		selectionArticles = toutSelectionne ? new Set() : new Set(articlesAffiches.map((a) => a.ID));
 	}
 
 	// Modale de confirmation (remplace window.confirm) pour les suppressions.
@@ -449,7 +447,9 @@
 							<div class="order-row">
 								<span class="order-date">{o.createdAt}</span>
 								<span class="order-name">{o.article || `Lot #${o.id}`}</span>
-								<span class="order-status order-{o.status}">{ORDER_STATUS_FR[o.status] ?? o.status}</span>
+								<span class="order-status order-{o.status}"
+									>{ORDER_STATUS_FR[o.status] ?? o.status}</span
+								>
 								<span class="order-price">{eur(o.price)}</span>
 							</div>
 						{/each}
@@ -490,11 +490,7 @@
 						<span>Tout sélectionner</span>
 					</label>
 					{#if selectionArticles.size > 0}
-						<button
-							type="button"
-							class="bulk-delete-btn"
-							onclick={demanderSuppressionSelection}
-						>
+						<button type="button" class="bulk-delete-btn" onclick={demanderSuppressionSelection}>
 							Retirer la sélection ({selectionArticles.size})
 						</button>
 					{/if}
@@ -586,13 +582,18 @@
 						soumettreCategory();
 					}}
 				>
-					<input class="input" type="text" bind:value={categoryForm.name} placeholder="Jeux vidéo" required />
+					<input
+						class="input"
+						type="text"
+						bind:value={categoryForm.name}
+						placeholder="Jeux vidéo"
+						required
+					/>
 					<textarea
 						class="input textarea"
 						bind:value={categoryForm.description}
 						placeholder="Consoles, cartouches, accessoires..."
-						required
-					></textarea>
+						required></textarea>
 					<button class="btn" type="submit" disabled={soumissionCategory}>
 						{soumissionCategory ? 'Création...' : 'Créer la catégorie'}
 					</button>
@@ -620,8 +621,7 @@
 						class="input textarea"
 						bind:value={articleForm.description}
 						placeholder="Description du collector..."
-						required
-					></textarea>
+						required></textarea>
 					<div class="form-row">
 						<input
 							class="input"

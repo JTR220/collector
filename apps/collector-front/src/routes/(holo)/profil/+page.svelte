@@ -70,24 +70,20 @@
 	};
 	const timeline = $derived<Activity[]>(
 		[
-			...orders.map(
-				(o): Activity => ({
-					date: o.CreatedAt,
-					kind: 'buy',
-					name: o.article?.name ?? `Lot #${o.articleId}`,
-					articleId: o.articleId,
-					status: o.status,
-					price: o.price
-				})
-			),
-			...wishlist.map(
-				(w): Activity => ({
-					date: w.CreatedAt,
-					kind: 'wish',
-					name: w.article?.name ?? `Lot #${w.articleId}`,
-					articleId: w.articleId
-				})
-			)
+			...orders.map((o): Activity => ({
+				date: o.CreatedAt,
+				kind: 'buy',
+				name: o.article?.name ?? `Lot #${o.articleId}`,
+				articleId: o.articleId,
+				status: o.status,
+				price: o.price
+			})),
+			...wishlist.map((w): Activity => ({
+				date: w.CreatedAt,
+				kind: 'wish',
+				name: w.article?.name ?? `Lot #${w.articleId}`,
+				articleId: w.articleId
+			}))
 		].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 	);
 
@@ -139,7 +135,9 @@
 						{/if}
 					</a>
 				{:else}
-					<p class="item-empty">Aucune pièce en wishlist. Ajoutez-en depuis la <a href="/">vitrine</a>.</p>
+					<p class="item-empty">
+						Aucune pièce en wishlist. Ajoutez-en depuis la <a href="/">vitrine</a>.
+					</p>
 				{/each}
 			</div>
 		</GPanel>
@@ -179,7 +177,9 @@
 						{/if}
 					</a>
 				{:else}
-					<p class="item-empty">Aucune activité pour l'instant — vos achats et ajouts wishlist apparaîtront ici.</p>
+					<p class="item-empty">
+						Aucune activité pour l'instant — vos achats et ajouts wishlist apparaîtront ici.
+					</p>
 				{/each}
 			</div>
 		</GPanel>
