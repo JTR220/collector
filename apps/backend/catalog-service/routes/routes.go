@@ -61,5 +61,12 @@ func InitRouter() *gin.Engine {
 		protected.DELETE("/me/wishlist/:articleId", controllers.RemoveFromWishlist)
 	}
 
+	// Back-office (moderation + stats) : reserve aux administrateurs.
+	admin := router.Group("/admin")
+	admin.Use(middlewares.AuthRequired(), middlewares.AdminRequired())
+	{
+		admin.GET("/stats", controllers.GetAdminStats)
+	}
+
 	return router
 }

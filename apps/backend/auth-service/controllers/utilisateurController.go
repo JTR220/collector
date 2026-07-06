@@ -32,6 +32,9 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	user.Password = string(hashed)
+	// Un compte cree via l'inscription publique est toujours un utilisateur standard :
+	// on ignore un eventuel "role" envoye par le client (anti-escalade de privilege).
+	user.Role = "user"
 
 	if err := repository.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de creer l'utilisateur (email deja pris ?)"})
@@ -44,6 +47,7 @@ func CreateUser(c *gin.Context) {
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  user.Role,
 		},
 	})
 }
@@ -70,6 +74,7 @@ func Login(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
+		"role":    user.Role,
 		// notification-service attend un claim "sub" au format UUID
 		"sub": fmt.Sprintf("00000000-0000-0000-0000-%012x", user.ID),
 		"exp": time.Now().Add(24 * time.Hour).Unix(),
@@ -87,6 +92,7 @@ func Login(c *gin.Context) {
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  user.Role,
 		},
 	})
 }
@@ -102,6 +108,7 @@ func GetMe(c *gin.Context) {
 		"id":    user.ID,
 		"name":  user.Name,
 		"email": user.Email,
+		"role":  user.Role,
 	})
 }
 

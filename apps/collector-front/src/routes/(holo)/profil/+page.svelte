@@ -33,19 +33,63 @@
 			goto('/login');
 			return;
 		}
+		// Seul un echec d'authentification (/me) deconnecte l'utilisateur.
 		try {
 			me = await fetchMe($auth.token);
-			[wishlist, orders] = await Promise.all([
-				fetchMyWishlist($auth.token),
-				fetchMyOrders($auth.token)
-			]);
+			// On rafraichit le role dans le store pour garder l'onglet Admin fiable.
+			auth.login($auth.token, {
+				id: me.id,
+				name: me.name,
+				email: me.email,
+				role: me.role
+			});
 		} catch {
 			auth.logout();
 			goto('/login');
-		} finally {
-			loading = false;
+			return;
 		}
+		// Wishlist et commandes viennent du catalog-service : une panne de ce
+		// service ne doit PAS deconnecter — on charge ce qui repond.
+		const [w, o] = await Promise.allSettled([
+			fetchMyWishlist($auth.token),
+			fetchMyOrders($auth.token)
+		]);
+		if (w.status === 'fulfilled') wishlist = w.value;
+		if (o.status === 'fulfilled') orders = o.value;
+		loading = false;
 	});
+
+	// Historique : flux chronologique fusionnant achats et ajouts wishlist.
+	type Activity = {
+		date: string;
+		kind: 'buy' | 'wish';
+		name: string;
+		articleId: number;
+		status?: string;
+		price?: number;
+	};
+	const timeline = $derived<Activity[]>(
+		[
+			...orders.map(
+				(o): Activity => ({
+					date: o.CreatedAt,
+					kind: 'buy',
+					name: o.article?.name ?? `Lot #${o.articleId}`,
+					articleId: o.articleId,
+					status: o.status,
+					price: o.price
+				})
+			),
+			...wishlist.map(
+				(w): Activity => ({
+					date: w.CreatedAt,
+					kind: 'wish',
+					name: w.article?.name ?? `Lot #${w.articleId}`,
+					articleId: w.articleId
+				})
+			)
+		].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+	);
 
 	function logout() {
 		auth.logout();
@@ -95,9 +139,7 @@
 						{/if}
 					</a>
 				{:else}
-					<p class="item-empty">
-						Aucune pièce en wishlist — parcourez la <a href="/">vitrine</a> pour en ajouter.
-					</p>
+					<p class="item-empty">Aucune pièce en wishlist. Ajoutez-en depuis la <a href="/">vitrine</a>.</p>
 				{/each}
 			</div>
 		</GPanel>
@@ -115,6 +157,29 @@
 					</a>
 				{:else}
 					<p class="item-empty">Aucun achat pour l'instant.</p>
+				{/each}
+			</div>
+		</GPanel>
+	</div>
+
+	<!-- Historique d'activité -->
+	<div class="history-wrap">
+		<GPanel>
+			<Kicker>Historique · {timeline.length}</Kicker>
+			<div class="timeline">
+				{#each timeline as ev (ev.kind + ev.articleId + ev.date)}
+					<a class="tl-row" href={`/lot/${ev.articleId}`}>
+						<span class="tl-dot" class:tl-buy={ev.kind === 'buy'}></span>
+						<span class="tl-date">{fmtDate(ev.date)}</span>
+						<span class="tl-action">{ev.kind === 'buy' ? 'Achat' : 'Wishlist'}</span>
+						<span class="tl-name">{ev.name}</span>
+						{#if ev.kind === 'buy'}
+							<GChip>{ORDER_STATUS_LABELS[ev.status ?? ''] ?? ev.status}</GChip>
+							<span class="tl-price">{eur(ev.price ?? 0)}</span>
+						{/if}
+					</a>
+				{:else}
+					<p class="item-empty">Aucune activité pour l'instant — vos achats et ajouts wishlist apparaîtront ici.</p>
 				{/each}
 			</div>
 		</GPanel>
@@ -247,5 +312,67 @@
 	}
 	.item-empty a {
 		color: #86b3a4;
+	}
+
+	/* Historique */
+	.history-wrap {
+		margin-top: 14px;
+	}
+	.timeline {
+		display: flex;
+		flex-direction: column;
+		margin-top: 6px;
+	}
+	.tl-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 11px 0;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		text-decoration: none;
+	}
+	.tl-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: #766d60;
+		flex-shrink: 0;
+	}
+	.tl-dot.tl-buy {
+		background: #86b3a4;
+	}
+	.tl-date {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+		color: #766d60;
+		flex-shrink: 0;
+		width: 82px;
+	}
+	.tl-action {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: #a39a8c;
+		flex-shrink: 0;
+		width: 68px;
+	}
+	.tl-name {
+		flex: 1;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+		color: #ece5da;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.tl-row:hover .tl-name {
+		color: #86b3a4;
+	}
+	.tl-price {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 12.5px;
+		color: #a39a8c;
+		flex-shrink: 0;
 	}
 </style>

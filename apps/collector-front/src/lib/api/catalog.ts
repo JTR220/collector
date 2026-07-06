@@ -61,3 +61,28 @@ export async function fetchCategories(): Promise<CategoryAPI[]> {
 	if (!res.ok) throw new Error(`catalog-service error: ${res.status}`);
 	return res.json();
 }
+
+export type NewArticleInput = {
+	name: string;
+	description: string;
+	prix: number;
+	fraisPort: number;
+	categoryId: number;
+	series?: string;
+	year?: number;
+	rarity?: string;
+	grade?: string;
+	imageUrl?: string;
+};
+
+/** Met une pièce en vente. Le vendeur (sellerId) est déduit du token côté serveur. */
+export async function createArticle(token: string, input: NewArticleInput): Promise<ArticleAPI> {
+	const res = await fetch(`${BASE_URL}/article`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+		body: JSON.stringify(input)
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) throw new Error(data.error ?? `catalog-service error: ${res.status}`);
+	return data.article as ArticleAPI;
+}

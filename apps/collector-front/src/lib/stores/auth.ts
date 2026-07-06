@@ -1,7 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 
-export type AuthUser = { id: number; name: string; email: string };
+export type AuthUser = { id: number; name: string; email: string; role?: string };
 type AuthState = { token: string | null; user: AuthUser | null };
 
 function createAuth() {

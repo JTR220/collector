@@ -7,4 +7,5 @@ type Utilisateur struct {
 	Name     string `json:"name" binding:"required"`
 	Email    string `json:"email" binding:"required,email" gorm:"unique"`
 	Password string `json:"password" binding:"required"`
+	Role     string `json:"role" gorm:"default:user"`
 }

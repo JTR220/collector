@@ -6,12 +6,21 @@
 	type Props = {
 		active?: string;
 	};
-	let { active = 'Vitrine' }: Props = $props();
+	let { active = 'Marché' }: Props = $props();
 
-	const nav = [
-		{ label: 'Vitrine', href: '/' },
-		{ label: 'Profil', href: '/profil' }
-	];
+	// « Vendre » n'apparait que pour un utilisateur connecte ; « Admin » uniquement
+	// pour les administrateurs, et reste visible sur toutes les pages holo.
+	const nav = $derived([
+		{ label: 'Marché', href: '/' },
+		...($auth.user ? [{ label: 'Vendre', href: '/vendre' }] : []),
+		{ label: 'Profil', href: '/profil' },
+		...($auth.user?.role === 'admin'
+			? [
+					{ label: 'Admin', href: '/admin' },
+					{ label: 'Tableau de bord', href: '/dashboard' }
+				]
+			: [])
+	]);
 
 	const initials = $derived(
 		$auth.user?.name

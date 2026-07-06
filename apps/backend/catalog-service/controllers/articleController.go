@@ -5,9 +5,28 @@ import (
 	"catalog-service/models"
 	"catalog-service/repository"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+// sanitizeImageURL ne garde une URL de photo fournie par le vendeur que si
+// elle est http(s), raisonnablement courte et pointe vers un hôte explicite.
+// Elle protege contre les schemas dangereux (data:, javascript:, file:...),
+// le mixed content et l'exfiltration d'IP des visiteurs vers un hote arbitraire
+// non verifie. Toute URL rejetee retombe silencieusement sur le visuel par defaut.
+func sanitizeImageURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 2048 {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return ""
+	}
+	return raw
+}
 
 func CreateArticle(c *gin.Context) {
 	var article models.Article
@@ -15,6 +34,22 @@ func CreateArticle(c *gin.Context) {
 	if err := c.ShouldBindJSON(&article); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides : " + err.Error()})
 		return
+	}
+
+	// Collector fonctionne comme eBay : n'importe quel utilisateur connecte peut
+	// mettre en vente. On rattache l'annonce a son auteur (le sellerId client est
+	// ignore) et on force la vente directe.
+	article.SellerID = currentUserID(c)
+	if email, ok := c.Get("email"); ok && article.Seller == "" {
+		article.Seller, _ = email.(string)
+	}
+	article.SaleType = "direct"
+	article.Sold = false
+	// Visuel par defaut (Unsplash themee) si le vendeur n'a pas fourni de photo
+	// valide (schema https obligatoire — voir sanitizeImageURL).
+	article.ImageURL = sanitizeImageURL(article.ImageURL)
+	if article.ImageURL == "" {
+		article.ImageURL = repository.DefaultImageFor(article.CategoryID)
 	}
 
 	if err := repository.DB.Create(&article).Error; err != nil {
@@ -61,6 +96,12 @@ func DeleteArticle(c *gin.Context) {
 		return
 	}
 
+	// Un vendeur ne supprime que ses propres annonces ; l'admin modere tout.
+	if !isAdmin(c) && article.SellerID != currentUserID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Vous ne pouvez retirer que vos propres annonces"})
+		return
+	}
+
 	if err := repository.DB.Delete(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de supprimer l'article"})
 		return
@@ -75,6 +116,12 @@ func UpdateArticle(c *gin.Context) {
 
 	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
+		return
+	}
+
+	// Un vendeur ne modifie que ses propres annonces ; l'admin modere tout.
+	if !isAdmin(c) && article.SellerID != currentUserID(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Vous ne pouvez modifier que vos propres annonces"})
 		return
 	}
 

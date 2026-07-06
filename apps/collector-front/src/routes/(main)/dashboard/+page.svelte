@@ -1,97 +1,58 @@
 <script lang="ts">
 	import { env } from '$env/dynamic/public';
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth';
 	import { fetchAlerts, resolveAlert, type FraudAlertAPI } from '$lib/api/priceTracker';
 	import { fromEventUuid } from '$lib/utils/eventId';
 
 	const authApiUrl = env.PUBLIC_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 	const catalogApiUrl = env.PUBLIC_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
 
-	// --- Acteurs selon le cours (page 17) ---
-	type Actor = 'ceo' | 'cto' | 'pm';
-	let activeActor: Actor = 'pm';
+	type AdminStats = {
+		gmv: number;
+		totalOrders: number;
+		avgOrderValue: number;
+		ordersByStatus: { paid: number; shipped: number; delivered: number; cancelled: number };
+		totalArticles: number;
+		activeListings: number;
+		soldArticles: number;
+		sellThrough: number;
+		avgListing: number;
+		categories: number;
+		activeSellers: number;
+		byCategory: { name: string; count: number }[];
+		recentOrders: {
+			id: number;
+			article: string;
+			price: number;
+			status: string;
+			buyerId: number;
+			createdAt: string;
+		}[];
+	};
 
-	const actors: { id: Actor; label: string; role: string; besoin: string; icon: string }[] = [
-		{
-			id: 'pm',
-			label: 'PM',
-			role: 'Chef de projet',
-			besoin: 'Avancement, qualité, vélocité',
-			icon: '📋'
-		},
-		{
-			id: 'cto',
-			label: 'CTO',
-			role: 'Directeur technique',
-			besoin: 'Infrastructure, performance, DevOps',
-			icon: '⚙️'
-		},
-		{
-			id: 'ceo',
-			label: 'CEO',
-			role: 'Direction générale',
-			besoin: 'Business, conversion, rétention',
-			icon: '📊'
-		}
-	];
+	const ORDER_STATUS_FR: Record<string, string> = {
+		paid: 'Payée',
+		shipped: 'Expédiée',
+		delivered: 'Livrée',
+		cancelled: 'Annulée'
+	};
+	const eur = (n: number) => `${n.toLocaleString('fr-FR')} €`;
 
-	// --- KPI live ---
 	type ServiceStatus = 'loading' | 'ok' | 'down';
 
 	let authStatus: ServiceStatus = 'loading';
 	let catalogStatus: ServiceStatus = 'loading';
 	let catalogLatencyMs: number | null = null;
-	let articlesCount = 0;
-	let categoriesCount = 0;
+	let stats: AdminStats | null = null;
+	let statsErreur = '';
 	let lastRefresh = new Date();
 
-	// --- KPI projet (PM) ---
-	const roadmapItems = [
-		{ label: 'Monorepo + CI/CD backend', done: true },
-		{ label: 'Catalog-service CRUD', done: true },
-		{ label: 'Collector-front catalogue', done: true },
-		{ label: 'Docker Compose complet', done: true },
-		{ label: 'CI front (build + tests)', done: true },
-		{ label: 'Auth JWT (bcrypt + login)', done: true },
-		{ label: 'Dashboard KPI', done: true },
-		{ label: 'Auth branché sur le front', done: false },
-		{ label: 'Tests unitaires backend', done: false },
-		{ label: 'Conventions API homogènes', done: false }
-	];
+	function authHeaders(): Record<string, string> {
+		return $auth.token ? { Authorization: `Bearer ${$auth.token}` } : {};
+	}
 
-	const avancement = Math.round(
-		(roadmapItems.filter((i) => i.done).length / roadmapItems.length) * 100
-	);
-
-	// Vélocité agile (sprints simulés)
-	const velocite = [
-		{ sprint: 'S1', points: 22 },
-		{ sprint: 'S2', points: 27 },
-		{ sprint: 'S3', points: 18 }
-	];
-
-	// KPI qualité
-	const testCoverage = 18;
-	const bugRate = 0.25;
-	const bugsOuverts = 2;
-	const featuresLivrees = 8;
-	const fixRate = 75;
-
-	// KPI DevOps (CTO)
-	const doraMetrics = [
-		{ label: 'Deployment Frequency', value: '1/sem.', note: 'push sur main', status: 'medium' },
-		{ label: 'Lead Time', value: '< 1j', note: 'commit → prod', status: 'good' },
-		{ label: 'MTTR', value: 'N/A', note: 'pas encore mesuré', status: 'na' },
-		{ label: 'Change Failure Rate', value: '~15%', note: 'builds échoués CI', status: 'medium' }
-	];
-
-	// KPI business (CEO)
-	const churnRate = 'N/A';
-	const retentionRate = 'N/A';
-	const arpu = 'N/A';
-	const conversionRate = 'N/A';
-
-	// --- Fonctions live ---
 	async function checkHealth(url: string): Promise<ServiceStatus> {
 		try {
 			const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
@@ -101,12 +62,24 @@
 		}
 	}
 
-	async function fetchLiveData() {
+	async function chargerStats() {
+		try {
+			const response = await fetch(`${catalogApiUrl}/admin/stats`, { headers: authHeaders() });
+			if (!response.ok) throw new Error();
+			stats = (await response.json()) as AdminStats;
+			statsErreur = '';
+		} catch {
+			stats = null;
+			statsErreur = 'Statistiques indisponibles.';
+		}
+	}
+
+	async function refreshAll() {
 		lastRefresh = new Date();
 		authStatus = 'loading';
 		catalogStatus = 'loading';
 
-		const [auth, catalog] = await Promise.all([
+		const [a, c] = await Promise.all([
 			checkHealth(authApiUrl),
 			(async () => {
 				const t0 = Date.now();
@@ -116,20 +89,14 @@
 			})()
 		]);
 
-		authStatus = auth;
-		catalogStatus = catalog;
+		authStatus = a;
+		catalogStatus = c;
 
 		if (catalogStatus === 'ok') {
-			try {
-				const [art, cat] = await Promise.all([
-					fetch(`${catalogApiUrl}/article`).then((r) => r.json()),
-					fetch(`${catalogApiUrl}/category`).then((r) => r.json())
-				]);
-				articlesCount = Array.isArray(art) ? art.length : 0;
-				categoriesCount = Array.isArray(cat) ? cat.length : 0;
-			} catch {
-				/* ignore */
-			}
+			await chargerStats();
+		} else {
+			stats = null;
+			statsErreur = 'catalog-service indisponible.';
 		}
 	}
 
@@ -163,530 +130,562 @@
 	};
 
 	onMount(() => {
-		fetchLiveData();
+		// Page reservee aux administrateurs.
+		if ($auth.user?.role !== 'admin') {
+			goto('/login');
+			return;
+		}
+		refreshAll();
 		fetchFraudAlerts();
 	});
-
-	function coverageBadge(v: number) {
-		if (v >= 90) return { label: 'Bon', color: 'emerald' };
-		if (v >= 70) return { label: 'Moyen', color: 'amber' };
-		return { label: 'Critique', color: 'red' };
-	}
-
-	const cvg = coverageBadge(testCoverage);
-	const velociteMax = Math.max(...velocite.map((s) => s.points));
 </script>
 
 <svelte:head>
 	<title>Collector.shop | Tableau de bord</title>
 </svelte:head>
 
-<div
-	class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,238,201,0.6),_rgba(255,255,255,1)_40%),linear-gradient(135deg,#0f172a_0%,#1f2937_45%,#f97316_45%,#fff7ed_100%)] text-slate-950"
->
-	<div class="mx-auto max-w-7xl px-4 py-8 md:px-8">
-		<!-- En-tête -->
-		<div class="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-			<div>
-				<p
-					class="inline-flex rounded-full border border-orange-300 bg-orange-100 px-3 py-1 text-xs font-semibold tracking-widest text-orange-700 uppercase"
-				>
-					Pilotage
-				</p>
-				<h1 class="mt-2 text-4xl font-black tracking-tight text-slate-900 uppercase">
-					Tableau de bord
-				</h1>
-				<p class="mt-1 text-sm text-slate-500">
-					Dernière mise à jour : {lastRefresh.toLocaleTimeString('fr-FR')}
-				</p>
-			</div>
-			<button
-				onclick={fetchLiveData}
-				class="self-start rounded-2xl border border-slate-200 bg-white px-5 py-2 text-xs font-bold tracking-widest text-slate-700 uppercase shadow-sm transition hover:bg-slate-50 sm:self-auto"
-			>
-				Rafraîchir
-			</button>
+<div class="dash">
+	<header class="head">
+		<div>
+			<div class="eyebrow">Pilotage</div>
+			<h1 class="title">Tableau de bord</h1>
+			<p class="subtitle">
+				Dernière mise à jour : {lastRefresh.toLocaleTimeString('fr-FR')}
+			</p>
 		</div>
+		<button class="btn-refresh" type="button" onclick={refreshAll}>Rafraîchir</button>
+	</header>
 
-		<!-- Sélecteur acteur — source cours p.17 -->
-		<div class="mb-8">
-			<p class="mb-1 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Identifier l'utilisateur · <span class="text-orange-500">source cours</span>
-			</p>
-			<p class="mb-4 text-xs text-slate-400">
-				Un dashboard = logique de décision adaptée à l'acteur. Sélectionnez votre rôle.
-			</p>
-			<div class="flex flex-wrap gap-3">
-				{#each actors as actor}
-					<button
-						onclick={() => (activeActor = actor.id)}
-						class={`flex flex-col items-start rounded-2xl border px-5 py-4 text-left transition ${
-							activeActor === actor.id
-								? 'border-orange-400 bg-orange-50 shadow-md ring-1 ring-orange-300'
-								: 'border-slate-200 bg-white shadow-sm hover:bg-slate-50'
-						}`}
+	<!-- Infrastructure -->
+	<section class="panel">
+		<div class="eyebrow">Infrastructure</div>
+		<h2 class="panel-title">Disponibilité des services</h2>
+		<div class="infra-grid">
+			{#each [{ label: 'auth-service', status: authStatus }, { label: 'catalog-service', status: catalogStatus }] as svc}
+				<div class="infra-row">
+					<div>
+						<span class="infra-name">{svc.label}</span>
+						<span class="infra-sub">GET /health</span>
+					</div>
+					<span class="infra-badge infra-{svc.status}">
+						{svc.status === 'loading' ? '…' : svc.status === 'ok' ? 'UP' : 'DOWN'}
+					</span>
+				</div>
+			{/each}
+			{#if catalogLatencyMs !== null}
+				<div class="infra-row">
+					<div>
+						<span class="infra-name">Latence catalog-service</span>
+						<span class="infra-sub">temps de réponse /health</span>
+					</div>
+					<span
+						class="infra-badge"
+						class:infra-ok={catalogLatencyMs < 200}
+						class:infra-warn={catalogLatencyMs >= 200 && catalogLatencyMs < 500}
+						class:infra-down={catalogLatencyMs >= 500}
 					>
-						<div class="flex items-center gap-2">
-							<span class="text-xl">{actor.icon}</span>
-							<span
-								class={`text-sm font-black tracking-wide uppercase ${activeActor === actor.id ? 'text-orange-700' : 'text-slate-800'}`}
-							>
-								{actor.label}
-							</span>
-						</div>
-						<span class="mt-1 text-xs font-semibold text-slate-500">{actor.role}</span>
-						<span class="mt-0.5 text-xs text-slate-400">{actor.besoin}</span>
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Alertes fraude — price-tracker -->
-		<div class="mb-8">
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Alertes fraude · <span class="text-orange-500">price-tracker</span>
-			</p>
-			{#if fraudTrackerDown}
-				<div
-					class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-400 shadow-sm"
-				>
-					price-tracker-service indisponible.
-				</div>
-			{:else if fraudAlerts.length === 0}
-				<div
-					class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm"
-				>
-					Aucune alerte non résolue. ✓
-				</div>
-			{:else}
-				<div class="grid gap-3">
-					{#each fraudAlerts as alert (alert.id)}
-						<div
-							class="flex flex-col gap-3 rounded-3xl border border-red-200 bg-red-50 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-						>
-							<div>
-								<p class="text-sm font-black tracking-wide text-red-700 uppercase">
-									{reasonLabels[alert.reason] ?? alert.reason}
-									<span class="ml-2 font-mono text-xs font-normal text-red-400">
-										article #{fromEventUuid(alert.item_id)}
-									</span>
-								</p>
-								<p class="mt-1 text-sm text-slate-600">{alert.detail}</p>
-								<p class="mt-1 font-mono text-xs text-slate-400">
-									{alert.old_price.toFixed(2)} € → {alert.new_price.toFixed(2)} € · {new Date(
-										alert.created_at
-									).toLocaleString('fr-FR')}
-								</p>
-							</div>
-							<button
-								onclick={() => onResolveAlert(alert.id)}
-								class="self-start rounded-2xl border border-red-300 bg-white px-4 py-2 text-xs font-bold tracking-widest text-red-700 uppercase shadow-sm transition hover:bg-red-100 sm:self-auto"
-							>
-								Résoudre
-							</button>
-						</div>
-					{/each}
+						{catalogLatencyMs} ms
+					</span>
 				</div>
 			{/if}
 		</div>
+	</section>
 
-		<!-- =============================== -->
-		<!-- VUE PM — Chef de projet         -->
-		<!-- =============================== -->
-		{#if activeActor === 'pm'}
-			<!-- Ligne 1 : Vision globale -->
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Ligne 1 — Vision globale
-			</p>
-			<div class="mb-6 grid gap-4 lg:grid-cols-2">
-				<!-- Avancement projet -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-						Avancement projet
-					</p>
-					<div class="mt-3 flex items-end gap-4">
-						<p class="text-5xl font-black text-slate-900">{avancement}%</p>
-						<p class="mb-1 text-sm text-slate-500">
-							{roadmapItems.filter((i) => i.done).length} / {roadmapItems.length} features
-						</p>
-					</div>
-					<div class="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
-						<div
-							class="h-full rounded-full bg-orange-500 transition-all"
-							style="width: {avancement}%"
-						></div>
-					</div>
-					<p class="mt-2 text-xs text-slate-400">
-						Formule cours : Avancement = Travail réalisé / Travail total × 100
-					</p>
-					<ul class="mt-4 grid grid-cols-2 gap-1">
-						{#each roadmapItems as item}
-							<li class="flex items-center gap-2 text-xs text-slate-600">
+	{#if statsErreur}
+		<div class="msg msg-error">{statsErreur}</div>
+	{/if}
+
+	{#if stats}
+		<section class="kpis">
+			<div class="kpi kpi-hero">
+				<span class="kpi-label">Volume d'affaires (GMV)</span>
+				<span class="kpi-val">{eur(stats.gmv)}</span>
+				<span class="kpi-sub">Panier moyen {eur(Math.round(stats.avgOrderValue))}</span>
+			</div>
+			<div class="kpi">
+				<span class="kpi-label">Commandes</span>
+				<span class="kpi-val">{stats.totalOrders}</span>
+				<span class="kpi-sub">{stats.ordersByStatus.paid} à expédier</span>
+			</div>
+			<div class="kpi">
+				<span class="kpi-label">Taux d'écoulement</span>
+				<span class="kpi-val">{stats.sellThrough.toFixed(1)}%</span>
+				<span class="kpi-sub">{stats.soldArticles}/{stats.totalArticles} vendues</span>
+			</div>
+			<div class="kpi">
+				<span class="kpi-label">Annonces actives</span>
+				<span class="kpi-val">{stats.activeListings}</span>
+				<span class="kpi-sub">prix moyen {eur(Math.round(stats.avgListing))}</span>
+			</div>
+			<div class="kpi">
+				<span class="kpi-label">Vendeurs actifs</span>
+				<span class="kpi-val">{stats.activeSellers}</span>
+				<span class="kpi-sub">{stats.categories} catégories</span>
+			</div>
+		</section>
+
+		<div class="dash-grid">
+			<section class="panel">
+				<div class="eyebrow">Suivi</div>
+				<h2 class="panel-title">Commandes par statut</h2>
+				<div class="funnel">
+					{#each ['paid', 'shipped', 'delivered', 'cancelled'] as st}
+						{@const n = stats.ordersByStatus[st as keyof typeof stats.ordersByStatus]}
+						<div class="funnel-row">
+							<span class="funnel-name" class:funnel-cancel={st === 'cancelled'}>
+								{ORDER_STATUS_FR[st]}
+							</span>
+							<span class="funnel-track">
 								<span
-									class={`h-2 w-2 flex-shrink-0 rounded-full ${item.done ? 'bg-emerald-500' : 'bg-slate-300'}`}
+									class="funnel-fill"
+									class:funnel-fill-cancel={st === 'cancelled'}
+									style={`width:${stats.totalOrders ? (n / stats.totalOrders) * 100 : 0}%`}
 								></span>
-								{item.label}
-							</li>
-						{/each}
-					</ul>
-				</div>
-
-				<!-- Vélocité agile -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-						Vélocité agile
-					</p>
-					<p class="mt-1 text-xs text-slate-400">Story points terminés par sprint</p>
-					<div class="mt-4 space-y-3">
-						{#each velocite as s}
-							<div>
-								<div class="mb-1 flex justify-between text-xs">
-									<span class="font-semibold text-slate-700">{s.sprint}</span>
-									<span class={`font-bold ${s.points < 20 ? 'text-red-600' : 'text-slate-900'}`}
-										>{s.points} pts</span
-									>
-								</div>
-								<div class="h-3 overflow-hidden rounded-full bg-slate-100">
-									<div
-										class={`h-full rounded-full transition-all ${s.points < 20 ? 'bg-red-400' : 'bg-orange-500'}`}
-										style="width: {(s.points / velociteMax) * 100}%"
-									></div>
-								</div>
-							</div>
-						{/each}
-					</div>
-					<div class="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-						Alerte : chute de vélocité S3 → investiguer blocages
-					</div>
-				</div>
-			</div>
-
-			<!-- Ligne 2 : Problèmes -->
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Ligne 2 — Problèmes (qualité)
-			</p>
-			<div class="mb-6 grid gap-4 md:grid-cols-3">
-				<!-- Taux de bugs -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">Taux de bugs</p>
-					<div class="mt-3 flex items-end gap-3">
-						<p class="text-4xl font-black text-slate-900">{bugRate.toFixed(2)}</p>
-						<span
-							class="mb-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700"
-							>Moyen</span
-						>
-					</div>
-					<p class="mt-1 text-xs text-slate-400">Formule : bugs / features livrées</p>
-					<div class="mt-4 space-y-2 text-xs text-slate-600">
-						<div class="flex justify-between rounded-xl bg-slate-50 px-3 py-2">
-							<span>Bugs critiques ouverts</span><span class="font-bold text-red-600"
-								>{bugsOuverts}</span
-							>
-						</div>
-						<div class="flex justify-between rounded-xl bg-slate-50 px-3 py-2">
-							<span>Features livrées</span><span class="font-bold">{featuresLivrees}</span>
-						</div>
-					</div>
-				</div>
-
-				<!-- Fix Rate -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">Fix Rate</p>
-					<div class="mt-3 flex items-end gap-3">
-						<p class="text-4xl font-black text-slate-900">{fixRate}%</p>
-						<span
-							class="mb-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700"
-							>Bon</span
-						>
-					</div>
-					<p class="mt-1 text-xs text-slate-400">Formule : bugs corrigés / bugs détectés × 100</p>
-					<div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-						<div class="h-full rounded-full bg-emerald-500" style="width: {fixRate}%"></div>
-					</div>
-					<p class="mt-2 text-xs text-slate-400">
-						Cible cours : &gt; 90% = bon · 70–90% = moyen · &lt; 70% = critique
-					</p>
-				</div>
-
-				<!-- Couverture tests -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-						Couverture tests
-					</p>
-					<div class="mt-3 flex items-end gap-3">
-						<p class="text-4xl font-black text-slate-900">{testCoverage}%</p>
-						<span
-							class={`mb-1 rounded-full px-2 py-0.5 text-xs font-bold bg-${cvg.color}-100 text-${cvg.color}-700`}
-						>
-							{cvg.label}
-						</span>
-					</div>
-					<div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-						<div
-							class={`h-full rounded-full bg-${cvg.color}-500`}
-							style="width: {testCoverage}%"
-						></div>
-					</div>
-					<p class="mt-2 text-xs text-slate-400">Cible : 80% · Source : SonarCloud CI</p>
-					<div class="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-						Action : ajouter tests unitaires backend
-					</div>
-				</div>
-			</div>
-
-			<div class="rounded-3xl border border-orange-200 bg-orange-50 p-5">
-				<p class="text-xs font-bold tracking-widest text-orange-700 uppercase">
-					Lecture PM · Cours p.17
-				</p>
-				<p class="mt-2 text-sm text-orange-800">
-					Le PM suit l'avancement (prévu vs réel), la vélocité pour détecter les blocages et la
-					qualité (bug rate, fix rate, couverture). Une chute de vélocité = signal d'alerte →
-					réallouer ressources ou geler de nouvelles features.
-				</p>
-			</div>
-
-			<!-- =============================== -->
-			<!-- VUE CTO — Directeur technique   -->
-			<!-- =============================== -->
-		{:else if activeActor === 'cto'}
-			<!-- Ligne 3 : Technique -->
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Ligne 3 — Technique (infrastructure live)
-			</p>
-			<div class="mb-6 grid gap-4 lg:grid-cols-2">
-				<!-- Uptime services -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-						Disponibilité (Uptime)
-					</p>
-					<p class="mt-1 text-xs text-slate-400">
-						Formule : temps fonctionnement / temps total × 100
-					</p>
-					<div class="mt-4 space-y-4">
-						{#each [{ label: 'auth-service', status: authStatus }, { label: 'catalog-service', status: catalogStatus }] as svc}
-							<div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-								<div>
-									<p class="text-sm font-bold text-slate-900">{svc.label}</p>
-									<p class="text-xs text-slate-400">GET /health</p>
-								</div>
-								<span
-									class={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
-										svc.status === 'ok'
-											? 'bg-emerald-100 text-emerald-700'
-											: svc.status === 'loading'
-												? 'bg-slate-100 text-slate-500'
-												: 'bg-red-100 text-red-700'
-									}`}
-								>
-									{svc.status === 'loading' ? '...' : svc.status === 'ok' ? 'UP' : 'DOWN'}
-								</span>
-							</div>
-						{/each}
-					</div>
-					<div class="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-						Niveau cible cours : 99.9% (standard) · 99.99% (critique)
-					</div>
-				</div>
-
-				<!-- Latence + taux d'erreur -->
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-						Performance API
-					</p>
-					<div class="mt-4 space-y-4">
-						{#if catalogLatencyMs !== null}
-							<div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-								<div>
-									<p class="text-sm font-bold text-slate-900">Latence (temps de réponse)</p>
-									<p class="text-xs text-slate-400">
-										catalog-service /health · Formule : Σtemps / nb requêtes
-									</p>
-								</div>
-								<span
-									class={`rounded-full px-3 py-1 text-xs font-bold ${
-										catalogLatencyMs < 200
-											? 'bg-emerald-100 text-emerald-700'
-											: catalogLatencyMs < 500
-												? 'bg-amber-100 text-amber-700'
-												: 'bg-red-100 text-red-700'
-									}`}
-								>
-									{catalogLatencyMs} ms
-								</span>
-							</div>
-						{/if}
-						<div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-							<div>
-								<p class="text-sm font-bold text-slate-900">Taux d'erreur API</p>
-								<p class="text-xs text-slate-400">Formule : requêtes erreur / total × 100</p>
-							</div>
-							<span
-								class={`rounded-full px-3 py-1 text-xs font-bold ${
-									catalogStatus === 'ok'
-										? 'bg-emerald-100 text-emerald-700'
-										: 'bg-slate-100 text-slate-500'
-								}`}
-							>
-								{catalogStatus === 'ok' ? '< 1%' : '...'}
 							</span>
-						</div>
-						<div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-							<div>
-								<p class="text-sm font-bold text-slate-900">Articles catalogue</p>
-								<p class="text-xs text-slate-400">catalog-service live</p>
-							</div>
-							<span class="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">
-								{catalogStatus === 'ok' ? articlesCount : '—'}
-							</span>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<!-- DORA Metrics -->
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				DORA Metrics · Standard mondial DevOps
-			</p>
-			<div class="mb-6 rounded-3xl border border-slate-800 bg-slate-950 p-6 text-white shadow-lg">
-				<p class="mb-1 text-xs font-semibold tracking-widest text-orange-300 uppercase">
-					State of DevOps Report — 4 indicateurs clés
-				</p>
-				<h2 class="mb-5 text-xl font-black tracking-tight uppercase">DORA Metrics</h2>
-				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					{#each doraMetrics as metric}
-						<div class="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-							<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-								{metric.label}
-							</p>
-							<p class="mt-2 text-2xl font-black text-white">{metric.value}</p>
-							<p class="mt-1 text-xs text-slate-400">{metric.note}</p>
-							<span
-								class={`mt-3 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${
-									metric.status === 'good'
-										? 'bg-emerald-900 text-emerald-400'
-										: metric.status === 'medium'
-											? 'bg-amber-900 text-amber-400'
-											: metric.status === 'bad'
-												? 'bg-red-900 text-red-400'
-												: 'bg-slate-800 text-slate-400'
-								}`}
-							>
-								{metric.status === 'good'
-									? 'Élite'
-									: metric.status === 'medium'
-										? 'En progression'
-										: metric.status === 'na'
-											? 'À mesurer'
-											: 'Critique'}
-							</span>
+							<span class="funnel-count">{n}</span>
 						</div>
 					{/each}
 				</div>
-				<p class="mt-4 text-xs text-slate-500">
-					Cours p.15-16 : Deployment Frequency · Lead Time · MTTR · Change Failure Rate
-				</p>
-			</div>
 
-			<div class="rounded-3xl border border-orange-200 bg-orange-50 p-5">
-				<p class="text-xs font-bold tracking-widest text-orange-700 uppercase">
-					Lecture CTO · Cours p.17
-				</p>
-				<p class="mt-2 text-sm text-orange-800">
-					Le CTO suit la disponibilité des services, la latence et les métriques DORA. Le MTTR et le
-					Change Failure Rate nécessiteront Prometheus / Grafana en production pour être mesurés
-					avec précision.
-				</p>
-			</div>
+				<div class="eyebrow" style="margin-top:20px">Catalogue</div>
+				<h2 class="panel-title">Répartition par catégorie</h2>
+				<div class="funnel">
+					{#each stats.byCategory as row}
+						{#if row.name}
+							<div class="funnel-row">
+								<span class="funnel-name">{row.name}</span>
+								<span class="funnel-track">
+									<span
+										class="funnel-fill"
+										style={`width:${stats.totalArticles ? (row.count / stats.totalArticles) * 100 : 0}%`}
+									></span>
+								</span>
+								<span class="funnel-count">{row.count}</span>
+							</div>
+						{/if}
+					{/each}
+				</div>
+			</section>
 
-			<!-- =============================== -->
-			<!-- VUE CEO — Direction générale    -->
-			<!-- =============================== -->
-		{:else if activeActor === 'ceo'}
-			<!-- Ligne 4 : Business -->
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Ligne 4 — Business (valeur créée)
-			</p>
-			<div class="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-				{#each [{ label: 'Taux de churn', value: churnRate, sub: 'Formule : utilisateurs perdus / total × 100', threshold: '< 5% = bon · > 10% = critique', color: 'slate' }, { label: 'Taux de rétention', value: retentionRate, sub: 'Utilisateurs actifs après période / initiaux × 100', threshold: 'Fidélité produit', color: 'slate' }, { label: 'Taux de conversion', value: conversionRate, sub: 'Visiteurs ayant agi / visiteurs totaux × 100', threshold: 'Cible : > 5%', color: 'slate' }, { label: 'ARPU', value: arpu, sub: "Revenu total / nombre d'utilisateurs", threshold: 'Amélioration UX → ARPU augmente', color: 'slate' }] as kpi}
-					<div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-						<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-							{kpi.label}
-						</p>
-						<p class="mt-2 text-4xl font-black text-slate-400">{kpi.value}</p>
-						<p class="mt-2 text-xs text-slate-400">{kpi.sub}</p>
-						<div class="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-							{kpi.threshold}
+			<section class="panel">
+				<div class="eyebrow">Activité</div>
+				<h2 class="panel-title">Dernières commandes</h2>
+				{#if stats.recentOrders.length === 0}
+					<div class="empty">Aucune commande pour l'instant.</div>
+				{:else}
+					<div class="orders">
+						{#each stats.recentOrders as o}
+							<div class="order-row">
+								<span class="order-date">{o.createdAt}</span>
+								<span class="order-name">{o.article || `Lot #${o.id}`}</span>
+								<span class="order-status order-{o.status}">
+									{ORDER_STATUS_FR[o.status] ?? o.status}
+								</span>
+								<span class="order-price">{eur(o.price)}</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</section>
+		</div>
+	{/if}
+
+	<!-- Alertes fraude -->
+	<section class="panel">
+		<div class="eyebrow">Sécurité</div>
+		<h2 class="panel-title">Alertes fraude</h2>
+		{#if fraudTrackerDown}
+			<div class="empty">price-tracker-service indisponible.</div>
+		{:else if fraudAlerts.length === 0}
+			<div class="empty">Aucune alerte non résolue.</div>
+		{:else}
+			<div class="alerts">
+				{#each fraudAlerts as alert (alert.id)}
+					<div class="alert-row">
+						<div>
+							<p class="alert-title">
+								{reasonLabels[alert.reason] ?? alert.reason}
+								<span class="alert-item">article #{fromEventUuid(alert.item_id)}</span>
+							</p>
+							<p class="alert-detail">{alert.detail}</p>
+							<p class="alert-meta">
+								{alert.old_price.toFixed(2)} € → {alert.new_price.toFixed(2)} € · {new Date(
+									alert.created_at
+								).toLocaleString('fr-FR')}
+							</p>
 						</div>
+						<button type="button" class="alert-resolve" onclick={() => onResolveAlert(alert.id)}>
+							Résoudre
+						</button>
 					</div>
 				{/each}
 			</div>
-
-			<!-- Données live catalogue -->
-			<p class="mb-3 text-xs font-semibold tracking-widest text-slate-400 uppercase">
-				Données live · Catalogue
-			</p>
-			<div class="mb-6 grid gap-4 md:grid-cols-2">
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-						Articles publiés
-					</p>
-					<p class="mt-2 text-5xl font-black text-orange-600">
-						{catalogStatus === 'ok' ? articlesCount : '—'}
-					</p>
-					<p class="mt-1 text-xs text-slate-400">catalogue live · catalog-service</p>
-				</div>
-				<div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-					<p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">Catégories</p>
-					<p class="mt-2 text-5xl font-black text-slate-900">
-						{catalogStatus === 'ok' ? categoriesCount : '—'}
-					</p>
-					<p class="mt-1 text-xs text-slate-400">taxonomie live · catalog-service</p>
-				</div>
-			</div>
-
-			<!-- Avertissement -->
-			<div class="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
-				<p class="text-xs font-bold tracking-widest text-amber-700 uppercase">
-					KPIs business — À instrumenter
-				</p>
-				<p class="mt-2 text-sm text-amber-800">
-					Churn, rétention, conversion et ARPU nécessitent un outil d'analytics dédié (Amplitude,
-					Mixpanel, ou tracking custom). Ces indicateurs sont définis dans le cours mais non encore
-					mesurables sans collecte de données utilisateurs.
-				</p>
-			</div>
-
-			<div class="rounded-3xl border border-orange-200 bg-orange-50 p-5">
-				<p class="text-xs font-bold tracking-widest text-orange-700 uppercase">
-					Lecture CEO · Cours p.12-14
-				</p>
-				<p class="mt-2 text-sm text-orange-800">
-					Le CEO suit la valeur business créée : rétention, churn, conversion, ARPU. Un projet
-					techniquement bon mais business KO = échec. Lien direct : KPI technique dégradé → KPI
-					business impacté (ex. latence élevée → churn augmente).
-				</p>
-			</div>
 		{/if}
-
-		<!-- Note pédagogique commune -->
-		<div class="mt-6 rounded-3xl border border-slate-200 bg-white p-5">
-			<p class="text-xs font-bold tracking-widest text-slate-400 uppercase">
-				Principe fondamental · Cours p.17
-			</p>
-			<div class="mt-2 grid gap-3 text-xs text-slate-600 md:grid-cols-3">
-				<div class="rounded-xl bg-slate-50 px-4 py-3">
-					<p class="font-bold text-slate-800">1. Identifier l'utilisateur</p>
-					<p class="mt-1">CEO → business · CTO → technique · PM → projet</p>
-				</div>
-				<div class="rounded-xl bg-slate-50 px-4 py-3">
-					<p class="font-bold text-slate-800">2. Limiter les KPI</p>
-					<p class="mt-1">Règle : 5 à 10 KPI max par vue</p>
-				</div>
-				<div class="rounded-xl bg-slate-50 px-4 py-3">
-					<p class="font-bold text-slate-800">3. Logique de décision</p>
-					<p class="mt-1">Un dashboard ≠ liste de KPI = outil pour décider</p>
-				</div>
-			</div>
-		</div>
-	</div>
+	</section>
 </div>
+
+<style>
+	.dash {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding-bottom: 60px;
+	}
+
+	.eyebrow {
+		font-size: 11px;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		font-weight: 600;
+		color: #86b3a4;
+		margin-bottom: 10px;
+	}
+
+	.head {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 24px;
+		flex-wrap: wrap;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		padding-bottom: 24px;
+		margin-bottom: 24px;
+	}
+	.title {
+		font-family: 'Newsreader', Georgia, serif;
+		font-weight: 500;
+		font-size: 40px;
+		line-height: 1;
+		color: #ece5da;
+		margin: 0 0 8px;
+	}
+	.subtitle {
+		font-size: 13px;
+		color: #a39a8c;
+		margin: 0;
+	}
+	.btn-refresh {
+		padding: 10px 18px;
+		border-radius: 7px;
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: rgba(255, 255, 255, 0.02);
+		color: #ece5da;
+		font-size: 12px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		cursor: pointer;
+		transition: background 150ms;
+	}
+	.btn-refresh:hover {
+		background: rgba(255, 255, 255, 0.05);
+	}
+
+	.msg {
+		padding: 10px 14px;
+		border-radius: 7px;
+		border: 1px solid;
+		font-size: 13px;
+		margin-bottom: 16px;
+	}
+	.msg-error {
+		border-color: rgba(215, 156, 134, 0.3);
+		background: rgba(215, 156, 134, 0.06);
+		color: #d79c86;
+	}
+
+	.panel {
+		background: #221f1b;
+		border: 1px solid rgba(236, 229, 218, 0.1);
+		border-radius: 9px;
+		padding: 20px;
+		margin-bottom: 22px;
+	}
+	.panel-title {
+		font-family: 'Newsreader', Georgia, serif;
+		font-weight: 500;
+		font-size: 22px;
+		color: #ece5da;
+		margin: 0 0 16px;
+	}
+	.empty {
+		border: 1px dashed rgba(236, 229, 218, 0.14);
+		border-radius: 8px;
+		padding: 18px;
+		font-size: 13px;
+		color: #a39a8c;
+	}
+
+	/* Infrastructure */
+	.infra-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 6px;
+	}
+	.infra-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 12px 14px;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.03);
+	}
+	.infra-name {
+		display: block;
+		font-size: 13.5px;
+		font-weight: 600;
+		color: #ece5da;
+	}
+	.infra-sub {
+		display: block;
+		font-size: 11.5px;
+		color: #766d60;
+		margin-top: 2px;
+	}
+	.infra-badge {
+		flex-shrink: 0;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		padding: 4px 10px;
+		border-radius: 20px;
+		background: rgba(255, 255, 255, 0.06);
+		color: #a39a8c;
+	}
+	.infra-ok {
+		background: rgba(134, 179, 164, 0.14);
+		color: #86b3a4;
+	}
+	.infra-warn {
+		background: rgba(224, 178, 96, 0.14);
+		color: #e0b260;
+	}
+	.infra-down {
+		background: rgba(215, 156, 134, 0.14);
+		color: #d79c86;
+	}
+
+	/* KPI */
+	.kpis {
+		display: grid;
+		grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+		gap: 12px;
+		margin-bottom: 16px;
+	}
+	.kpi {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+		padding: 16px 18px;
+		border: 1px solid rgba(236, 229, 218, 0.1);
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.02);
+	}
+	.kpi-hero {
+		background: rgba(134, 179, 164, 0.06);
+		border-color: rgba(134, 179, 164, 0.24);
+	}
+	.kpi-label {
+		font-size: 10.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: #766d60;
+	}
+	.kpi-val {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 25px;
+		color: #86b3a4;
+	}
+	.kpi-hero .kpi-val {
+		font-size: 30px;
+		color: #ece5da;
+	}
+	.kpi-sub {
+		font-size: 11.5px;
+		color: #a39a8c;
+	}
+	@media (max-width: 900px) {
+		.kpis {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	.dash-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 14px;
+		margin-bottom: 22px;
+		align-items: start;
+	}
+	.dash-grid .panel {
+		margin-bottom: 0;
+	}
+	@media (max-width: 900px) {
+		.dash-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	/* Funnel */
+	.funnel {
+		display: flex;
+		flex-direction: column;
+		gap: 9px;
+		margin-top: 6px;
+	}
+	.funnel-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.funnel-name {
+		width: 96px;
+		font-size: 12.5px;
+		color: #ece5da;
+		flex-shrink: 0;
+	}
+	.funnel-cancel {
+		color: #d79c86;
+	}
+	.funnel-track {
+		flex: 1;
+		height: 8px;
+		border-radius: 4px;
+		background: rgba(255, 255, 255, 0.05);
+		overflow: hidden;
+	}
+	.funnel-fill {
+		display: block;
+		height: 100%;
+		background: #86b3a4;
+		border-radius: 4px;
+		min-width: 2px;
+	}
+	.funnel-fill-cancel {
+		background: #d79c86;
+	}
+	.funnel-count {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 12px;
+		color: #a39a8c;
+		width: 28px;
+		text-align: right;
+		flex-shrink: 0;
+	}
+
+	/* Commandes */
+	.orders {
+		display: flex;
+		flex-direction: column;
+		margin-top: 6px;
+	}
+	.order-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 0;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.08);
+	}
+	.order-date {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+		color: #766d60;
+		flex-shrink: 0;
+		width: 82px;
+	}
+	.order-name {
+		flex: 1;
+		font-size: 13px;
+		color: #ece5da;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.order-status {
+		font-size: 10.5px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		padding: 3px 8px;
+		border-radius: 4px;
+		flex-shrink: 0;
+		background: rgba(134, 179, 164, 0.1);
+		color: #86b3a4;
+	}
+	.order-cancelled {
+		background: rgba(215, 156, 134, 0.1);
+		color: #d79c86;
+	}
+	.order-price {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 12.5px;
+		color: #a39a8c;
+		flex-shrink: 0;
+		width: 84px;
+		text-align: right;
+	}
+
+	/* Alertes fraude */
+	.alerts {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin-top: 6px;
+	}
+	.alert-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		padding: 14px 16px;
+		border: 1px solid rgba(215, 156, 134, 0.24);
+		background: rgba(215, 156, 134, 0.05);
+		border-radius: 9px;
+		flex-wrap: wrap;
+	}
+	.alert-title {
+		font-size: 13px;
+		font-weight: 700;
+		color: #d79c86;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+		margin: 0;
+	}
+	.alert-item {
+		margin-left: 8px;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+		font-weight: 400;
+		color: #a39a8c;
+		text-transform: none;
+	}
+	.alert-detail {
+		margin: 4px 0 0;
+		font-size: 13px;
+		color: #cbc3b6;
+	}
+	.alert-meta {
+		margin: 4px 0 0;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+		color: #766d60;
+	}
+	.alert-resolve {
+		flex-shrink: 0;
+		padding: 8px 16px;
+		border-radius: 7px;
+		border: 1px solid rgba(215, 156, 134, 0.4);
+		background: rgba(255, 255, 255, 0.02);
+		color: #d79c86;
+		font-size: 11.5px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		cursor: pointer;
+		transition: background 150ms;
+	}
+	.alert-resolve:hover {
+		background: rgba(215, 156, 134, 0.12);
+	}
+</style>

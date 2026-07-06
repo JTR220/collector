@@ -27,11 +27,14 @@
 	});
 
 	const routeToActive: Record<string, string> = {
-		'/': 'Vitrine',
-		'/profil': 'Profil'
+		'/': 'Marché',
+		'/vendre': 'Vendre',
+		'/profil': 'Profil',
+		'/admin': 'Admin',
+		'/dashboard': 'Tableau de bord'
 	};
 
-	const active = $derived(routeToActive[$page.url.pathname] ?? 'Vitrine');
+	const active = $derived(routeToActive[$page.url.pathname] ?? 'Marché');
 </script>
 
 <svelte:head>

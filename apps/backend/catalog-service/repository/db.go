@@ -39,13 +39,8 @@ func InitDB() {
 func SeedData() {
 	defer backfillArticleImages()
 
-	var count int64
-	DB.Model(&models.Article{}).Count(&count)
-	if count > 0 {
-		log.Println("Donnees deja presentes, seed ignore")
-		return
-	}
-
+	// Categories idempotentes (FirstOrCreate par nom) : le seed peut tourner
+	// plusieurs fois sans doublon ni suppression de donnees existantes.
 	categories := []models.Categorie{
 		{Name: "TCG", Description: "Cartes à collectionner — Pokémon, Magic, Yu-Gi-Oh et autres"},
 		{Name: "Console", Description: "Consoles de jeu vintage et éditions scellées"},
@@ -56,8 +51,9 @@ func SeedData() {
 	}
 
 	for i := range categories {
-		if err := DB.Create(&categories[i]).Error; err != nil {
-			log.Printf("Erreur creation categorie %s: %v", categories[i].Name, err)
+		if err := DB.Where(models.Categorie{Name: categories[i].Name}).
+			FirstOrCreate(&categories[i]).Error; err != nil {
+			log.Printf("Erreur categorie %s: %v", categories[i].Name, err)
 			return
 		}
 	}
@@ -69,6 +65,16 @@ func SeedData() {
 			}
 		}
 		return 0
+	}
+
+	// Les 6 pieces vedettes ne sont inserees qu'une fois (au premier boot).
+	var baseCount int64
+	DB.Model(&models.Article{}).Where("slug IN ?",
+		[]string{"PKM-001", "GBC-014", "CMX-007", "VNL-022", "FIG-101", "WAT-045"}).Count(&baseCount)
+	if baseCount > 0 {
+		topUpCatalog(catID)
+		log.Println("Pieces vedettes deja presentes : top-up catalogue etendu applique")
+		return
 	}
 
 	articles := []models.Article{
@@ -218,30 +224,177 @@ func SeedData() {
 		},
 	}
 
+	// Photos Unsplash sur les 6 pieces vedettes (cyclage du pool par defaut).
 	for i := range articles {
+		articles[i].ImageURL = unsplashURL("", i)
 		if err := DB.Create(&articles[i]).Error; err != nil {
 			log.Printf("Erreur creation article %s: %v", articles[i].Slug, err)
 			return
 		}
 	}
 
-	log.Printf("Seed termine : %d categories, %d articles inseres", len(categories), len(articles))
+	// Catalogue etendu : ~40 pieces thematiques par categorie, photos Unsplash.
+	added := topUpCatalog(catID)
+
+	log.Printf("Seed termine : %d categories, %d pieces vedettes + %d pieces catalogue",
+		len(categories), len(articles), added)
 }
 
-// backfillArticleImages donne aux articles existants une photo de démo stable
-// (picsum seedé par slug) tant qu'aucune vraie photo n'a été uploadée.
+// topUpCatalog insere le catalogue etendu de facon idempotente (par slug) :
+// on ne recree jamais une piece deja presente. Renvoie le nombre d'ajouts.
+func topUpCatalog(catID func(string) uint) int {
+	added := 0
+	for _, a := range generateCatalog(catID) {
+		var count int64
+		DB.Model(&models.Article{}).Where("slug = ?", a.Slug).Count(&count)
+		if count > 0 {
+			continue
+		}
+		if err := DB.Create(&a).Error; err != nil {
+			log.Printf("Erreur creation article %s: %v", a.Slug, err)
+			continue
+		}
+		added++
+	}
+	return added
+}
+
+// unsplashPool : identifiants de photos Unsplash (CDN images.unsplash.com)
+// verifies 200, regroupes par categorie. Voir unsplashURL().
+var unsplashPool = map[string][]string{
+	"TCG":          {"1613771404784-3a5686aa2be3", "1610890716171-6b1bb98ffd09", "1526779259212-939e64788e3c", "1611605698335-8b1569810432"},
+	"Console":      {"1606663889134-b1dedb5ed8b7", "1531525645387-7f14be1bdbbd", "1486401899868-0e435ed85128", "1550745165-9bc0b252726f"},
+	"Comics":       {"1608889175123-8ee362201f81", "1612036782180-6f0b6cd846fe", "1601645191163-3fc0d5d64e35"},
+	"Vinyle":       {"1493225457124-a3eb161ffa5f", "1458560871784-56d23406c091", "1571330735066-03aaa9429d89"},
+	"Designer Toy": {"1566576912321-d58ddd7a6088", "1533105079780-92b9be482077", "1608889175123-8ee362201f81"},
+	"Horlogerie":   {"1524592094714-0f0654e20314", "1587836374828-4dbafa94cf0e", "1548169874-53e85f753f1e"},
+	"_default":     {"1493711662062-fa541adb3fc8", "1585504198199-20277593b94f", "1518709268805-4e9042af9f23", "1550009158-9ebf69173e03"},
+}
+
+// DefaultImageFor renvoie une photo Unsplash themee pour une categorie donnee,
+// utilisee comme visuel par defaut quand un vendeur n'a pas fourni d'URL.
+func DefaultImageFor(categoryID uint) string {
+	var cat models.Categorie
+	if err := DB.First(&cat, categoryID).Error; err != nil {
+		return unsplashURL("", int(categoryID))
+	}
+	return unsplashURL(cat.Name, int(categoryID))
+}
+
+// unsplashURL renvoie une URL de photo Unsplash themee pour la categorie donnee,
+// choisie de facon deterministe (cyclage sur l'index) pour varier les visuels.
+func unsplashURL(category string, i int) string {
+	pool := unsplashPool[category]
+	if len(pool) == 0 {
+		pool = unsplashPool["_default"]
+	}
+	id := pool[i%len(pool)]
+	return fmt.Sprintf("https://images.unsplash.com/photo-%s?auto=format&fit=crop&w=600&q=70", id)
+}
+
+// generateCatalog produit un catalogue etoffe : plusieurs pieces par categorie,
+// avec photos Unsplash themees. Deterministe (pas de hasard) pour un seed stable.
+func generateCatalog(catID func(string) uint) []models.Article {
+	type item struct {
+		name, series, rarity, grade string
+		year                        int
+		prix, port                  float64
+	}
+	catalog := map[string][]item{
+		"TCG": {
+			{"Pikachu Illustrator", "Promo CoroCoro, 1998", "Grail", "PSA 7", 1998, 42000, 30},
+			{"Black Lotus — Alpha", "Magic, Alpha 1993", "Grail", "BGS 8", 1993, 26500, 25},
+			{"Blue-Eyes White Dragon", "Yu-Gi-Oh, LOB 1re ed.", "Ultra Rare", "PSA 9", 2002, 3400, 15},
+			{"Lugia — Neo Genesis", "Pokémon, Neo Genesis", "Holo Rare", "PSA 8", 2000, 2100, 14},
+			{"Mewtwo GX Rainbow", "Pokémon, Shining Legends", "Secret Rare", "PSA 10", 2017, 460, 10},
+			{"Rayquaza Gold Star", "Pokémon, EX Deoxys", "Gold Star", "PSA 9", 2005, 5200, 16},
+		},
+		"Console": {
+			{"Nintendo 64 — Édition Pikachu", "N64, boîte complète", "Rare", "CIB", 1999, 540, 28},
+			{"Sega Mega Drive scellé", "Model 1, neuf scellé", "Sealed", "Mint", 1990, 890, 34},
+			{"PlayStation SCPH-1000", "PS1 japonaise, 1994", "Vintage", "EX", 1994, 620, 30},
+			{"Game Boy Advance SP", "Édition Tribal, complète", "Uncommon", "Mint", 2003, 240, 12},
+			{"Super Famicom — Set", "SNES JP, 12 jeux", "Bundle", "VG+", 1992, 380, 26},
+			{"Neo Geo AES", "SNK, avec Metal Slug", "Rare", "EX", 1991, 1450, 40},
+		},
+		"Comics": {
+			{"Amazing Fantasy #15", "Marvel, reprint gradé", "Key Issue", "CGC 9.4", 2002, 720, 14},
+			{"Batman #1 — Facsimile", "DC, édition anniversaire", "Near Mint", "CGC 9.8", 2019, 180, 12},
+			{"X-Men #1 (1991)", "Marvel, Jim Lee cover", "Near Mint", "CGC 9.6", 1991, 260, 12},
+			{"Spawn #1", "Image Comics, 1992", "Near Mint", "CGC 9.8", 1992, 210, 12},
+			{"Watchmen #1", "DC, 1re impression", "Very Fine", "CGC 9.0", 1986, 340, 13},
+			{"Saga #1 signé", "Image, signé B.K. Vaughan", "Signature", "CGC 9.6", 2012, 290, 12},
+		},
+		"Vinyle": {
+			{"Pink Floyd — Dark Side", "Harvest, 1re presse UK", "Rare", "VG+", 1973, 420, 14},
+			{"The Beatles — Abbey Road", "Apple, presse 1969", "Rare", "VG", 1969, 380, 14},
+			{"Nirvana — Nevermind", "DGC, presse 1991", "Collector", "NM", 1991, 190, 12},
+			{"Michael Jackson — Thriller", "Epic, gatefold", "Uncommon", "VG+", 1982, 95, 11},
+			{"Radiohead — OK Computer", "Parlophone, 2xLP", "Collector", "NM", 1997, 160, 12},
+			{"Kendrick Lamar — DAMN.", "TDE, presse rouge", "Limited", "M", 2017, 85, 10},
+		},
+		"Designer Toy": {
+			{"KAWS Companion — Grey", "OriginalFake, 2016", "Limited", "MIB", 2016, 980, 30},
+			{"Bearbrick 400% Basquiat", "Medicom, série #1", "Limited", "MIB", 2019, 320, 22},
+			{"Funko Pop Gold Batman", "18\" édition dorée", "Chase", "Mint", 2021, 140, 18},
+			{"Dunny 8\" — Kidrobot", "Art toy signé", "Rare", "MIB", 2015, 180, 16},
+			{"Sonny Angel — Série complète", "12 figurines scellées", "Full Set", "Mint", 2020, 130, 14},
+			{"Labubu — The Monsters", "Pop Mart, édition macaron", "Limited", "MIB", 2023, 110, 12},
+		},
+		"Horlogerie": {
+			{"Seiko SKX007", "Diver automatique, full set", "Discontinued", "EX", 2015, 380, 12},
+			{"Casio A168 Gold", "Vintage réédition dorée", "Common", "Mint", 2019, 75, 8},
+			{"MoonSwatch Mission to Moon", "Swatch x Omega", "Hype", "Mint", 2022, 320, 10},
+			{"Timex Q Reissue", "Réédition 1979", "Uncommon", "Mint", 2021, 110, 9},
+			{"Orient Bambino V4", "Dress automatique", "Common", "EX", 2018, 130, 9},
+			{"Vostok Amphibia", "Diver soviétique 200m", "Vintage", "VG+", 1988, 95, 10},
+		},
+	}
+
+	glyphs := map[string]string{
+		"TCG": "卡", "Console": "電", "Comics": "S", "Vinyle": "♪", "Designer Toy": "★", "Horlogerie": "◷",
+	}
+
+	var out []models.Article
+	seq := 200
+	for _, cat := range []string{"TCG", "Console", "Comics", "Vinyle", "Designer Toy", "Horlogerie"} {
+		for i, it := range catalog[cat] {
+			seq++
+			out = append(out, models.Article{
+				Slug:        fmt.Sprintf("CAT-%03d", seq),
+				Name:        it.name,
+				Description: fmt.Sprintf("%s. Pièce authentifiée, état %s, expédition soignée sous protection.", it.series, it.grade),
+				Series:      it.series,
+				Year:        it.year,
+				Rarity:      it.rarity,
+				Grade:       it.grade,
+				Prix:        it.prix,
+				FraisPort:   it.port,
+				Seller:      "collector_vault",
+				SellerScore: 4.8,
+				ImageURL:    unsplashURL(cat, i),
+				SaleType:    "drop",
+				Glyph:       glyphs[cat],
+				CategoryID:  catID(cat),
+			})
+		}
+	}
+	return out
+}
+
+// backfillArticleImages donne aux articles sans photo une image Unsplash themee
+// (par categorie) tant qu'aucune vraie photo n'a été uploadée.
 func backfillArticleImages() {
 	var articles []models.Article
-	DB.Where("image_url IS NULL OR image_url = ''").Find(&articles)
+	// Photos manquantes OU anciennes demos picsum : on (re)pose une image Unsplash themee.
+	DB.Preload("Category").
+		Where("image_url IS NULL OR image_url = '' OR image_url LIKE ?", "%picsum.photos%").
+		Find(&articles)
 	for i := range articles {
-		seed := articles[i].Slug
-		if seed == "" {
-			seed = fmt.Sprintf("art-%d", articles[i].ID)
-		}
-		url := fmt.Sprintf("https://picsum.photos/seed/%s/600/450", seed)
+		url := unsplashURL(articles[i].Category.Name, int(articles[i].ID))
 		DB.Model(&articles[i]).Update("image_url", url)
 	}
 	if len(articles) > 0 {
-		log.Printf("Backfill images : %d articles avec photo de demo", len(articles))
+		log.Printf("Backfill images : %d articles avec photo Unsplash", len(articles))
 	}
 }

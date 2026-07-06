@@ -35,8 +35,21 @@ func AuthRequired() gin.HandlerFunc {
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			c.Set("user_id", claims["user_id"])
 			c.Set("email", claims["email"])
+			c.Set("role", claims["role"])
 		}
 
+		c.Next()
+	}
+}
+
+// AdminRequired doit etre chaine apres AuthRequired : il refuse toute requete
+// dont le claim "role" n'est pas "admin" (moderation catalogue, stats back-office).
+func AdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if role, _ := c.Get("role"); role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Acces reserve aux administrateurs"})
+			return
+		}
 		c.Next()
 	}
 }

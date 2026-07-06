@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { auth } from '$lib/stores/auth';
 	import { fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
 	import { eur, pct } from '$lib/utils/format';
-	import GPanel from '$lib/components/galerie/GPanel.svelte';
-	import GMeter from '$lib/components/galerie/GMeter.svelte';
 	import GChip from '$lib/components/galerie/GChip.svelte';
 	import GSpark from '$lib/components/galerie/GSpark.svelte';
+	import GSelect from '$lib/components/galerie/GSelect.svelte';
 	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
 	let articles = $state<ArticleAPI[]>([]);
@@ -25,32 +23,54 @@
 		}
 	});
 
-	// Filtres pilotés par l'URL : /?cat=TCG&max=300
-	const filterCat = $derived($page.url.searchParams.get('cat'));
-	const filterMax = $derived(Number($page.url.searchParams.get('max')) || null);
+	// Recherche & filtres (état local, orientés marketplace)
+	let search = $state('');
+	let filterCat = $state('');
+	let filterMax = $state(0);
+	let availableOnly = $state(false);
+	let sort = $state<'recent' | 'price-asc' | 'price-desc' | 'name'>('recent');
+
+	const categories = $derived([...new Set(articles.map((a) => a.category.name))].sort());
 
 	const filtered = $derived(
-		articles.filter(
-			(a) => (!filterCat || a.category.name === filterCat) && (!filterMax || a.prix <= filterMax)
-		)
+		articles
+			.filter((a) => {
+				const q = search.trim().toLowerCase();
+				const matchQ =
+					!q ||
+					a.name.toLowerCase().includes(q) ||
+					(a.series ?? '').toLowerCase().includes(q) ||
+					(a.slug ?? '').toLowerCase().includes(q) ||
+					a.category.name.toLowerCase().includes(q);
+				return (
+					matchQ &&
+					(!filterCat || a.category.name === filterCat) &&
+					(!filterMax || a.prix <= filterMax) &&
+					(!availableOnly || !a.sold)
+				);
+			})
+			.sort((a, b) => {
+				switch (sort) {
+					case 'price-asc':
+						return a.prix - b.prix;
+					case 'price-desc':
+						return b.prix - a.prix;
+					case 'name':
+						return a.name.localeCompare(b.name);
+					default:
+						return b.ID - a.ID;
+				}
+			})
 	);
 
-	function setCategoryFilter(cat: string) {
-		goto(filterCat === cat ? '/' : `/?cat=${encodeURIComponent(cat)}`, { noScroll: true });
+	const hasFilters = $derived(!!(search || filterCat || filterMax || availableOnly));
+	function resetFilters() {
+		search = '';
+		filterCat = '';
+		filterMax = 0;
+		availableOnly = false;
+		sort = 'recent';
 	}
-
-	const meters = $derived(
-		(() => {
-			const counts: Record<string, number> = {};
-			for (const a of articles) counts[a.category.name] = (counts[a.category.name] ?? 0) + 1;
-			const total = articles.length || 1;
-			return Object.entries(counts).map(([label, val]) => ({
-				label,
-				value: Math.round((val / total) * 100),
-				count: val
-			}));
-		})()
-	);
 
 	// Hue dérivée du nom de catégorie pour le placeholder art
 	function categoryHue(name: string): number {
@@ -81,47 +101,69 @@
 	}
 </script>
 
-<svelte:head><title>Collector.shop · Vitrine</title></svelte:head>
+<svelte:head><title>Collector.shop · Marché</title></svelte:head>
 
-<!-- Hero -->
-<section class="hero">
-	<div>
-		<Kicker>Sélection de la semaine</Kicker>
-		<h1 class="hero-title">Holo rares<br />&amp; scellés.</h1>
-		<p class="hero-lede">
-			Pièces vérifiées · grading PSA / CGC · livraison tracée sous boîtier antichoc. Chaque lot est
-			authentifié avant mise en ligne.
+<!-- En-tête marché -->
+<section class="market-head">
+	<div class="mh-text">
+		<Kicker>Marché</Kicker>
+		<h1 class="mh-title">Le marché des collectionneurs</h1>
+		<p class="mh-sub">
+			Achat direct entre membres · chaque lot authentifié · grading PSA / CGC. Trouvez la pièce,
+			ou mettez la vôtre en vente.
 		</p>
 	</div>
-
-	<GPanel>
-		<Kicker>Catégories</Kicker>
-		<div class="meters-list">
-			{#if meters.length === 0}
-				{#each ['TCG', 'Console', 'Comics', 'Vinyles'] as cat, i}
-					<div class="meter-row">
-						<span class="meter-label">{cat}</span>
-						<div style="flex:1"><GMeter value={[42, 28, 18, 12][i]} /></div>
-						<span class="meter-count">{[42, 28, 18, 12][i]}</span>
-					</div>
-				{/each}
-			{:else}
-				{#each meters as m}
-					<button
-						class="meter-row meter-btn"
-						class:meter-active={filterCat === m.label}
-						onclick={() => setCategoryFilter(m.label)}
-						title={filterCat === m.label ? 'Retirer le filtre' : `Filtrer : ${m.label}`}
-					>
-						<span class="meter-label">{m.label}</span>
-						<div style="flex:1"><GMeter value={m.value} /></div>
-						<span class="meter-count">{m.count}</span>
-					</button>
-				{/each}
-			{/if}
-		</div>
-	</GPanel>
+	{#if $auth.user}
+		<a class="mh-sell" href="/vendre">+ Vendre une pièce</a>
+	{:else}
+		<a class="mh-sell" href="/login">Se connecter pour vendre</a>
+	{/if}
 </section>
+
+<!-- Barre de recherche & filtres -->
+<div class="toolbar">
+	<div class="tb-search">
+		<span class="tb-ico" aria-hidden="true">⌕</span>
+		<input
+			class="tb-input"
+			type="search"
+			placeholder="Rechercher une pièce, une série, une référence…"
+			bind:value={search}
+		/>
+	</div>
+	<GSelect
+		bind:value={filterCat}
+		ariaLabel="Catégorie"
+		placeholder="Toutes catégories"
+		options={[{ value: '', label: 'Toutes catégories' }, ...categories.map((c) => ({ value: c, label: c }))]}
+	/>
+	<GSelect
+		bind:value={filterMax}
+		ariaLabel="Prix maximum"
+		placeholder="Tous prix"
+		options={[
+			{ value: 0, label: 'Tous prix' },
+			{ value: 100, label: '≤ 100 €' },
+			{ value: 500, label: '≤ 500 €' },
+			{ value: 1000, label: '≤ 1 000 €' },
+			{ value: 5000, label: '≤ 5 000 €' }
+		]}
+	/>
+	<GSelect
+		bind:value={sort}
+		ariaLabel="Tri"
+		options={[
+			{ value: 'recent', label: 'Plus récents' },
+			{ value: 'price-asc', label: 'Prix croissant' },
+			{ value: 'price-desc', label: 'Prix décroissant' },
+			{ value: 'name', label: 'Nom A→Z' }
+		]}
+	/>
+	<label class="tb-check">
+		<input type="checkbox" bind:checked={availableOnly} />
+		Disponibles
+	</label>
+</div>
 
 <!-- États -->
 {#if loading}
@@ -131,16 +173,18 @@
 {:else if articles.length === 0}
 	<div class="state-msg">Aucun article disponible pour le moment.</div>
 {:else}
-	{#if filterCat || filterMax}
-		<div class="filter-bar">
-			<span class="filter-label">
-				Filtre actif :
-				{#if filterCat}{filterCat}{/if}
-				{#if filterMax}{filterCat ? ' · ' : ''}moins de {eur(filterMax)}{/if}
-				— {filtered.length} pièce{filtered.length > 1 ? 's' : ''}
-			</span>
-			<a href="/" class="filter-clear">× effacer</a>
-		</div>
+	<div class="result-bar">
+		<span class="result-count">
+			{filtered.length} pièce{filtered.length > 1 ? 's' : ''}
+			{#if hasFilters}sur {articles.length}{/if}
+		</span>
+		{#if hasFilters}
+			<button class="result-clear" onclick={resetFilters}>× réinitialiser</button>
+		{/if}
+	</div>
+
+	{#if filtered.length === 0}
+		<div class="state-msg">Aucune pièce ne correspond à votre recherche.</div>
 	{/if}
 
 	<!-- Grille de cartes -->
@@ -234,110 +278,130 @@
 {/if}
 
 <style>
-	/* ── Hero ── */
-	.hero {
-		display: grid;
-		grid-template-columns: 1.55fr 1fr;
-		gap: 56px;
-		padding: 30px 0 26px;
-		align-items: start;
+	/* ── En-tête marché ── */
+	.market-head {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 24px;
+		padding: 28px 0 18px;
+		flex-wrap: wrap;
 	}
-	@media (max-width: 768px) {
-		.hero {
-			grid-template-columns: 1fr;
-			gap: 24px;
-		}
-	}
-
-	.hero-title {
+	.mh-title {
 		font-family: 'Newsreader', Georgia, serif;
 		font-weight: 500;
-		font-size: clamp(36px, 5vw, 50px);
+		font-size: clamp(30px, 4vw, 42px);
 		line-height: 1.05;
 		color: #ece5da;
-		margin: 10px 0 14px;
+		margin: 8px 0 10px;
 		text-wrap: balance;
 	}
-	.hero-lede {
+	.mh-sub {
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 15px;
+		font-size: 14px;
 		color: #a39a8c;
-		line-height: 1.6;
-		margin-bottom: 24px;
-		max-width: 480px;
+		line-height: 1.55;
+		max-width: 520px;
+		margin: 0;
+	}
+	.mh-sell {
+		flex-shrink: 0;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 600;
+		padding: 11px 20px;
+		border-radius: 8px;
+		background: #86b3a4;
+		color: #191714;
+		text-decoration: none;
+		transition: filter 120ms;
+	}
+	.mh-sell:hover {
+		filter: brightness(1.08);
 	}
 
-	.meters-list {
+	/* ── Barre de recherche & filtres ── */
+	.toolbar {
 		display: flex;
-		flex-direction: column;
 		gap: 10px;
-		margin-top: 14px;
+		flex-wrap: wrap;
+		align-items: center;
+		padding: 12px 0 18px;
+		border-top: 1px solid rgba(236, 229, 218, 0.08);
 	}
-	.meter-row {
+	.tb-search {
+		flex: 1 1 260px;
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: 8px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(236, 229, 218, 0.12);
+		border-radius: 8px;
+		padding: 0 12px;
+		transition:
+			border-color 150ms,
+			box-shadow 150ms;
 	}
-	.meter-btn {
+	.tb-search:focus-within {
+		border-color: rgba(134, 179, 164, 0.5);
+		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+	}
+	.tb-ico {
+		color: #766d60;
+		font-size: 15px;
+	}
+	.tb-input {
+		flex: 1;
 		background: none;
 		border: none;
-		padding: 4px 6px;
-		margin: -4px -6px;
-		border-radius: 6px;
+		outline: none;
+		padding: 11px 0;
+		color: #ece5da;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 14px;
+	}
+	.tb-input::placeholder {
+		color: rgba(236, 229, 218, 0.28);
+	}
+	.tb-check {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+		color: #a39a8c;
 		cursor: pointer;
-		width: 100%;
-		text-align: left;
-		transition: background 120ms;
+		user-select: none;
 	}
-	.meter-btn:hover {
-		background: rgba(255, 255, 255, 0.04);
-	}
-	.meter-active {
-		background: rgba(134, 179, 164, 0.08);
-	}
-	.meter-active .meter-label {
-		color: #86b3a4;
+	.tb-check input {
+		accent-color: #86b3a4;
+		cursor: pointer;
 	}
 
-	.filter-bar {
+	/* ── Barre de résultats ── */
+	.result-bar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding: 9px 14px;
-		border: 1px solid rgba(134, 179, 164, 0.28);
-		border-radius: 7px;
-		background: rgba(134, 179, 164, 0.05);
 		margin-bottom: 16px;
 	}
-	.filter-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 12.5px;
-		color: #86b3a4;
-	}
-	.filter-clear {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 12px;
-		color: #a39a8c;
-		text-decoration: none;
-	}
-	.filter-clear:hover {
-		color: #ece5da;
-	}
-	.meter-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 12px;
-		color: #a39a8c;
-		width: 90px;
-		flex-shrink: 0;
-	}
-	.meter-count {
+	.result-count {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;
 		font-size: 12px;
-		color: #766d60;
-		width: 28px;
-		text-align: right;
-		flex-shrink: 0;
+		letter-spacing: 0.04em;
+		color: #a39a8c;
+	}
+	.result-clear {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		color: #a39a8c;
+	}
+	.result-clear:hover {
+		color: #ece5da;
 	}
 
 	/* ── États ── */

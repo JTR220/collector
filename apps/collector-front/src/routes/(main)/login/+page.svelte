@@ -35,7 +35,7 @@
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? 'Erreur connexion');
 				auth.login(data.token, data.user);
-				goto('/');
+				goto(data.user?.role === 'admin' ? '/admin' : '/');
 			} else {
 				const res = await fetch(`${authApiUrl}/utilisateur`, {
 					method: 'POST',
@@ -174,6 +174,32 @@
 			>
 				{mode === 'login' ? "Pas de compte ? · S'inscrire" : 'Déjà un compte ? · Se connecter'}
 			</button>
+
+				<div class="demo">
+					<span class="demo-label">Comptes de démo</span>
+					<button
+						type="button"
+						class="demo-row"
+						onclick={() => {
+							email = 'admin@collector.shop';
+							password = 'admin123';
+						}}
+					>
+						<span class="demo-role">Admin</span>
+						<span class="demo-creds">admin@collector.shop · admin123</span>
+					</button>
+					<button
+						type="button"
+						class="demo-row"
+						onclick={() => {
+							email = 'test@collector.shop';
+							password = 'test123';
+						}}
+					>
+						<span class="demo-role">Test</span>
+						<span class="demo-creds">test@collector.shop · test123</span>
+					</button>
+				</div>
 		</div>
 	</div>
 </div>
@@ -428,5 +454,51 @@
 	}
 	.toggle-btn:hover {
 		color: #86b3a4;
+	}
+
+	/* Encart comptes de démo */
+	.demo {
+		margin-top: 20px;
+		border: 1px solid rgba(236, 229, 218, 0.1);
+		border-radius: 9px;
+		padding: 12px;
+		background: rgba(255, 255, 255, 0.02);
+	}
+	.demo-label {
+		display: block;
+		font-size: 10.5px;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: #766d60;
+		margin-bottom: 8px;
+	}
+	.demo-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		background: none;
+		border: none;
+		border-radius: 6px;
+		padding: 7px 8px;
+		cursor: pointer;
+		text-align: left;
+		transition: background 120ms;
+	}
+	.demo-row:hover {
+		background: rgba(134, 179, 164, 0.08);
+	}
+	.demo-role {
+		flex-shrink: 0;
+		font-size: 10.5px;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: #86b3a4;
+		width: 42px;
+	}
+	.demo-creds {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 12px;
+		color: #a39a8c;
 	}
 </style>

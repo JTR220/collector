@@ -14,6 +14,11 @@ func currentUserID(c *gin.Context) uint {
 	return uint(c.GetFloat64("user_id"))
 }
 
+func isAdmin(c *gin.Context) bool {
+	role, _ := c.Get("role")
+	return role == "admin"
+}
+
 // ── Wishlist ─────────────────────────────────────────────────────────────
 
 type wishlistInput struct {
