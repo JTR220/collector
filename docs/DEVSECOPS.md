@@ -98,16 +98,24 @@ Progression :
 - [x] Argo CD installé (Helm), tous les pods `1/1 Running`
 - [x] `kubectl apply -f infra/argocd/bootstrap/root-app.yaml` → `collector-root` `Synced`/`Healthy`
 - [x] `argo-rollouts`, `kyverno-policies` → `Synced`/`Healthy`
-- [ ] `kyverno`, `monitoring` → encore `OutOfSync`/`Progressing` (gros charts Helm, en cours)
-- [ ] `sealed-secrets` → status `Unknown`, à investiguer
-- [ ] `collector-staging` → `OutOfSync`/`Progressing`, bloqué tant que le secret
-      `collector-secrets` (JWT_SECRET, DB_PASSWORD) n'existe pas — **prochaine
-      étape : générer les SealedSecrets** via [infra/secrets/README.md](../infra/secrets/README.md)
+- [x] `sealed-secrets` → `Synced`/`Healthy` (l'URL du repo Helm avait bougé,
+      `bitnami-labs.github.io` → `bitnami.github.io` : voir
+      [infra/argocd/apps/sealed-secrets.yaml](../infra/argocd/apps/sealed-secrets.yaml))
+- [x] `collector-staging` → **`Synced`/`Healthy`**, les 7 pods `1/1 Running` :
+      SealedSecret `collector-secrets` généré via
+      [infra/secrets/README.md](../infra/secrets/README.md), et deux bugs corrigés
+      au passage (probe RabbitMQ `timeout` → `timeoutSeconds` dans
+      `infra/k8s/base/rabbitmq/statefulset.yaml` ; variables d'exchange/queue
+      RabbitMQ manquantes dans les manifests de `price-tracker-service` et
+      `notification-service`, présentes seulement dans `docker-compose.yml`)
+- [ ] `kyverno`, `monitoring` → à reconfirmer `Healthy` (étaient encore
+      `OutOfSync`/`Progressing` lors du bootstrap initial)
 - `collector-prod` reste `OutOfSync`/`Missing` : **attendu**, sync manuel volontaire (pas une erreur)
 
-Une fois les SealedSecrets committés, `collector-staging` doit passer `Healthy`
-et le flux complet (push → CI → digest → Argo CD sync auto) pourra être
-validé de bout en bout.
+Le flux complet (push → CI → digest → Argo CD sync auto) est validé de bout en
+bout sur staging. Reste à faire : SealedSecrets pour `collector-prod`,
+sauvegarde de la clé privée du controller sealed-secrets, et passage de
+Kyverno en mode Enforce.
 
 ## Actions manuelles côté GitHub (une fois)
 
