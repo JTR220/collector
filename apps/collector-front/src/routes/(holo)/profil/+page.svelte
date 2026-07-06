@@ -4,7 +4,12 @@
 	import { auth, isAuthenticated } from '$lib/stores/auth';
 	import { fetchMe, type MeResponse } from '$lib/api/auth';
 	import { fetchMyWishlist, type WishlistItem } from '$lib/api/wishlist';
-	import { fetchMyOrders, ORDER_STATUS_LABELS, type Order } from '$lib/api/market';
+	import {
+		fetchMyOrders,
+		ORDER_STATUS_LABELS,
+		type Order,
+		type OrderStatus
+	} from '$lib/api/market';
 	import { eur } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GAvatar from '$lib/components/galerie/GAvatar.svelte';
@@ -65,7 +70,7 @@
 		kind: 'buy' | 'wish';
 		name: string;
 		articleId: number;
-		status?: string;
+		status?: OrderStatus;
 		price?: number;
 	};
 	const timeline = $derived<Activity[]>(
@@ -172,7 +177,7 @@
 						<span class="tl-action">{ev.kind === 'buy' ? 'Achat' : 'Wishlist'}</span>
 						<span class="tl-name">{ev.name}</span>
 						{#if ev.kind === 'buy'}
-							<GChip>{ORDER_STATUS_LABELS[ev.status ?? ''] ?? ev.status}</GChip>
+							<GChip>{(ev.status && ORDER_STATUS_LABELS[ev.status]) ?? ev.status}</GChip>
 							<span class="tl-price">{eur(ev.price ?? 0)}</span>
 						{/if}
 					</a>
