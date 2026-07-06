@@ -6,10 +6,10 @@ kind: Kustomization
 
 namespace: collector-staging
 
+  # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
 resources:
 - ../../base
 - ingress.yaml
-  # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
 - sealed-collector-secrets.yaml
 
 # Hosts d'API STAGING lus au runtime par le front (remplace les defaults base).
@@ -38,7 +38,7 @@ images:
 - digest: sha256:e5a55da33722cc428b79b9d54b653f7e8198a95bd130ef5f8175d9d2d1435b1c
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
-- digest: sha256:7f354fd43e7ae98a11877742bbb3eacf9a7632bd9afef26c987cb306f5de061a
+- digest: sha256:1df32a4a5e99910f3bb8a95dd26cb1d2e1c4f3f6f78dc2474b009d07eba06b6e
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
 - digest: sha256:cbc129bf46f0fb2bba809aa4d1d3d0ff1621aeab0b33960e6952a9f523374581
