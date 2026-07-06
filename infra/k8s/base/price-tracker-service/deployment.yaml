@@ -46,6 +46,20 @@ spec:
                 secretKeyRef:
                   name: collector-secrets
                   key: RABBITMQ_URL
+            - name: RABBITMQ_EXCHANGE_EVENTS
+              value: "collector.events"
+            - name: RABBITMQ_EXCHANGE_ALERTS
+              value: "collector.alerts"
+            - name: RABBITMQ_QUEUE_PRICE_UPDATE
+              value: "price-tracker.price.updated"
+            - name: SPIKE_THRESHOLD_PERCENT
+              value: "50"
+            - name: SPIKE_WINDOW_HOURS
+              value: "24"
+            - name: FLOOD_MAX_UPDATES
+              value: "5"
+            - name: FLOOD_WINDOW_MINUTES
+              value: "60"
           readinessProbe:
             httpGet:
               path: /api/v1/health

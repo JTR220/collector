@@ -52,6 +52,14 @@ spec:
                 secretKeyRef:
                   name: collector-secrets
                   key: JWT_SECRET
+            - name: RABBITMQ_EXCHANGE_EVENTS
+              value: "collector.events"
+            - name: RABBITMQ_EXCHANGE_ALERTS
+              value: "collector.alerts"
+            - name: RABBITMQ_QUEUE_PRICE_NOTIF
+              value: "notification-service.price.updated"
+            - name: RABBITMQ_QUEUE_FRAUD_NOTIF
+              value: "notification-service.fraud.alert"
           readinessProbe:
             httpGet:
               path: /api/v1/health
