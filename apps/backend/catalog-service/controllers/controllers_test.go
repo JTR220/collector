@@ -77,7 +77,7 @@ func seedCategory(t *testing.T) models.Categorie {
 func TestUpdateArticlePriceChangePublishesAndAppendsHistory(t *testing.T) {
 	setupCatalogDB(t)
 	cat := seedCategory(t)
-	art := models.Article{Name: "Dracaufeu", Description: "1ed", Prix: 100, FraisPort: 5, CategoryID: cat.ID, SellerID: 9, PriceHistory: models.PriceHistory{100}}
+	art := models.Article{Name: "Dracaufeu", Description: "1ed", Prix: 100, FraisPort: 5, CategoryID: cat.ID, SellerID: 1, PriceHistory: models.PriceHistory{100}}
 	repository.DB.Create(&art)
 
 	mock := &mockPublisher{}
@@ -107,7 +107,7 @@ func TestUpdateArticlePriceChangePublishesAndAppendsHistory(t *testing.T) {
 func TestUpdateArticleSamePriceDoesNotPublish(t *testing.T) {
 	setupCatalogDB(t)
 	cat := seedCategory(t)
-	art := models.Article{Name: "Pikachu", Description: "promo", Prix: 80, FraisPort: 3, CategoryID: cat.ID, SellerID: 9, PriceHistory: models.PriceHistory{80}}
+	art := models.Article{Name: "Pikachu", Description: "promo", Prix: 80, FraisPort: 3, CategoryID: cat.ID, SellerID: 1, PriceHistory: models.PriceHistory{80}}
 	repository.DB.Create(&art)
 
 	mock := &mockPublisher{}
