@@ -10,7 +10,7 @@ resources:
 - ../../base
 - ingress.yaml
   # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
-  # - sealed-collector-secrets.yaml
+- sealed-collector-secrets.yaml
 
 # Hosts d'API STAGING lus au runtime par le front (remplace les defaults base).
 configMapGenerator:
