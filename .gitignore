@@ -42,6 +42,10 @@ Thumbs.db
 # Markdown docs
 # =========================
 *.md
+!/README.md
+!docs/**/*.md
+!infra/**/*.md
+!apps/backend/README.md
 
 # =========================
 # Claude design handoffs & config
