@@ -59,11 +59,18 @@ func TestAlertsRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestPriceHistoryRequiresAuth(t *testing.T) {
+func TestPriceHistoryIsPublic(t *testing.T) {
+	// Affiche sur la fiche d'un lot, y compris pour un visiteur non
+	// connecte : ne doit pas exiger de token. On envoie un id invalide pour
+	// obtenir un 400 (repond dans le handler, avant tout appel repo) plutot
+	// que de toucher un repo=nil.
 	r := newTestRouter()
-	w := doRequest(r, http.MethodGet, "/api/v1/items/00000000-0000-0000-0000-000000000001/price-history", "")
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
+	w := doRequest(r, http.MethodGet, "/api/v1/items/not-a-uuid/price-history", "")
+	if w.Code == http.StatusUnauthorized {
+		t.Fatalf("la route ne devrait pas exiger d'authentification, obtenu 401 (%s)", w.Body.String())
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status attendu 400, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }
 

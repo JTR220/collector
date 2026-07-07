@@ -24,11 +24,14 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/health", h.Health)
+		// Historique de prix : information publique affichee sur la fiche
+		// d'un lot, y compris pour un visiteur non connecte.
+		api.GET("/items/:id/price-history", h.GetPriceHistory)
 
+		// Alertes de fraude : reservees au dashboard admin.
 		authed := api.Group("")
 		authed.Use(middleware.AuthRequired())
 		{
-			authed.GET("/items/:id/price-history", h.GetPriceHistory)
 			authed.GET("/alerts", h.GetAlerts)
 			authed.PUT("/alerts/:id/resolve", middleware.AdminRequired(), h.ResolveAlert)
 		}

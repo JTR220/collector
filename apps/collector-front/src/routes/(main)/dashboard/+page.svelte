@@ -105,8 +105,9 @@
 	let fraudTrackerDown = false;
 
 	async function fetchFraudAlerts() {
+		if (!$auth.token) return;
 		try {
-			fraudAlerts = await fetchAlerts(true);
+			fraudAlerts = await fetchAlerts($auth.token, true);
 			fraudTrackerDown = false;
 		} catch {
 			fraudAlerts = [];
@@ -115,8 +116,9 @@
 	}
 
 	async function onResolveAlert(id: string) {
+		if (!$auth.token) return;
 		try {
-			await resolveAlert(id);
+			await resolveAlert($auth.token, id);
 			fraudAlerts = fraudAlerts.filter((a) => a.id !== id);
 		} catch {
 			/* ignore */
