@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { fetchArticle, fetchArticles, fetchCategories, createArticle, articleImage } from './catalog';
+import {
+	fetchArticle,
+	fetchArticles,
+	fetchCategories,
+	createArticle,
+	articleImage
+} from './catalog';
 
 describe('catalog API', () => {
 	const fetchMock = vi.fn();
