@@ -53,12 +53,23 @@ func (r *NotificationRepository) GetByUser(ctx context.Context, userID uuid.UUID
 	return notifs, err
 }
 
-func (r *NotificationRepository) MarkRead(ctx context.Context, notifID uuid.UUID) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE notifications SET read = TRUE WHERE id = $1`,
-		notifID,
+// MarkRead marque une notification comme lue, uniquement si elle appartient
+// a userID (evite qu'un utilisateur marque comme lue une notification d'autrui).
+// found=false signifie que la notification n'existe pas ou n'appartient pas
+// a cet utilisateur.
+func (r *NotificationRepository) MarkRead(ctx context.Context, notifID, userID uuid.UUID) (found bool, err error) {
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE notifications SET read = TRUE WHERE id = $1 AND user_id = $2`,
+		notifID, userID,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
 }
 
 func (r *NotificationRepository) MarkAllRead(ctx context.Context, userID uuid.UUID) error {

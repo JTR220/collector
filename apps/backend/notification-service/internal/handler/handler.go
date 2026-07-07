@@ -147,9 +147,15 @@ func (h *Handler) MarkRead(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid notification id"})
 		return
 	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
-	if err := h.repo.MarkRead(c.Request.Context(), notifID); err != nil {
+	found, err := h.repo.MarkRead(c.Request.Context(), notifID, userID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "notification introuvable"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
