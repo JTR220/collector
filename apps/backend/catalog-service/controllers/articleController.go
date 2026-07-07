@@ -33,7 +33,7 @@ func CreateArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := c.ShouldBindJSON(&article); err != nil {
-		response.Error(c, http.StatusBadRequest, "Donnees invalides : " + err.Error())
+		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
 		return
 	}
 

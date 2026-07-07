@@ -13,7 +13,7 @@ func CreateCategory(c *gin.Context) {
 	var category models.Categorie
 
 	if err := c.ShouldBindJSON(&category); err != nil {
-		response.Error(c, http.StatusBadRequest, "Donnees invalides : " + err.Error())
+		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
 		return
 	}
 

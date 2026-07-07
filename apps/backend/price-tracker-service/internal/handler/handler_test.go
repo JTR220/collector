@@ -94,4 +94,3 @@ func TestResolveAlertRequiresAdminRole(t *testing.T) {
 		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }
-
