@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/JTR220/collector/price-tracker-service/config"
@@ -25,8 +26,10 @@ type MessageStore interface {
 	MarkProcessed(ctx context.Context, messageID string) (bool, error)
 }
 
-// Publisher sends fraud alerts to RabbitMQ
+// Publisher sends fraud alerts to RabbitMQ. Le channel sous-jacent est
+// remplace apres chaque reconnexion (voir PriceConsumer.Start), d'ou le mutex.
 type Publisher struct {
+	mu       sync.RWMutex
 	ch       *amqp.Channel
 	exchange string
 }
@@ -35,12 +38,27 @@ func NewPublisher(ch *amqp.Channel, exchange string) *Publisher {
 	return &Publisher{ch: ch, exchange: exchange}
 }
 
+// SetChannel remplace le channel AMQP utilise pour publier, typiquement
+// apres une reconnexion au broker.
+func (p *Publisher) SetChannel(ch *amqp.Channel) {
+	p.mu.Lock()
+	p.ch = ch
+	p.mu.Unlock()
+}
+
 func (p *Publisher) PublishAlert(alert model.FraudAlertEvent) error {
+	p.mu.RLock()
+	ch := p.ch
+	p.mu.RUnlock()
+	if ch == nil {
+		return fmt.Errorf("publisher: pas de channel AMQP disponible (broker deconnecte)")
+	}
+
 	body, err := json.Marshal(alert)
 	if err != nil {
 		return err
 	}
-	return p.ch.Publish(
+	return ch.Publish(
 		p.exchange,    // exchange
 		"fraud.alert", // routing key
 		false,
@@ -101,8 +119,49 @@ func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
 	return ch.QueueBind(q.Name, "price.updated", cfg.ExchangeEvents, false, nil)
 }
 
-// Start begins consuming messages — blocks until context is cancelled
-func (c *PriceConsumer) Start(ctx context.Context, ch *amqp.Channel) error {
+// Start consomme les messages en boucle jusqu'a annulation du contexte. Si la
+// connexion au broker est perdue en cours de route, elle est retablie avec un
+// backoff exponentiel (le service ne s'arrete pas sur une coupure RabbitMQ
+// transitoire) : reconnexion, re-declaration des exchanges/queue (Setup) et
+// re-attachement du publisher d'alertes fraude au nouveau channel.
+func (c *PriceConsumer) Start(ctx context.Context, url string) error {
+	backoff := time.Second
+	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+
+		conn, ch, err := dialAndSetup(url, &c.cfg.RabbitMQ)
+		if err != nil {
+			log.Error().Err(err).Msg("connexion RabbitMQ (consumer) echouee, nouvel essai")
+			if !sleepOrDone(ctx, backoff) {
+				return nil
+			}
+			backoff = nextBackoff(backoff)
+			continue
+		}
+		backoff = time.Second
+
+		if c.publisher != nil {
+			c.publisher.SetChannel(ch)
+		}
+
+		closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
+		lost := c.consumeUntilClosed(ctx, ch, closeCh)
+		_ = ch.Close()
+		_ = conn.Close()
+
+		if !lost {
+			log.Info().Msg("consumer stopped")
+			return nil
+		}
+		log.Warn().Msg("connexion RabbitMQ perdue (consumer), reconnexion...")
+	}
+}
+
+// consumeUntilClosed consomme jusqu'a annulation du contexte (retourne false)
+// ou perte de connexion (retourne true, pour declencher une reconnexion).
+func (c *PriceConsumer) consumeUntilClosed(ctx context.Context, ch *amqp.Channel, closeCh <-chan *amqp.Error) bool {
 	msgs, err := ch.Consume(
 		c.cfg.RabbitMQ.QueuePriceUpdate,
 		"price-tracker-consumer",
@@ -113,7 +172,8 @@ func (c *PriceConsumer) Start(ctx context.Context, ch *amqp.Channel) error {
 		nil,
 	)
 	if err != nil {
-		return err
+		log.Error().Err(err).Msg("impossible de demarrer la consommation")
+		return true
 	}
 
 	log.Info().Msg("price-tracker consumer started, waiting for price.updated events...")
@@ -121,16 +181,50 @@ func (c *PriceConsumer) Start(ctx context.Context, ch *amqp.Channel) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info().Msg("consumer stopped")
-			return nil
+			return false
+		case <-closeCh:
+			return true
 		case msg, ok := <-msgs:
 			if !ok {
-				log.Warn().Msg("RabbitMQ channel closed")
-				return nil
+				return true
 			}
 			c.handleMessage(ctx, msg)
 		}
 	}
+}
+
+func dialAndSetup(url string, cfg *config.RabbitMQConfig) (*amqp.Connection, *amqp.Channel, error) {
+	conn, err := amqp.Dial(url)
+	if err != nil {
+		return nil, nil, err
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	if err := Setup(ch, cfg); err != nil {
+		_ = ch.Close()
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	return conn, ch, nil
+}
+
+func sleepOrDone(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(d):
+		return true
+	}
+}
+
+func nextBackoff(d time.Duration) time.Duration {
+	if d >= 30*time.Second {
+		return 30 * time.Second
+	}
+	return d * 2
 }
 
 func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {

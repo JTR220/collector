@@ -44,25 +44,28 @@ func main() {
 	}
 
 	// ── RabbitMQ ─────────────────────────────────────────────
+	// Verification de connectivite au demarrage (fail-fast) : la connexion
+	// reelle et sa reconnexion automatique sont gerees par PriceConsumer.Start.
 	conn, err := amqp.Dial(cfg.RabbitMQ.URL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot connect to rabbitmq")
 	}
-	defer func() { _ = conn.Close() }()
-
 	ch, err := conn.Channel()
 	if err != nil {
+		_ = conn.Close()
 		log.Fatal().Err(err).Msg("cannot open rabbitmq channel")
 	}
-	defer func() { _ = ch.Close() }()
-
 	if err := consumer.Setup(ch, &cfg.RabbitMQ); err != nil {
+		_ = ch.Close()
+		_ = conn.Close()
 		log.Fatal().Err(err).Msg("rabbitmq setup failed")
 	}
+	_ = ch.Close()
+	_ = conn.Close()
 	log.Info().Msg("connected to rabbitmq")
 
 	// ── Components ───────────────────────────────────────────
-	pub := consumer.NewPublisher(ch, cfg.RabbitMQ.ExchangeAlerts)
+	pub := consumer.NewPublisher(nil, cfg.RabbitMQ.ExchangeAlerts)
 	det := detector.New(repo, cfg.Rules)
 	priceConsumer := consumer.NewPriceConsumer(repo, det, pub, cfg)
 
@@ -86,9 +89,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start RabbitMQ consumer in background
+	// Start RabbitMQ consumer in background — gere sa propre reconnexion.
 	go func() {
-		if err := priceConsumer.Start(ctx, ch); err != nil {
+		if err := priceConsumer.Start(ctx, cfg.RabbitMQ.URL); err != nil {
 			log.Error().Err(err).Msg("consumer error")
 			cancel()
 		}
