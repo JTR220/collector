@@ -1,0 +1,36 @@
+# ClusterIssuer Let's Encrypt via challenge HTTP-01 (Traefik).
+# Pas de nom de domaine possede -> utilisation de nip.io (DNS public qui
+# resout <sous-domaine>.<ip>.nip.io vers <ip>), voir infra/k8s/overlays/*/ingress.yaml.
+#
+# "staging" sert a valider le circuit (limites de débit tres larges, certificat
+# non fiable par les navigateurs) avant de basculer les Ingress sur "prod"
+# (limites de débit strictes : 5 certificats identiques / semaine).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: braikiachaker30@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: braikiachaker30@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: traefik

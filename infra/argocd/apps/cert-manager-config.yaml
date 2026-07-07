@@ -1,0 +1,23 @@
+# Étape 16 — ClusterIssuer Let's Encrypt (infra/cert-manager), déployés une
+# fois que les CRDs cert-manager sont disponibles (application cert-manager).
+# Sync automatique + selfHeal : si le premier essai échoue faute de CRDs, Argo
+# CD reessaiera jusqu'a ce que cert-manager soit pret (meme logique que
+# kyverno / kyverno-policies).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-config
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/JTR220/collector.git
+    targetRevision: main
+    path: infra/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

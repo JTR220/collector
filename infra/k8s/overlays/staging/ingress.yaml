@@ -1,15 +1,32 @@
 # Routage host-based (k3d/k3s : Traefik est l'ingress class par défaut).
-# À ajouter dans le hosts du poste de travail (127.0.0.1) :
-#   collector.staging.local  auth.collector.staging.local  api.collector.staging.local
-#   notifications.collector.staging.local  price.collector.staging.local
+# Pas de nom de domaine possede -> hosts en <sous-domaine>.51.255.199.160.nip.io
+# (DNS public gratuit qui resout vers l'IP embarquee dans le nom, ce qui
+# permet un vrai certificat Let's Encrypt sans rien configurer cote DNS).
 # Traefik gere nativement l'upgrade WebSocket (/ws) — aucune annotation requise.
+#
+# Validation en 2 temps (voir infra/cert-manager/cluster-issuer.yaml) :
+#   1. cert-manager.io/cluster-issuer: letsencrypt-staging (ici) — certificat
+#      non fiable par les navigateurs, mais confirme que le challenge HTTP-01
+#      aboutit (limites de débit Let's Encrypt tres larges en staging).
+#   2. Une fois "kubectl get certificate -n collector-staging" Ready=True,
+#      repasser cette annotation a letsencrypt-prod pour un certificat fiable.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: collector
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
 spec:
+  tls:
+    - hosts:
+        - collector.51.255.199.160.nip.io
+        - auth.51.255.199.160.nip.io
+        - api.51.255.199.160.nip.io
+        - price.51.255.199.160.nip.io
+        - notifications.51.255.199.160.nip.io
+      secretName: collector-staging-tls
   rules:
-    - host: collector.staging.local
+    - host: collector.51.255.199.160.nip.io
       http:
         paths:
           - path: /
@@ -19,7 +36,7 @@ spec:
                 name: collector-front
                 port:
                   name: http
-    - host: auth.collector.staging.local
+    - host: auth.51.255.199.160.nip.io
       http:
         paths:
           - path: /
@@ -29,7 +46,7 @@ spec:
                 name: auth-service
                 port:
                   name: http
-    - host: api.collector.staging.local
+    - host: api.51.255.199.160.nip.io
       http:
         paths:
           - path: /
@@ -39,7 +56,7 @@ spec:
                 name: catalog-service
                 port:
                   name: http
-    - host: price.collector.staging.local
+    - host: price.51.255.199.160.nip.io
       http:
         paths:
           - path: /
@@ -49,7 +66,7 @@ spec:
                 name: price-tracker-service
                 port:
                   name: http
-    - host: notifications.collector.staging.local
+    - host: notifications.51.255.199.160.nip.io
       http:
         paths:
           - path: /
