@@ -49,7 +49,6 @@ func InitRouter() *gin.Engine {
 		protected.POST("/article", controllers.CreateArticle)
 		protected.PUT("/article/:id", controllers.UpdateArticle)
 		protected.DELETE("/article/:id", controllers.DeleteArticle)
-		protected.POST("/category", controllers.CreateCategory)
 
 		// Achats
 		protected.POST("/article/:id/buy", controllers.BuyArticle)
@@ -67,6 +66,9 @@ func InitRouter() *gin.Engine {
 	{
 		admin.GET("/stats", controllers.GetAdminStats)
 	}
+
+	// Creation de categories : reservee aux administrateurs (moderation du catalogue).
+	router.POST("/category", middlewares.AuthRequired(), middlewares.AdminRequired(), controllers.CreateCategory)
 
 	return router
 }
