@@ -32,18 +32,18 @@ configMapGenerator:
 # "bootstrap" est un placeholder : remplacé par un digest immuable
 # (image@sha256:...) au premier passage de la CI.
 images:
-- digest: sha256:15fef1883c230bbaff32d1b3717236fdcabf77f80626ccaaf8a13cf23b3dab12
+- digest: sha256:750316902397ac6bc77c5a0c89bed5bef49d7e22b775b6ae74ba15115ff9e590
   name: ghcr.io/jtr220/collector/auth-service
   newName: ghcr.io/jtr220/collector/auth-service
-- digest: sha256:08ab9959241632d60f16e859ed71b4feaee3128dfac15ddc3d0ae19c30845f57
+- digest: sha256:add09627bce949df3976e8aa5b9030e09bad25b0ebc4baed444ebc33f9260376
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
 - digest: sha256:1df32a4a5e99910f3bb8a95dd26cb1d2e1c4f3f6f78dc2474b009d07eba06b6e
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
-- digest: sha256:3b62d333c9acf1461306725596d5989e6cda1d6073d09cf8176c98eb7031afe6
+- digest: sha256:e3616d959dd62323379cdab4d49cb3bc8b4eefe0bb6515b664b1030416caa160
   name: ghcr.io/jtr220/collector/notification-service
   newName: ghcr.io/jtr220/collector/notification-service
-- digest: sha256:6c1afab801b1c313be2d9ad1a5c7f2923573893da24dfaefcf47bd2a3bdbd63c
+- digest: sha256:f18cfabb73eec22c21f45a7f6ee881ce42405f4895190badcb10df2e45799cb8
   name: ghcr.io/jtr220/collector/price-tracker-service
   newName: ghcr.io/jtr220/collector/price-tracker-service
