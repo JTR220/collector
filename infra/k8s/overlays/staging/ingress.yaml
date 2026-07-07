@@ -4,18 +4,15 @@
 # permet un vrai certificat Let's Encrypt sans rien configurer cote DNS).
 # Traefik gere nativement l'upgrade WebSocket (/ws) — aucune annotation requise.
 #
-# Validation en 2 temps (voir infra/cert-manager/cluster-issuer.yaml) :
-#   1. cert-manager.io/cluster-issuer: letsencrypt-staging (ici) — certificat
-#      non fiable par les navigateurs, mais confirme que le challenge HTTP-01
-#      aboutit (limites de débit Let's Encrypt tres larges en staging).
-#   2. Une fois "kubectl get certificate -n collector-staging" Ready=True,
-#      repasser cette annotation a letsencrypt-prod pour un certificat fiable.
+# Validation effectuee le 2026-07-07 avec letsencrypt-staging (challenge
+# HTTP-01 confirme OK, Certificate Ready=True) avant bascule sur
+# letsencrypt-prod ci-dessous pour un certificat fiable par les navigateurs.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: collector
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
     - hosts:
