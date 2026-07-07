@@ -2,7 +2,10 @@ package consumer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/JTR220/collector/price-tracker-service/config"
@@ -13,6 +16,14 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 )
+
+// MessageStore tracks which message IDs have already been processed, to make
+// consumption idempotent across redeliveries (e.g. after a nack/requeue or a
+// consumer restart before the ack reached the broker). Satisfied by
+// *repository.PriceRepository; a fake is used in tests.
+type MessageStore interface {
+	MarkProcessed(ctx context.Context, messageID string) (bool, error)
+}
 
 // Publisher sends fraud alerts to RabbitMQ
 type Publisher struct {
@@ -47,6 +58,7 @@ func (p *Publisher) PublishAlert(alert model.FraudAlertEvent) error {
 // PriceConsumer listens to price.updated events from catalog-service
 type PriceConsumer struct {
 	repo      *repository.PriceRepository
+	store     MessageStore
 	detector  *detector.Detector
 	publisher *Publisher
 	cfg       *config.Config
@@ -60,6 +72,7 @@ func NewPriceConsumer(
 ) *PriceConsumer {
 	return &PriceConsumer{
 		repo:      repo,
+		store:     repo,
 		detector:  det,
 		publisher: pub,
 		cfg:       cfg,
@@ -127,6 +140,26 @@ func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
 		log.Error().Err(err).Msg("failed to unmarshal price event — nacking")
 		_ = msg.Nack(false, false)
+		return
+	}
+
+	// Idempotence : un message redistribue (nack/requeue, restart consumer
+	// avant l'ack) ne doit pas re-declencher persistance/detection/publication.
+	// A defaut de MessageId AMQP, on derive une cle stable du contenu.
+	messageID := msg.MessageId
+	if messageID == "" {
+		sum := sha256.Sum256(msg.Body)
+		messageID = fmt.Sprintf("price.updated:%s", hex.EncodeToString(sum[:]))
+	}
+	firstSeen, err := c.store.MarkProcessed(ctx, messageID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Str("message_id", messageID).Msg("duplicate price.updated ignored")
+		_ = msg.Ack(false)
 		return
 	}
 

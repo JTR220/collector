@@ -1,7 +1,10 @@
 package events
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -125,13 +128,27 @@ func (p *AMQPPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, new
 	err = ch.Publish(exchangeEvents, routingKeyPrice, false, false, amqp.Publishing{
 		ContentType:  "application/json",
 		DeliveryMode: amqp.Persistent,
-		Body:         body,
+		// MessageId deterministe : permet aux consumers de dedupliquer les
+		// livraisons redelivrees (meme evenement => meme MessageId).
+		MessageId: messageID(event),
+		Timestamp: time.Now(),
+		Body:      body,
 	})
 	if err != nil {
 		log.Printf("price.updated non publie (publish) : %v", err)
 		return
 	}
 	log.Printf("price.updated publie : article %d, %.2f -> %.2f", itemID, oldPrice, newPrice)
+}
+
+// messageID derive un identifiant stable et deterministe pour un evenement
+// price.updated, utilise comme AMQP MessageId. Meme article + memes prix +
+// meme horodatage => meme MessageId, ce qui permet aux consumers de
+// deduplicquer une livraison redelivree par RabbitMQ (idempotence).
+func messageID(event PriceUpdatedEvent) string {
+	h := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%.2f|%.2f|%s",
+		event.ItemID, event.SellerID, event.OldPrice, event.NewPrice, event.UpdatedAt.UTC().Format(time.RFC3339Nano))))
+	return hex.EncodeToString(h[:])
 }
 
 func (p *AMQPPublisher) Close() {

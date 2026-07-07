@@ -31,6 +31,11 @@ func (r *PriceRepository) Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_price_history_item_id ON price_history(item_id);
 	CREATE INDEX IF NOT EXISTS idx_price_history_created_at ON price_history(created_at);
 
+	CREATE TABLE IF NOT EXISTS processed_messages (
+		message_id   TEXT PRIMARY KEY,
+		processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+
 	CREATE TABLE IF NOT EXISTS fraud_alerts (
 		id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		item_id    UUID NOT NULL,
@@ -90,6 +95,25 @@ func (r *PriceRepository) GetLastPrice(ctx context.Context, itemID uuid.UUID, si
 		itemID, cutoff,
 	)
 	return price, err
+}
+
+// MarkProcessed records a message ID as processed. It returns (true, nil) if
+// this is the first time we see this message ID, and (false, nil) if it was
+// already processed — the caller should then skip reprocessing (idempotence
+// on redelivery). Relies on the primary key constraint on processed_messages.
+func (r *PriceRepository) MarkProcessed(ctx context.Context, messageID string) (bool, error) {
+	res, err := r.db.ExecContext(ctx,
+		`INSERT INTO processed_messages (message_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+		messageID,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // SaveAlert persists a fraud alert
