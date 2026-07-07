@@ -4,6 +4,7 @@ import (
 	"catalog-service/events"
 	"catalog-service/models"
 	"catalog-service/repository"
+	"catalog-service/response"
 	"net/http"
 	"net/url"
 	"strings"
@@ -32,7 +33,7 @@ func CreateArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := c.ShouldBindJSON(&article); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides : " + err.Error()})
+		response.Error(c, http.StatusBadRequest, "Donnees invalides : " + err.Error())
 		return
 	}
 
@@ -53,7 +54,7 @@ func CreateArticle(c *gin.Context) {
 	}
 
 	if err := repository.DB.Create(&article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la creation de l'article"})
+		response.Error(c, http.StatusInternalServerError, "Erreur lors de la creation de l'article")
 		return
 	}
 
@@ -69,7 +70,7 @@ func GetArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := repository.DB.Preload("Category").First(&article, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
+		response.Error(c, http.StatusNotFound, "Article introuvable")
 		return
 	}
 
@@ -80,7 +81,7 @@ func GetAllArticles(c *gin.Context) {
 	var articles []models.Article
 
 	if err := repository.DB.Preload("Category").Order("id desc").Find(&articles).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de recuperer les articles"})
+		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer les articles")
 		return
 	}
 
@@ -92,18 +93,18 @@ func DeleteArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
+		response.Error(c, http.StatusNotFound, "Article introuvable")
 		return
 	}
 
 	// Un vendeur ne supprime que ses propres annonces ; l'admin modere tout.
 	if !isAdmin(c) && article.SellerID != currentUserID(c) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Vous ne pouvez retirer que vos propres annonces"})
+		response.Error(c, http.StatusForbidden, "Vous ne pouvez retirer que vos propres annonces")
 		return
 	}
 
 	if err := repository.DB.Delete(&article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de supprimer l'article"})
+		response.Error(c, http.StatusInternalServerError, "Impossible de supprimer l'article")
 		return
 	}
 
@@ -115,19 +116,19 @@ func UpdateArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Article introuvable"})
+		response.Error(c, http.StatusNotFound, "Article introuvable")
 		return
 	}
 
 	// Un vendeur ne modifie que ses propres annonces ; l'admin modere tout.
 	if !isAdmin(c) && article.SellerID != currentUserID(c) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Vous ne pouvez modifier que vos propres annonces"})
+		response.Error(c, http.StatusForbidden, "Vous ne pouvez modifier que vos propres annonces")
 		return
 	}
 
 	var input models.Article
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides"})
+		response.Error(c, http.StatusBadRequest, "Donnees invalides")
 		return
 	}
 
@@ -143,7 +144,7 @@ func UpdateArticle(c *gin.Context) {
 	}
 
 	if err := repository.DB.Save(&article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de mettre a jour l'article"})
+		response.Error(c, http.StatusInternalServerError, "Impossible de mettre a jour l'article")
 		return
 	}
 

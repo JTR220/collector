@@ -3,6 +3,7 @@ package controllers
 import (
 	"auth-service/models"
 	"auth-service/repository"
+	"auth-service/response"
 	"fmt"
 	"net/http"
 	"os"
@@ -22,13 +23,13 @@ func CreateUser(c *gin.Context) {
 	var user models.Utilisateur
 
 	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides : " + err.Error()})
+		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
 		return
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur interne"})
+		response.Error(c, http.StatusInternalServerError, "Erreur interne")
 		return
 	}
 	user.Password = string(hashed)
@@ -37,7 +38,7 @@ func CreateUser(c *gin.Context) {
 	user.Role = "user"
 
 	if err := repository.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Impossible de creer l'utilisateur (email deja pris ?)"})
+		response.Error(c, http.StatusInternalServerError, "Impossible de creer l'utilisateur (email deja pris ?)")
 		return
 	}
 
@@ -55,18 +56,18 @@ func CreateUser(c *gin.Context) {
 func Login(c *gin.Context) {
 	var input LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Donnees invalides"})
+		response.Error(c, http.StatusBadRequest, "Donnees invalides")
 		return
 	}
 
 	var user models.Utilisateur
 	if err := repository.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email ou mot de passe incorrect"})
+		response.Error(c, http.StatusUnauthorized, "Email ou mot de passe incorrect")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email ou mot de passe incorrect"})
+		response.Error(c, http.StatusUnauthorized, "Email ou mot de passe incorrect")
 		return
 	}
 
@@ -82,7 +83,7 @@ func Login(c *gin.Context) {
 
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur generation token"})
+		response.Error(c, http.StatusInternalServerError, "Erreur generation token")
 		return
 	}
 
@@ -101,7 +102,7 @@ func GetMe(c *gin.Context) {
 	userID := uint(c.GetFloat64("user_id"))
 	var user models.Utilisateur
 	if err := repository.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Utilisateur introuvable"})
+		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
