@@ -5,6 +5,7 @@ import (
 
 	"github.com/JTR220/collector/price-tracker-service/internal/middleware"
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
+	"github.com/JTR220/collector/price-tracker-service/internal/response"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -53,14 +54,14 @@ func (h *Handler) Health(c *gin.Context) {
 func (h *Handler) GetPriceHistory(c *gin.Context) {
 	itemID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid item id"})
+		response.Error(c, http.StatusBadRequest, "invalid item id")
 		return
 	}
 
 	history, err := h.repo.GetPriceHistory(c.Request.Context(), itemID)
 	if err != nil {
 		log.Error().Err(err).Str("item_id", itemID.String()).Msg("GetPriceHistory failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -83,7 +84,7 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 	alerts, err := h.repo.GetAlerts(c.Request.Context(), onlyUnresolved)
 	if err != nil {
 		log.Error().Err(err).Msg("GetAlerts failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -103,13 +104,13 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 func (h *Handler) ResolveAlert(c *gin.Context) {
 	alertID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid alert id"})
+		response.Error(c, http.StatusBadRequest, "invalid alert id")
 		return
 	}
 
 	if err := h.repo.ResolveAlert(c.Request.Context(), alertID); err != nil {
 		log.Error().Err(err).Str("alert_id", alertID.String()).Msg("ResolveAlert failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 

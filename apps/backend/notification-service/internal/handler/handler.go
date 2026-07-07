@@ -12,6 +12,7 @@ import (
 
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/repository"
+	"github.com/JTR220/collector/notification-service/internal/response"
 )
 
 var upgrader = websocket.Upgrader{
@@ -76,14 +77,14 @@ func (h *Handler) WebSocket(c *gin.Context) {
 	// Extract JWT from query param (standard for WS connections)
 	tokenStr := c.Query("token")
 	if tokenStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
+		response.Error(c, http.StatusUnauthorized, "missing token")
 		return
 	}
 
 	userID, err := h.extractUserIDFromToken(tokenStr)
 	if err != nil {
 		log.Warn().Err(err).Msg("WebSocket auth failed")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		response.Error(c, http.StatusUnauthorized, "invalid token")
 		return
 	}
 
@@ -124,7 +125,7 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 	notifs, err := h.repo.GetByUser(c.Request.Context(), userID, limit)
 	if err != nil {
 		log.Error().Err(err).Msg("GetNotifications failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -144,18 +145,18 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 func (h *Handler) MarkRead(c *gin.Context) {
 	notifID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid notification id"})
+		response.Error(c, http.StatusBadRequest, "invalid notification id")
 		return
 	}
 	userID := c.MustGet("user_id").(uuid.UUID)
 
 	found, err := h.repo.MarkRead(c.Request.Context(), notifID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	if !found {
-		c.JSON(http.StatusNotFound, gin.H{"error": "notification introuvable"})
+		response.Error(c, http.StatusNotFound, "notification introuvable")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
@@ -171,7 +172,7 @@ func (h *Handler) MarkAllRead(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
 	if err := h.repo.MarkAllRead(c.Request.Context(), userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "all notifications marked as read"})
@@ -188,7 +189,7 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 	count, err := h.repo.UnreadCount(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"unread_count": count})
@@ -200,13 +201,13 @@ func (h *Handler) JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid Authorization header"})
+			response.AbortError(c, http.StatusUnauthorized, "missing or invalid Authorization header")
 			return
 		}
 		tokenStr := authHeader[7:]
 		userID, err := h.extractUserIDFromToken(tokenStr)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			response.AbortError(c, http.StatusUnauthorized, "invalid token")
 			return
 		}
 		c.Set("user_id", userID)
