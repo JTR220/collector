@@ -31,9 +31,32 @@ func (r *NotificationRepository) Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_notif_user_id ON notifications(user_id);
 	CREATE INDEX IF NOT EXISTS idx_notif_read    ON notifications(read);
 	CREATE INDEX IF NOT EXISTS idx_notif_created ON notifications(created_at DESC);
+
+	CREATE TABLE IF NOT EXISTS processed_messages (
+		message_id   TEXT PRIMARY KEY,
+		processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
 	`
 	_, err := r.db.Exec(schema)
 	return err
+}
+
+// MarkProcessed enregistre un message comme traite. Renvoie (true, nil) la
+// premiere fois qu'on voit ce messageID, (false, nil) s'il a deja ete traite —
+// l'appelant doit alors sauter le traitement (idempotence sur redelivery).
+func (r *NotificationRepository) MarkProcessed(ctx context.Context, messageID string) (bool, error) {
+	res, err := r.db.ExecContext(ctx,
+		`INSERT INTO processed_messages (message_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+		messageID,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 func (r *NotificationRepository) Save(ctx context.Context, n *model.Notification) error {

@@ -2,6 +2,8 @@ package consumer
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -15,6 +17,17 @@ import (
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 )
+
+// messageIDOf renvoie un identifiant stable pour deduplicquer une livraison
+// AMQP redistribuee : le MessageId pose par le publisher si present, sinon
+// un hash du corps (compatibilite avec un publisher qui n'en fixe pas).
+func messageIDOf(msg amqp.Delivery, prefix string) string {
+	if msg.MessageId != "" {
+		return msg.MessageId
+	}
+	sum := sha256.Sum256(msg.Body)
+	return fmt.Sprintf("%s:%s", prefix, hex.EncodeToString(sum[:]))
+}
 
 // Setup declares all exchanges and queues needed by notification-service
 func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
@@ -92,6 +105,18 @@ func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
 		log.Error().Err(err).Msg("invalid price event payload")
 		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "price.updated"))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate price.updated ignored")
+		_ = msg.Ack(false)
 		return
 	}
 
@@ -183,6 +208,18 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
 		log.Error().Err(err).Msg("invalid fraud alert payload")
 		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "fraud.alert"))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate fraud.alert ignored")
+		_ = msg.Ack(false)
 		return
 	}
 
