@@ -20,10 +20,20 @@
 		if ($isAuthenticated) goto('/');
 	});
 
+	function isValidEmail(value: string) {
+		return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+	}
+
 	async function submit() {
-		loading = true;
 		error = '';
 		success = '';
+
+		if (!isValidEmail(email)) {
+			error = 'Adresse email invalide.';
+			return;
+		}
+
+		loading = true;
 
 		try {
 			if (mode === 'login') {
