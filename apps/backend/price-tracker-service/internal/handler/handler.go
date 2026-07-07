@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/JTR220/collector/price-tracker-service/internal/middleware"
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,9 +23,14 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/health", h.Health)
-		api.GET("/items/:id/price-history", h.GetPriceHistory)
-		api.GET("/alerts", h.GetAlerts)
-		api.PUT("/alerts/:id/resolve", h.ResolveAlert)
+
+		authed := api.Group("")
+		authed.Use(middleware.AuthRequired())
+		{
+			authed.GET("/items/:id/price-history", h.GetPriceHistory)
+			authed.GET("/alerts", h.GetAlerts)
+			authed.PUT("/alerts/:id/resolve", middleware.AdminRequired(), h.ResolveAlert)
+		}
 	}
 }
 

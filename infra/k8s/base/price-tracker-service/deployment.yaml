@@ -60,6 +60,11 @@ spec:
               value: "5"
             - name: FLOOD_WINDOW_MINUTES
               value: "60"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-secrets
+                  key: JWT_SECRET
           readinessProbe:
             httpGet:
               path: /api/v1/health
