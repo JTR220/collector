@@ -40,27 +40,30 @@ func main() {
 		log.Fatal().Err(err).Msg("migration failed")
 	}
 
+	// Verification de connectivite au demarrage (fail-fast) : la connexion
+	// reelle et sa reconnexion automatique sont gerees par Manager.Start.
 	conn, err := amqp.Dial(cfg.RabbitMQ.URL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot connect to rabbitmq")
 	}
-	defer func() { _ = conn.Close() }()
-
 	ch, err := conn.Channel()
 	if err != nil {
+		_ = conn.Close()
 		log.Fatal().Err(err).Msg("cannot open rabbitmq channel")
 	}
-	defer func() { _ = ch.Close() }()
-
 	if err := consumer.Setup(ch, &cfg.RabbitMQ); err != nil {
+		_ = ch.Close()
+		_ = conn.Close()
 		log.Fatal().Err(err).Msg("rabbitmq setup failed")
 	}
+	_ = ch.Close()
+	_ = conn.Close()
 	log.Info().Msg("connected to rabbitmq")
 
 	wsHub := hub.New()
 	go wsHub.Run()
 
-	mgr := consumer.NewManager(ch, wsHub, repo, cfg)
+	mgr := consumer.NewManager(wsHub, repo, cfg)
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -80,7 +83,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go mgr.Start(ctx)
+	go mgr.Start(ctx, cfg.RabbitMQ.URL)
 
 	go func() {
 		log.Info().Str("port", cfg.Server.Port).Msg("HTTP server listening")

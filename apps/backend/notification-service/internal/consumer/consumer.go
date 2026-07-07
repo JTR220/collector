@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,29 +62,109 @@ func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
 
 // Manager runs all consumers concurrently
 type Manager struct {
-	ch   *amqp.Channel
 	hub  *hub.Hub
 	repo *repository.NotificationRepository
 	cfg  *config.Config
 }
 
-func NewManager(ch *amqp.Channel, h *hub.Hub, repo *repository.NotificationRepository, cfg *config.Config) *Manager {
-	return &Manager{ch: ch, hub: h, repo: repo, cfg: cfg}
+func NewManager(h *hub.Hub, repo *repository.NotificationRepository, cfg *config.Config) *Manager {
+	return &Manager{hub: h, repo: repo, cfg: cfg}
 }
 
-// Start launches all consumers — blocks until ctx is cancelled
-func (m *Manager) Start(ctx context.Context) {
-	go m.consumePriceUpdates(ctx)
-	go m.consumeFraudAlerts(ctx)
-	<-ctx.Done()
+// Start consomme les deux files (price/fraud) jusqu'a annulation du contexte.
+// Si la connexion au broker est perdue en cours de route, elle est retablie
+// avec un backoff exponentiel : reconnexion, re-declaration des exchanges/
+// queues (Setup), puis relance des deux consumers sur le nouveau channel.
+func (m *Manager) Start(ctx context.Context, url string) {
+	backoff := time.Second
+	for ctx.Err() == nil {
+		conn, ch, err := dialAndSetup(url, &m.cfg.RabbitMQ)
+		if err != nil {
+			log.Error().Err(err).Msg("connexion RabbitMQ (consumer) echouee, nouvel essai")
+			if !sleepOrDone(ctx, backoff) {
+				return
+			}
+			backoff = nextBackoff(backoff)
+			continue
+		}
+		backoff = time.Second
+
+		lost := m.runUntilClosed(ctx, ch, conn.NotifyClose(make(chan *amqp.Error, 1)))
+		_ = ch.Close()
+		_ = conn.Close()
+
+		if !lost {
+			return
+		}
+		log.Warn().Msg("connexion RabbitMQ perdue (consumer), reconnexion...")
+	}
+}
+
+// runUntilClosed lance les deux consumers sur ch et attend soit l'annulation
+// du contexte parent (retourne false), soit la perte du channel/connexion
+// (retourne true, pour declencher une reconnexion dans Start).
+func (m *Manager) runUntilClosed(ctx context.Context, ch *amqp.Channel, closeCh <-chan *amqp.Error) bool {
+	cycleCtx, cancelCycle := context.WithCancel(ctx)
+	defer cancelCycle()
+
+	go func() {
+		select {
+		case <-closeCh:
+			cancelCycle()
+		case <-cycleCtx.Done():
+		}
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); m.consumePriceUpdates(cycleCtx, ch) }()
+	go func() { defer wg.Done(); m.consumeFraudAlerts(cycleCtx, ch) }()
+	wg.Wait()
+
+	return ctx.Err() == nil
+}
+
+func dialAndSetup(url string, cfg *config.RabbitMQConfig) (*amqp.Connection, *amqp.Channel, error) {
+	conn, err := amqp.Dial(url)
+	if err != nil {
+		return nil, nil, err
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	if err := Setup(ch, cfg); err != nil {
+		_ = ch.Close()
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	return conn, ch, nil
+}
+
+func sleepOrDone(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(d):
+		return true
+	}
+}
+
+func nextBackoff(d time.Duration) time.Duration {
+	if d >= 30*time.Second {
+		return 30 * time.Second
+	}
+	return d * 2
 }
 
 // ── Price Updates Consumer ───────────────────────────────────────────────────
 
-func (m *Manager) consumePriceUpdates(ctx context.Context) {
-	msgs, err := m.ch.Consume(m.cfg.RabbitMQ.QueuePriceNotif, "notif-price-consumer", false, false, false, false, nil)
+func (m *Manager) consumePriceUpdates(ctx context.Context, ch *amqp.Channel) {
+	msgs, err := ch.Consume(m.cfg.RabbitMQ.QueuePriceNotif, "notif-price-consumer", false, false, false, false, nil)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start price consumer")
+		log.Error().Err(err).Msg("failed to start price consumer")
+		return
 	}
 	log.Info().Msg("price update consumer started")
 
@@ -183,10 +264,11 @@ func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 
 // ── Fraud Alerts Consumer ────────────────────────────────────────────────────
 
-func (m *Manager) consumeFraudAlerts(ctx context.Context) {
-	msgs, err := m.ch.Consume(m.cfg.RabbitMQ.QueueFraudNotif, "notif-fraud-consumer", false, false, false, false, nil)
+func (m *Manager) consumeFraudAlerts(ctx context.Context, ch *amqp.Channel) {
+	msgs, err := ch.Consume(m.cfg.RabbitMQ.QueueFraudNotif, "notif-fraud-consumer", false, false, false, false, nil)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start fraud consumer")
+		log.Error().Err(err).Msg("failed to start fraud consumer")
+		return
 	}
 	log.Info().Msg("fraud alert consumer started")
 
