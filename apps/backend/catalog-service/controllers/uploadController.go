@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -84,8 +83,19 @@ func UploadArticleImage(c *gin.Context) {
 		return
 	}
 
+	// os.Root scope toutes les operations sous dir : meme si filename etait
+	// un jour manipule, une tentative de sortie ("..", lien symbolique externe)
+	// serait rejetee par construction, plutot que de dependre uniquement du
+	// fait que filename est un UUID genere cote serveur.
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Stockage indisponible")
+		return
+	}
+	defer func() { _ = root.Close() }()
+
 	filename := uuid.New().String() + ext
-	dest, err := os.OpenFile(filepath.Join(dir, filename), os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o640)
+	dest, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Impossible d'enregistrer la photo")
 		return
