@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -162,5 +163,121 @@ func TestCreateUserDuplicateEmailReturns409(t *testing.T) {
 		`{"name":"Alice2","email":"alice@example.com","password":"longpassword"}`)
 	if w.Code != http.StatusConflict {
 		t.Fatalf("email duplique : status attendu 409, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func performGetUserInternal(t *testing.T, id string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/internal/utilisateurs/"+url.PathEscape(id), nil)
+	c.Params = gin.Params{{Key: "id", Value: id}}
+	GetUserInternal(c)
+	return w
+}
+
+func TestGetUserInternalReturnsProfile(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performGetUserInternal(t, "1")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		ID    uint   `json:"id"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode reponse : %v", err)
+	}
+	if resp.Email != "alice@example.com" {
+		t.Errorf("email attendu alice@example.com, obtenu %q", resp.Email)
+	}
+}
+
+func TestGetUserInternalUnknownIDReturns404(t *testing.T) {
+	setupTestDB(t)
+
+	w := performGetUserInternal(t, "999")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status attendu 404, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestGetUserInternalRejectsNonNumericID(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	// Une valeur non numerique (ex. tentative d'injection SQL) doit etre
+	// rejetee avant toute requete en base plutot que transmise a GORM.
+	w := performGetUserInternal(t, "1 OR 1=1")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("id non numerique : status attendu 404, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func performGetMe(t *testing.T, userID float64) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/me", nil)
+	c.Set("user_id", userID)
+	GetMe(c)
+	return w
+}
+
+func TestGetMeReturnsAuthenticatedProfile(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performGetMe(t, 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Email string `json:"email"`
+		Role  string `json:"role"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode reponse : %v", err)
+	}
+	if resp.Email != "alice@example.com" {
+		t.Errorf("email attendu alice@example.com, obtenu %q", resp.Email)
+	}
+}
+
+func TestGetMeUnknownIDReturns404(t *testing.T) {
+	setupTestDB(t)
+
+	w := performGetMe(t, 42)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status attendu 404, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestLogoutClearsAuthCookie(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/logout", nil)
+
+	Logout(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("un seul cookie attendu, obtenu %d", len(cookies))
+	}
+	if cookies[0].MaxAge >= 0 {
+		t.Errorf("maxAge negatif attendu pour effacer le cookie, obtenu %d", cookies[0].MaxAge)
 	}
 }

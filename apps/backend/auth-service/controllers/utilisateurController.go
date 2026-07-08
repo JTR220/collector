@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -159,8 +160,14 @@ func Logout(c *gin.Context) {
 // Reserve par le middleware InternalOnly (secret partage), jamais expose
 // publiquement.
 func GetUserInternal(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
+		return
+	}
+
 	var user models.Utilisateur
-	if err := repository.DB.First(&user, c.Param("id")).Error; err != nil {
+	if err := repository.DB.First(&user, id).Error; err != nil {
 		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
 		return
 	}
