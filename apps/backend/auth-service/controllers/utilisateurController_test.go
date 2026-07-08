@@ -16,9 +16,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const testSecret = "secret-de-test"
+
 func setupTestDB(t *testing.T) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	t.Setenv("JWT_SECRET", testSecret)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatalf("ouverture sqlite en memoire : %v", err)
 	}
@@ -43,15 +46,20 @@ func seedUser(t *testing.T, email, password string) {
 	}
 }
 
-func performLogin(t *testing.T, body string) *httptest.ResponseRecorder {
+func performJSON(t *testing.T, handler gin.HandlerFunc, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
+	c.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
-	Login(c)
+	handler(c)
 	return w
+}
+
+func performLogin(t *testing.T, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	return performJSON(t, Login, body)
 }
 
 func TestLoginSuccessEmitsExpectedClaims(t *testing.T) {
@@ -74,7 +82,7 @@ func TestLoginSuccessEmitsExpectedClaims(t *testing.T) {
 	}
 
 	token, err := jwt.Parse(resp.Token, func(tok *jwt.Token) (interface{}, error) {
-		return []byte(jwtSecret()), nil
+		return []byte(testSecret), nil
 	})
 	if err != nil || !token.Valid {
 		t.Fatalf("token invalide : %v", err)
@@ -86,6 +94,9 @@ func TestLoginSuccessEmitsExpectedClaims(t *testing.T) {
 	}
 	if claims["email"] != "alice@example.com" {
 		t.Errorf("claim email attendu alice@example.com, obtenu %v", claims["email"])
+	}
+	if claims["name"] != "Test" {
+		t.Errorf("claim name attendu Test, obtenu %v", claims["name"])
 	}
 	// L'utilisateur seede est le premier insere => ID 1.
 	if sub, _ := claims["sub"].(string); sub != "00000000-0000-0000-0000-000000000001" {
@@ -112,5 +123,44 @@ func TestLoginUnknownEmailReturns401(t *testing.T) {
 	w := performLogin(t, `{"email":"ghost@example.com","password":"whatever"}`)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateUserForcesUserRoleAndIgnoresClientRole(t *testing.T) {
+	setupTestDB(t)
+
+	// Le champ "role" envoye par le client doit etre ignore (anti-escalade).
+	w := performJSON(t, CreateUser,
+		`{"name":"Mallory","email":"mallory@example.com","password":"longpassword","role":"admin"}`)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status attendu 201, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var user models.Utilisateur
+	if err := repository.DB.Where("email = ?", "mallory@example.com").First(&user).Error; err != nil {
+		t.Fatalf("utilisateur non cree : %v", err)
+	}
+	if user.Role != "user" {
+		t.Errorf("role attendu user, obtenu %q", user.Role)
+	}
+}
+
+func TestCreateUserRejectsShortPassword(t *testing.T) {
+	setupTestDB(t)
+
+	w := performJSON(t, CreateUser, `{"name":"Eve","email":"eve@example.com","password":"court"}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("mot de passe court : status attendu 400, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateUserDuplicateEmailReturns409(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performJSON(t, CreateUser,
+		`{"name":"Alice2","email":"alice@example.com","password":"longpassword"}`)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("email duplique : status attendu 409, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }

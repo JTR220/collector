@@ -50,7 +50,6 @@ func Load() *Config {
 	viper.SetDefault("RABBITMQ_EXCHANGE_ALERTS", "collector.alerts")
 	viper.SetDefault("RABBITMQ_QUEUE_PRICE_NOTIF", "notification-service.price.updated")
 	viper.SetDefault("RABBITMQ_QUEUE_FRAUD_NOTIF", "notification-service.fraud.alert")
-	viper.SetDefault("JWT_SECRET", "change-me-in-production")
 
 	viper.AutomaticEnv()
 
@@ -69,6 +68,13 @@ func Load() *Config {
 	cfg.RabbitMQ.QueuePriceNotif = envOr("RABBITMQ_QUEUE_PRICE_NOTIF", cfg.RabbitMQ.QueuePriceNotif)
 	cfg.RabbitMQ.QueueFraudNotif = envOr("RABBITMQ_QUEUE_FRAUD_NOTIF", cfg.RabbitMQ.QueueFraudNotif)
 	cfg.JWT.Secret = envOr("JWT_SECRET", cfg.JWT.Secret)
+
+	// Fail-fast : aucun secret par defaut dans le code. docker-compose ou le
+	// Sealed Secret k8s doivent fournir JWT_SECRET (il doit etre identique a
+	// celui d'auth-service, qui signe les tokens).
+	if cfg.JWT.Secret == "" {
+		log.Fatal().Msg("JWT_SECRET est requis : definissez-le dans l'environnement")
+	}
 
 	return &cfg
 }

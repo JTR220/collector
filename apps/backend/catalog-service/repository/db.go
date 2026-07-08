@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -25,6 +26,14 @@ func InitDB() {
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Echec de la connexion a la base de donnees : ", err)
+	}
+
+	// Borne le pool de connexions : sans limite, un pic de trafic peut epuiser
+	// max_connections de PostgreSQL (base partagee entre les services).
+	if sqlDB, poolErr := DB.DB(); poolErr == nil {
+		sqlDB.SetMaxOpenConns(25)
+		sqlDB.SetMaxIdleConns(5)
+		sqlDB.SetConnMaxLifetime(30 * time.Minute)
 	}
 
 	err = DB.AutoMigrate(

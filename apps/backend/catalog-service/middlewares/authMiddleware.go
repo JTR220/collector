@@ -11,6 +11,15 @@ import (
 
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Defense en profondeur : sans secret configure, on refuse tout plutot
+		// que de valider des tokens signes avec une cle vide (main.go empeche
+		// deja le demarrage dans ce cas).
+		secret := jwtSecret()
+		if secret == "" {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "Configuration serveur incomplete"})
+			return
+		}
+
 		authHeader := c.GetHeader("Authorization")
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token requis"})
@@ -18,7 +27,6 @@ func AuthRequired() gin.HandlerFunc {
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		secret := jwtSecret()
 
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -36,6 +44,7 @@ func AuthRequired() gin.HandlerFunc {
 			c.Set("user_id", claims["user_id"])
 			c.Set("email", claims["email"])
 			c.Set("role", claims["role"])
+			c.Set("name", claims["name"])
 		}
 
 		c.Next()
@@ -54,9 +63,8 @@ func AdminRequired() gin.HandlerFunc {
 	}
 }
 
+// jwtSecret lit le secret de signature depuis l'environnement. Aucune valeur
+// par defaut : main.go refuse de demarrer si JWT_SECRET est absent.
 func jwtSecret() string {
-	if s := os.Getenv("JWT_SECRET"); s != "" {
-		return s
-	}
-	return "collector-jwt-secret-dev"
+	return os.Getenv("JWT_SECRET")
 }

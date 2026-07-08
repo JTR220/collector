@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -18,8 +19,24 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Allow all origins for development — restrict in production
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin:     checkWSOrigin,
+}
+
+// checkWSOrigin n'accepte l'upgrade WebSocket que depuis le front autorise
+// (FRONTEND_ORIGIN, meme convention que le middleware CORS) : protection
+// contre le Cross-Site WebSocket Hijacking. Les clients non-navigateur
+// (tests, outils CLI) n'envoient pas d'en-tete Origin et restent acceptes —
+// ils n'ont pas de cookies/credentials ambiants a detourner.
+func checkWSOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	allowed := os.Getenv("FRONTEND_ORIGIN")
+	if allowed == "" {
+		allowed = "http://localhost:5173"
+	}
+	return origin == allowed
 }
 
 type Handler struct {
@@ -222,8 +239,13 @@ func (h *Handler) extractUserIDFromToken(tokenStr string) (uuid.UUID, error) {
 		}
 		return h.jwtSecret, nil
 	})
-	if err != nil || !token.Valid {
+	if err != nil {
 		return uuid.Nil, err
+	}
+	// Ne jamais renvoyer (uuid.Nil, nil) : un token non valide sans erreur de
+	// parsing doit quand meme etre rejete par l'appelant.
+	if !token.Valid {
+		return uuid.Nil, jwt.ErrTokenUnverifiable
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)

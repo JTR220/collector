@@ -33,6 +33,10 @@ func main() {
 		log.Fatal().Err(err).Msg("cannot connect to postgres")
 	}
 	defer func() { _ = db.Close() }()
+	// Borne le pool de connexions (PostgreSQL est partage entre les services).
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
 	log.Info().Msg("connected to postgres")
 
 	repo := repository.New(db)

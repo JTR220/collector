@@ -16,6 +16,12 @@ func main() {
 		log.Printf("Chargement de .env ignore : %v", err)
 	}
 
+	// Fail-fast : aucun fallback de secret dans le code. En local le .env le
+	// fournit, en cluster c'est le Sealed Secret collector-secrets.
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Fatal("JWT_SECRET est requis : definissez-le dans .env (local) ou via le secret k8s")
+	}
+
 	repository.InitDB()
 	repository.SeedData()
 

@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
 import { toEventUuid } from '$lib/utils/eventId';
+import { apiRequest } from './http';
 
 const BASE_URL = env.PUBLIC_PRICE_TRACKER_API_BASE_URL ?? 'http://localhost:8082';
 
@@ -24,17 +25,8 @@ export type FraudAlertAPI = {
 	created_at: string;
 };
 
-async function request<T>(path: string, init?: RequestInit, token?: string): Promise<T> {
-	const res = await fetch(`${BASE_URL}${path}`, {
-		...init,
-		headers: {
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-			...init?.headers
-		}
-	});
-	if (!res.ok) throw new Error(`price-tracker ${path} error: ${res.status}`);
-	return res.json();
-}
+const request = <T>(path: string, init?: RequestInit, token?: string) =>
+	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: `price-tracker ${path}` });
 
 // Historique de prix : route publique (fiche lot visible sans connexion).
 export async function fetchPriceHistory(articleId: number): Promise<PriceHistoryEntry[]> {

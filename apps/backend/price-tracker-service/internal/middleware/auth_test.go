@@ -10,6 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const testSecret = "secret-de-test"
+
 func signToken(t *testing.T, secret string, claims jwt.MapClaims) string {
 	t.Helper()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -40,6 +42,7 @@ func performAuthedRequest(t *testing.T, authHeader string, extraMiddleware ...gi
 }
 
 func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
+	t.Setenv("JWT_SECRET", testSecret)
 	w := performAuthedRequest(t, "")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -47,6 +50,7 @@ func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredInvalidTokenReturns401(t *testing.T) {
+	t.Setenv("JWT_SECRET", testSecret)
 	w := performAuthedRequest(t, "Bearer not-a-real-jwt")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -54,7 +58,8 @@ func TestAuthRequiredInvalidTokenReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredValidTokenPasses(t *testing.T) {
-	token := signToken(t, jwtSecret(), jwt.MapClaims{
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{
 		"user_id": "1",
 		"role":    "user",
 		"exp":     time.Now().Add(time.Hour).Unix(),
@@ -66,7 +71,8 @@ func TestAuthRequiredValidTokenPasses(t *testing.T) {
 }
 
 func TestAdminRequiredBlocksNonAdmin(t *testing.T) {
-	token := signToken(t, jwtSecret(), jwt.MapClaims{
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{
 		"user_id": "1",
 		"role":    "user",
 		"exp":     time.Now().Add(time.Hour).Unix(),
@@ -78,7 +84,8 @@ func TestAdminRequiredBlocksNonAdmin(t *testing.T) {
 }
 
 func TestAdminRequiredAllowsAdmin(t *testing.T) {
-	token := signToken(t, jwtSecret(), jwt.MapClaims{
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{
 		"user_id": "1",
 		"role":    "admin",
 		"exp":     time.Now().Add(time.Hour).Unix(),
@@ -92,7 +99,8 @@ func TestAdminRequiredAllowsAdmin(t *testing.T) {
 func TestAdminRequiredBlocksMissingRoleClaim(t *testing.T) {
 	// Tokens emis avant l'introduction du claim role : traites comme role=user,
 	// donc bloques sur les routes admin (comportement conservateur voulu).
-	token := signToken(t, jwtSecret(), jwt.MapClaims{
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{
 		"user_id": "1",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})

@@ -10,6 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const testSecret = "secret-de-test"
+
 func performRequest(t *testing.T, authHeader string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -41,7 +43,21 @@ func signToken(t *testing.T, secret string, claims jwt.MapClaims) string {
 	return signed
 }
 
+func TestAuthRequiredWithoutConfiguredSecretReturns503(t *testing.T) {
+	// Sans JWT_SECRET, le middleware doit tout refuser (jamais de cle vide).
+	t.Setenv("JWT_SECRET", "")
+	token := signToken(t, "", jwt.MapClaims{
+		"user_id": float64(1),
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	w := performRequest(t, "Bearer "+token)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status attendu 503, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
 func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
+	t.Setenv("JWT_SECRET", testSecret)
 	w := performRequest(t, "")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -49,6 +65,7 @@ func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredMalformedHeaderReturns401(t *testing.T) {
+	t.Setenv("JWT_SECRET", testSecret)
 	w := performRequest(t, "Basic somevalue")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -56,6 +73,7 @@ func TestAuthRequiredMalformedHeaderReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredInvalidTokenReturns401(t *testing.T) {
+	t.Setenv("JWT_SECRET", testSecret)
 	w := performRequest(t, "Bearer not-a-real-jwt")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -63,7 +81,8 @@ func TestAuthRequiredInvalidTokenReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredExpiredTokenReturns401(t *testing.T) {
-	token := signToken(t, jwtSecret(), jwt.MapClaims{
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{
 		"user_id": float64(1),
 		"email":   "alice@example.com",
 		"exp":     time.Now().Add(-time.Hour).Unix(),
@@ -75,6 +94,7 @@ func TestAuthRequiredExpiredTokenReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredWrongSigningSecretReturns401(t *testing.T) {
+	t.Setenv("JWT_SECRET", testSecret)
 	token := signToken(t, "un-autre-secret", jwt.MapClaims{
 		"user_id": float64(1),
 		"email":   "alice@example.com",
@@ -87,7 +107,8 @@ func TestAuthRequiredWrongSigningSecretReturns401(t *testing.T) {
 }
 
 func TestAuthRequiredValidTokenSetsContextAndPasses(t *testing.T) {
-	token := signToken(t, jwtSecret(), jwt.MapClaims{
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{
 		"user_id": "1",
 		"email":   "alice@example.com",
 		"exp":     time.Now().Add(time.Hour).Unix(),

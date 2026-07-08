@@ -10,19 +10,23 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// signToken signe un JWT HS256 avec le meme secret par defaut que
-// internal/middleware (JWT_SECRET non defini en test).
+const testSecret = "secret-de-test"
+
+// signToken signe un JWT HS256 avec le secret de test injecte via t.Setenv
+// (le middleware n'a aucun secret par defaut).
 func signToken(t *testing.T, claims jwt.MapClaims) string {
 	t.Helper()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString([]byte("collector-jwt-secret-dev"))
+	signed, err := token.SignedString([]byte(testSecret))
 	if err != nil {
 		t.Fatalf("signature token : %v", err)
 	}
 	return signed
 }
 
-func newTestRouter() *gin.Engine {
+func newTestRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	t.Setenv("JWT_SECRET", testSecret)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	// repo=nil : les tests ci-dessous ne doivent jamais atteindre le repo
@@ -44,7 +48,7 @@ func doRequest(r *gin.Engine, method, path, authHeader string) *httptest.Respons
 }
 
 func TestHealthIsPublic(t *testing.T) {
-	r := newTestRouter()
+	r := newTestRouter(t)
 	w := doRequest(r, http.MethodGet, "/api/v1/health", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
@@ -52,7 +56,7 @@ func TestHealthIsPublic(t *testing.T) {
 }
 
 func TestAlertsRequiresAuth(t *testing.T) {
-	r := newTestRouter()
+	r := newTestRouter(t)
 	w := doRequest(r, http.MethodGet, "/api/v1/alerts", "")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -64,7 +68,7 @@ func TestPriceHistoryIsPublic(t *testing.T) {
 	// connecte : ne doit pas exiger de token. On envoie un id invalide pour
 	// obtenir un 400 (repond dans le handler, avant tout appel repo) plutot
 	// que de toucher un repo=nil.
-	r := newTestRouter()
+	r := newTestRouter(t)
 	w := doRequest(r, http.MethodGet, "/api/v1/items/not-a-uuid/price-history", "")
 	if w.Code == http.StatusUnauthorized {
 		t.Fatalf("la route ne devrait pas exiger d'authentification, obtenu 401 (%s)", w.Body.String())
@@ -75,7 +79,7 @@ func TestPriceHistoryIsPublic(t *testing.T) {
 }
 
 func TestResolveAlertRequiresAuth(t *testing.T) {
-	r := newTestRouter()
+	r := newTestRouter(t)
 	w := doRequest(r, http.MethodPut, "/api/v1/alerts/00000000-0000-0000-0000-000000000001/resolve", "")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -83,7 +87,7 @@ func TestResolveAlertRequiresAuth(t *testing.T) {
 }
 
 func TestResolveAlertRequiresAdminRole(t *testing.T) {
-	r := newTestRouter()
+	r := newTestRouter(t)
 	token := signToken(t, jwt.MapClaims{
 		"user_id": "1",
 		"role":    "user",
