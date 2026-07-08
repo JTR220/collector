@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/hub"
+	"github.com/JTR220/collector/notification-service/internal/idconv"
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 	"github.com/JTR220/collector/notification-service/internal/response"
@@ -350,7 +350,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 
 	recipientName := "Utilisateur"
 	if h.auth != nil {
-		if user, err := h.auth.GetUser(c.Request.Context(), fromEventUUID(recipientID)); err == nil {
+		if user, err := h.auth.GetUser(c.Request.Context(), idconv.FromUUID(recipientID)); err == nil {
 			recipientName = user.Name
 		} else {
 			log.Warn().Err(err).Str("recipient_id", recipientID.String()).Msg("resolution destinataire echouee")
@@ -450,16 +450,4 @@ func (h *Handler) MarkConversationRead(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
-}
-
-// fromEventUUID inverse le mapping deterministe ID numerique -> UUID utilise
-// par auth-service/catalog-service ("00000000-0000-0000-0000-<hex id>").
-func fromEventUUID(id uuid.UUID) uint {
-	s := id.String()
-	if len(s) < 12 {
-		return 0
-	}
-	var n uint64
-	_, _ = fmt.Sscanf(s[len(s)-12:], "%x", &n)
-	return uint(n)
 }

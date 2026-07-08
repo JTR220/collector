@@ -45,7 +45,67 @@ func TestPriceUpdatedEventJSONTags(t *testing.T) {
 func TestNoopPublisherDoesNotPanic(t *testing.T) {
 	var p Publisher = NoopPublisher{}
 	p.PublishPriceUpdated(1, 2, 10, 20)
+	p.PublishOrderCreated(1, 2, 3, 4, "Lot", 60)
+	p.PublishOrderDecision(1, 2, 3, 4, "Lot", 60, true)
 	p.Close()
+}
+
+// Sans connexion active (ch nil, comme avant tout Dial reussi ou apres perte
+// de connexion), les methodes Publish* ne doivent jamais paniquer : elles se
+// contentent de logger et abandonner l'evenement.
+func TestAMQPPublisherDisconnectedDoesNotPanic(t *testing.T) {
+	p := &AMQPPublisher{}
+	p.PublishPriceUpdated(1, 2, 10, 20)
+	p.PublishOrderCreated(1, 2, 3, 4, "Lot", 60)
+	p.PublishOrderDecision(1, 2, 3, 4, "Lot", 60, false)
+	p.Close()
+}
+
+func TestOrderCreatedEventJSONTags(t *testing.T) {
+	body, err := json.Marshal(OrderCreatedEvent{
+		OrderID:  ToEventUUID(1),
+		ItemID:   ToEventUUID(2),
+		ItemName: "Dracaufeu",
+		BuyerID:  ToEventUUID(3),
+		SellerID: ToEventUUID(4),
+		Price:    100,
+	})
+	if err != nil {
+		t.Fatalf("marshal : %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("unmarshal : %v", err)
+	}
+	for _, key := range []string{"order_id", "item_id", "item_name", "buyer_id", "seller_id", "price", "created_at"} {
+		if _, ok := raw[key]; !ok {
+			t.Errorf("clef JSON %q absente du payload OrderCreatedEvent", key)
+		}
+	}
+}
+
+func TestOrderDecisionEventJSONTags(t *testing.T) {
+	body, err := json.Marshal(OrderDecisionEvent{
+		OrderID:  ToEventUUID(1),
+		ItemID:   ToEventUUID(2),
+		ItemName: "Dracaufeu",
+		BuyerID:  ToEventUUID(3),
+		SellerID: ToEventUUID(4),
+		Price:    100,
+		Accepted: true,
+	})
+	if err != nil {
+		t.Fatalf("marshal : %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("unmarshal : %v", err)
+	}
+	for _, key := range []string{"order_id", "item_id", "item_name", "buyer_id", "seller_id", "price", "accepted", "decided_at"} {
+		if _, ok := raw[key]; !ok {
+			t.Errorf("clef JSON %q absente du payload OrderDecisionEvent", key)
+		}
+	}
 }
 
 func TestInitWithEmptyURLUsesNoop(t *testing.T) {

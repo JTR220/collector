@@ -16,23 +16,11 @@ import (
 	"github.com/JTR220/collector/notification-service/config"
 	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/hub"
+	"github.com/JTR220/collector/notification-service/internal/idconv"
 	"github.com/JTR220/collector/notification-service/internal/mailer"
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 )
-
-// fromEventUUID inverse events.ToEventUUID (uuid deterministe "0...-<hex id>")
-// pour retrouver l'ID numerique auth-service/catalog-service, necessaire a
-// la resolution d'email.
-func fromEventUUID(id uuid.UUID) uint {
-	s := id.String()
-	if len(s) < 12 {
-		return 0
-	}
-	var n uint64
-	_, _ = fmt.Sscanf(s[len(s)-12:], "%x", &n)
-	return uint(n)
-}
 
 // messageIDOf renvoie un identifiant stable pour deduplicquer une livraison
 // AMQP redistribuee : le MessageId pose par le publisher si present, sinon
@@ -484,7 +472,7 @@ func (m *Manager) handleOrderCreated(ctx context.Context, msg amqp.Delivery) {
 		"Bonjour,\n\nUn acheteur souhaite acquérir votre annonce \"%s\" pour %.2f€.\n\nConnectez-vous à votre profil Collector.shop pour accepter ou refuser cette commande.\n\n— Collector.shop",
 		event.ItemName, event.Price,
 	)
-	m.notifyAndEmail(ctx, notif, fromEventUUID(event.SellerID), title, emailBody)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.SellerID), title, emailBody)
 
 	log.Info().Str("item_id", event.ItemID.String()).Msg("order.created notification dispatched")
 	_ = msg.Ack(false)
@@ -531,7 +519,7 @@ func (m *Manager) handleOrderDecided(ctx context.Context, msg amqp.Delivery) {
 		CreatedAt: time.Now(),
 	}
 
-	m.notifyAndEmail(ctx, notif, fromEventUUID(event.BuyerID), title, emailBody)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.BuyerID), title, emailBody)
 
 	log.Info().Str("item_id", event.ItemID.String()).Bool("accepted", event.Accepted).Msg("order.decided notification dispatched")
 	_ = msg.Ack(false)
