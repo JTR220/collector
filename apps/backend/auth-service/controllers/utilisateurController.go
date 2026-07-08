@@ -114,6 +114,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	if user.Suspended {
+		response.Error(c, http.StatusForbidden, "Ce compte a ete suspendu")
+		return
+	}
+
 	ttl := tokenTTL()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,

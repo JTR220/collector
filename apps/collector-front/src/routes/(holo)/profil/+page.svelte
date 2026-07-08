@@ -9,6 +9,7 @@
 		fetchMySales,
 		acceptOrder,
 		rejectOrder,
+		leaveReview,
 		ORDER_STATUS_LABELS,
 		type Order,
 		type OrderStatus
@@ -30,8 +31,17 @@
 	let myArticles = $state<ArticleAPI[]>([]);
 	let articleBusyId = $state<number | null>(null);
 	let articlesMsg = $state<string | null>(null);
+	let reviewFormOrderId = $state<number | null>(null);
+	let reviewRating = $state(5);
+	let reviewComment = $state('');
+	let reviewBusy = $state(false);
+	let reviewMsg = $state<string | null>(null);
 
 	const pendingSales = $derived(sales.filter((s) => s.status === 'pending'));
+	const reviewableStatuses: OrderStatus[] = ['paid', 'shipped', 'delivered'];
+	function canReview(o: Order) {
+		return !o.reviewed && reviewableStatuses.includes(o.status);
+	}
 
 	const articleStats = $derived({
 		listed: myArticles.filter((a) => !a.sold).length,
@@ -98,6 +108,32 @@
 			articlesMsg = e instanceof Error ? e.message : "Impossible de retirer l'annonce.";
 		} finally {
 			articleBusyId = null;
+		}
+	}
+
+	function toggleReview(order: Order) {
+		reviewMsg = null;
+		if (reviewFormOrderId === order.ID) {
+			reviewFormOrderId = null;
+			return;
+		}
+		reviewFormOrderId = order.ID;
+		reviewRating = 5;
+		reviewComment = '';
+	}
+
+	async function submitReview(order: Order) {
+		if (!$auth.token) return;
+		reviewBusy = true;
+		reviewMsg = null;
+		try {
+			await leaveReview($auth.token, order.ID, reviewRating, reviewComment.trim());
+			orders = orders.map((o) => (o.ID === order.ID ? { ...o, reviewed: true } : o));
+			reviewFormOrderId = null;
+		} catch (e) {
+			reviewMsg = e instanceof Error ? e.message : "Impossible d'enregistrer l'avis.";
+		} finally {
+			reviewBusy = false;
 		}
 	}
 
@@ -258,16 +294,47 @@
 			<Kicker>Mes achats · {orders.length}</Kicker>
 			<div class="item-list">
 				{#each orders as o (o.ID)}
-					<a class="item-row" href={`/lot/${o.articleId}`}>
+					<div class="item-row">
 						<span class="item-date">{fmtDate(o.CreatedAt)}</span>
-						<span class="item-name">{o.article?.name ?? `Lot #${o.articleId}`}</span>
+						<a class="item-name" href={`/lot/${o.articleId}`}
+							>{o.article?.name ?? `Lot #${o.articleId}`}</a
+						>
 						<GChip>{ORDER_STATUS_LABELS[o.status] ?? o.status}</GChip>
 						<span class="item-price">{eur(o.price)}</span>
-					</a>
+						{#if o.reviewed}
+							<span class="review-tag">avis laissé</span>
+						{:else if canReview(o)}
+							<button class="btn-ghost-sm" onclick={() => toggleReview(o)}>★ Avis</button>
+						{/if}
+					</div>
+					{#if reviewFormOrderId === o.ID}
+						<div class="review-form">
+							<div class="review-stars-input">
+								{#each [1, 2, 3, 4, 5] as n}
+									<button
+										type="button"
+										class="star-btn"
+										class:star-on={n <= reviewRating}
+										onclick={() => (reviewRating = n)}
+										aria-label={`${n} étoile${n > 1 ? 's' : ''}`}>★</button
+									>
+								{/each}
+							</div>
+							<textarea
+								placeholder="Commentaire (facultatif)…"
+								bind:value={reviewComment}
+								disabled={reviewBusy}
+								rows="2"></textarea>
+							<button class="btn-accept" disabled={reviewBusy} onclick={() => submitReview(o)}>
+								Envoyer l'avis
+							</button>
+						</div>
+					{/if}
 				{:else}
 					<p class="item-empty">Aucun achat pour l'instant.</p>
 				{/each}
 			</div>
+			{#if reviewMsg}<p class="action-msg">{reviewMsg}</p>{/if}
 		</GPanel>
 	</div>
 
@@ -519,6 +586,55 @@
 	.btn-reject-sm:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	/* Avis */
+	.review-tag {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 11.5px;
+		color: #766d60;
+		font-style: italic;
+		flex-shrink: 0;
+	}
+	.review-form {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 0 16px;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+	}
+	.review-stars-input {
+		display: flex;
+		gap: 4px;
+	}
+	.star-btn {
+		background: none;
+		border: none;
+		font-size: 18px;
+		color: rgba(236, 229, 218, 0.25);
+		cursor: pointer;
+		padding: 0;
+		line-height: 1;
+	}
+	.star-btn.star-on {
+		color: #e0b260;
+	}
+	.review-form textarea {
+		resize: vertical;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		border-radius: 8px;
+		padding: 9px 12px;
+		color: #ece5da;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+	}
+	.review-form textarea:focus {
+		outline: none;
+		border-color: #86b3a4;
+	}
+	.review-form .btn-accept {
+		align-self: flex-start;
 	}
 
 	/* 2 colonnes */

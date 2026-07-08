@@ -26,11 +26,15 @@
 	// Recherche & filtres (état local, orientés marketplace)
 	let search = $state('');
 	let filterCat = $state('');
+	let filterRarity = $state('');
+	let filterGrade = $state('');
 	let filterMax = $state(0);
 	let availableOnly = $state(false);
 	let sort = $state<'recent' | 'price-asc' | 'price-desc' | 'name'>('recent');
 
 	const categories = $derived([...new Set(articles.map((a) => a.category.name))].sort());
+	const rarities = $derived([...new Set(articles.map((a) => a.rarity).filter(Boolean))].sort());
+	const grades = $derived([...new Set(articles.map((a) => a.grade).filter(Boolean))].sort());
 
 	const filtered = $derived(
 		articles
@@ -45,6 +49,8 @@
 				return (
 					matchQ &&
 					(!filterCat || a.category.name === filterCat) &&
+					(!filterRarity || a.rarity === filterRarity) &&
+					(!filterGrade || a.grade === filterGrade) &&
 					(!filterMax || a.prix <= filterMax) &&
 					(!availableOnly || !a.sold)
 				);
@@ -63,10 +69,14 @@
 			})
 	);
 
-	const hasFilters = $derived(!!(search || filterCat || filterMax || availableOnly));
+	const hasFilters = $derived(
+		!!(search || filterCat || filterRarity || filterGrade || filterMax || availableOnly)
+	);
 	function resetFilters() {
 		search = '';
 		filterCat = '';
+		filterRarity = '';
+		filterGrade = '';
 		filterMax = 0;
 		availableOnly = false;
 		sort = 'recent';
@@ -139,6 +149,21 @@
 			{ value: '', label: 'Toutes catégories' },
 			...categories.map((c) => ({ value: c, label: c }))
 		]}
+	/>
+	<GSelect
+		bind:value={filterRarity}
+		ariaLabel="Rareté"
+		placeholder="Toutes raretés"
+		options={[
+			{ value: '', label: 'Toutes raretés' },
+			...rarities.map((r) => ({ value: r, label: r }))
+		]}
+	/>
+	<GSelect
+		bind:value={filterGrade}
+		ariaLabel="Grade"
+		placeholder="Tous grades"
+		options={[{ value: '', label: 'Tous grades' }, ...grades.map((g) => ({ value: g, label: g }))]}
 	/>
 	<GSelect
 		bind:value={filterMax}

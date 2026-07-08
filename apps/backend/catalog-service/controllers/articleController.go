@@ -114,6 +114,17 @@ func GetMyArticles(c *gin.Context) {
 	c.JSON(http.StatusOK, articles)
 }
 
+// GetAllArticlesAdmin renvoie tout le catalogue (vendues incluses, tous
+// vendeurs), pour la moderation back-office — reserve aux administrateurs.
+func GetAllArticlesAdmin(c *gin.Context) {
+	var articles []models.Article
+	if err := repository.DB.Preload("Category").Order("id desc").Find(&articles).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer le catalogue")
+		return
+	}
+	c.JSON(http.StatusOK, articles)
+}
+
 // GetAllArticles renvoie le catalogue, avec pagination optionnelle
 // (?limit=&offset=) pour que les clients puissent borner la reponse quand le
 // catalogue grossit. Sans parametre, le comportement historique est conserve.

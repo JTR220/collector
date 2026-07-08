@@ -2,6 +2,7 @@
 	import { auth } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
 	import { unreadMessagesCount } from '$lib/stores/messages';
+	import { cartCount } from '$lib/stores/cart';
 	import GNotifBell from './GNotifBell.svelte';
 
 	type Props = {
@@ -60,6 +61,12 @@
 	</nav>
 
 	<div class="g-user">
+		<a href="/panier" class="g-cart" title="Panier" aria-label="Panier">
+			<span class="g-cart-ico">🛒</span>
+			{#if $cartCount > 0}
+				<span class="g-nav-badge g-cart-badge">{$cartCount > 99 ? '99+' : $cartCount}</span>
+			{/if}
+		</a>
 		{#if $auth.user}
 			<GNotifBell />
 			<div class="g-avatar">{initials}</div>
@@ -155,6 +162,30 @@
 		align-items: center;
 		gap: 14px;
 		flex-shrink: 0;
+	}
+	.g-cart {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		border-radius: 6px;
+		border: 1px solid rgba(236, 229, 218, 0.1);
+		text-decoration: none;
+		transition: border-color 120ms;
+	}
+	.g-cart:hover {
+		border-color: rgba(236, 229, 218, 0.22);
+	}
+	.g-cart-ico {
+		font-size: 14px;
+	}
+	.g-cart-badge {
+		position: absolute;
+		top: -6px;
+		right: -6px;
+		margin-left: 0;
 	}
 	.g-avatar {
 		width: 34px;

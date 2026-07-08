@@ -72,6 +72,18 @@ func JWTSecret() string {
 	return os.Getenv("JWT_SECRET")
 }
 
+// AdminRequired doit etre chaine apres AuthRequired : il refuse toute requete
+// dont le claim "role" n'est pas "admin" (moderation des comptes).
+func AdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if role, _ := c.Get("role"); role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Acces reserve aux administrateurs"})
+			return
+		}
+		c.Next()
+	}
+}
+
 // InternalOnly protege les endpoints d'appel inter-services (ex: resolution
 // d'email par notification-service) via un secret partage transmis en en-tete
 // X-Internal-Secret. Sans INTERNAL_SECRET configure, l'acces est refuse par

@@ -204,8 +204,12 @@
 		categories = payload.map(normalizeCategory);
 	}
 
+	// /admin/articles (et non /article) : la moderation doit voir aussi les
+	// pieces deja vendues, exclues du catalogue public depuis GetAllArticles.
 	async function chargerArticles() {
-		const response = await fetch(`${catalogApiBaseUrl}/article`);
+		const response = await fetch(`${catalogApiBaseUrl}/admin/articles`, {
+			headers: authHeaders(false)
+		});
 		if (!response.ok) {
 			throw new Error('Impossible de charger les articles.');
 		}

@@ -84,6 +84,23 @@ func GetMyOrders(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer vos achats")
 		return
 	}
+
+	if len(orders) > 0 {
+		orderIDs := make([]uint, len(orders))
+		for i, o := range orders {
+			orderIDs[i] = o.ID
+		}
+		var reviewedIDs []uint
+		repository.DB.Model(&models.Review{}).Where("order_id IN ?", orderIDs).Pluck("order_id", &reviewedIDs)
+		reviewed := make(map[uint]bool, len(reviewedIDs))
+		for _, id := range reviewedIDs {
+			reviewed[id] = true
+		}
+		for i := range orders {
+			orders[i].Reviewed = reviewed[orders[i].ID]
+		}
+	}
+
 	c.JSON(http.StatusOK, orders)
 }
 

@@ -5,9 +5,16 @@
 	import { auth, isAuthenticated } from '$lib/stores/auth';
 	import { fetchArticle, articleImage, type ArticleAPI } from '$lib/api/catalog';
 	import { addToWishlist, removeFromWishlist, fetchMyWishlist } from '$lib/api/wishlist';
-	import { buyArticle } from '$lib/api/market';
+	import {
+		buyArticle,
+		fetchSellerRating,
+		fetchSellerReviews,
+		type SellerRating,
+		type Review
+	} from '$lib/api/market';
 	import { fetchPriceHistory } from '$lib/api/priceTracker';
 	import { sendMessage, toUserUUID } from '$lib/api/messages';
+	import { cart } from '$lib/stores/cart';
 	import { eur, eurC, pct, sparkPath } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GChip from '$lib/components/galerie/GChip.svelte';
@@ -28,6 +35,8 @@
 	let negotiateBusy = $state(false);
 
 	let trackedPrices = $state<number[]>([]);
+	let sellerRating = $state<SellerRating | null>(null);
+	let sellerReviews = $state<Review[]>([]);
 
 	onMount(async () => {
 		try {
@@ -50,6 +59,16 @@
 				trackedPrices = hist.map((h) => h.new_price);
 			} catch {
 				trackedPrices = [];
+			}
+
+			try {
+				[sellerRating, sellerReviews] = await Promise.all([
+					fetchSellerRating(article.sellerId),
+					fetchSellerReviews(article.sellerId)
+				]);
+			} catch {
+				sellerRating = null;
+				sellerReviews = [];
 			}
 		}
 	});
@@ -84,6 +103,11 @@
 	}
 
 	const isOwnArticle = $derived(!!article && !!$auth.user && article.sellerId === $auth.user.id);
+
+	function addToCart() {
+		if (!article) return;
+		cart.add(article);
+	}
 
 	async function buyNow() {
 		const token = requireAuth();
@@ -253,6 +277,13 @@
 				<button class="btn-ghost" disabled={actionBusy} onclick={toggleWishlist}>
 					{inWishlist ? '♥ Dans la wishlist' : '♡ Wishlist'}
 				</button>
+				{#if !isOwnArticle && !article.sold}
+					{@const currentId = article.ID}
+					{@const inCart = $cart.some((i) => i.ID === currentId)}
+					<button class="btn-ghost" disabled={inCart} onclick={addToCart}>
+						{inCart ? '✓ Dans le panier' : '🛒 Ajouter au panier'}
+					</button>
+				{/if}
 				{#if !isOwnArticle}
 					<button class="btn-ghost" onclick={() => (contactOpen = !contactOpen)}>
 						✉ Contacter le vendeur
@@ -317,8 +348,25 @@
 				<Kicker>Vendeur</Kicker>
 				<div class="seller-row">
 					<span class="seller-name">@{article.seller}</span>
-					<span class="seller-score">★ {article.sellerScore.toFixed(2)} / 5</span>
+					{#if sellerRating && sellerRating.count > 0}
+						<span class="seller-score"
+							>★ {sellerRating.average.toFixed(2)} / 5 · {sellerRating.count} avis</span
+						>
+					{:else}
+						<span class="seller-score seller-score-empty">Pas encore d'avis</span>
+					{/if}
 				</div>
+				{#if sellerReviews.length > 0}
+					<div class="review-list">
+						{#each sellerReviews.slice(0, 5) as r (r.ID)}
+							<div class="review-row">
+								<span class="review-stars">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+								<span class="review-author">{r.reviewerName}</span>
+								{#if r.comment}<span class="review-comment">{r.comment}</span>{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		</div>
 	</section>
@@ -654,6 +702,44 @@
 		color: #86b3a4;
 	}
 	.seller-score {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12.5px;
+		color: #a39a8c;
+	}
+	.seller-score-empty {
+		color: #766d60;
+		font-style: italic;
+	}
+
+	.review-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-top: 10px;
+	}
+	.review-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 8px;
+		padding: 8px 12px;
+		border: 1px solid rgba(236, 229, 218, 0.08);
+		border-radius: 7px;
+		background: rgba(255, 255, 255, 0.02);
+	}
+	.review-stars {
+		color: #e0b260;
+		font-size: 12px;
+		letter-spacing: 1px;
+	}
+	.review-author {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		color: #ece5da;
+	}
+	.review-comment {
+		flex-basis: 100%;
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12.5px;
 		color: #a39a8c;

@@ -13,6 +13,7 @@ export type Order = {
 	status: OrderStatus;
 	article: ArticleAPI;
 	CreatedAt: string;
+	reviewed: boolean;
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -39,3 +40,36 @@ export const acceptOrder = (token: string, orderId: number) =>
 
 export const rejectOrder = (token: string, orderId: number) =>
 	request<{ order: Order }>(`/order/${orderId}/reject`, token, { method: 'PATCH' });
+
+// ── Avis vendeur ─────────────────────────────────────────────────────────────
+
+export type Review = {
+	ID: number;
+	orderId: number;
+	reviewerId: number;
+	reviewerName: string;
+	sellerId: number;
+	rating: number;
+	comment: string;
+	CreatedAt: string;
+};
+
+export type SellerRating = { average: number; count: number };
+
+export const leaveReview = (token: string, orderId: number, rating: number, comment: string) =>
+	request<{ review: Review }>(`/order/${orderId}/review`, token, {
+		method: 'POST',
+		body: JSON.stringify({ rating, comment })
+	});
+
+export async function fetchSellerRating(sellerId: number): Promise<SellerRating> {
+	const res = await fetch(`${BASE_URL}/sellers/${sellerId}/rating`);
+	if (!res.ok) throw new Error(`catalog-service error: ${res.status}`);
+	return res.json();
+}
+
+export async function fetchSellerReviews(sellerId: number): Promise<Review[]> {
+	const res = await fetch(`${BASE_URL}/sellers/${sellerId}/reviews`);
+	if (!res.ok) throw new Error(`catalog-service error: ${res.status}`);
+	return res.json();
+}

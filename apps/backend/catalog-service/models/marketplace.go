@@ -23,4 +23,7 @@ type Order struct {
 	FraisPort float64 `json:"fraisPort"`
 	Status    string  `json:"status"`
 	Article   Article `json:"article" gorm:"foreignKey:ArticleID"`
+	// Reviewed n'est pas persiste : calcule par GetMyOrders pour savoir si un
+	// avis existe deja sur cette commande (evite de le proposer deux fois).
+	Reviewed bool `json:"reviewed" gorm:"-"`
 }

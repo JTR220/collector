@@ -128,6 +128,14 @@ export async function fetchMyArticles(token: string): Promise<ArticleAPI[]> {
 	});
 }
 
+/** Tout le catalogue (vendues incluses, tous vendeurs), pour la modération back-office. */
+export async function fetchAllArticlesAdmin(token: string): Promise<ArticleAPI[]> {
+	return apiRequest<ArticleAPI[]>(BASE_URL, '/admin/articles', {
+		token,
+		errorPrefix: 'catalog-service'
+	});
+}
+
 /**
  * Envoie une photo pour une annonce existante (multipart). Ne passe pas par
  * apiRequest : celui-ci force Content-Type: application/json dès qu'un body

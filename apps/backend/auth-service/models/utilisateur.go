@@ -11,4 +11,7 @@ type Utilisateur struct {
 	Email    string `json:"email" gorm:"unique"`
 	Password string `json:"-"`
 	Role     string `json:"role" gorm:"default:user"`
+	// Suspended : compte desactive par un administrateur (moderation). Bloque
+	// la connexion sans supprimer les donnees associees (annonces, commandes).
+	Suspended bool `json:"suspended" gorm:"default:false"`
 }

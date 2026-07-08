@@ -50,5 +50,14 @@ func InitRouter() *gin.Engine {
 	// Endpoints internes (secret partage) : reserves aux appels inter-services.
 	router.GET("/internal/users/:id", middlewares.InternalOnly(), controllers.GetUserInternal)
 
+	// Back-office (moderation des comptes) : reserve aux administrateurs.
+	admin := router.Group("/admin")
+	admin.Use(middlewares.AuthRequired(), middlewares.AdminRequired())
+	{
+		admin.GET("/users", controllers.ListUsers)
+		admin.PATCH("/users/:id/suspend", controllers.SuspendUser)
+		admin.PATCH("/users/:id/unsuspend", controllers.UnsuspendUser)
+	}
+
 	return router
 }

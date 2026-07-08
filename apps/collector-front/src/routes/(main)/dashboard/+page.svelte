@@ -5,6 +5,7 @@
 	import { auth } from '$lib/stores/auth';
 	import { fetchAlerts, resolveAlert, type FraudAlertAPI } from '$lib/api/priceTracker';
 	import { fromEventUuid } from '$lib/utils/eventId';
+	import { fetchUsers, suspendUser, unsuspendUser, type AdminUser } from '$lib/api/auth';
 
 	const authApiUrl = env.PUBLIC_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 	const catalogApiUrl = env.PUBLIC_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
@@ -131,6 +132,39 @@
 		DUMPING: 'Prix anormalement bas'
 	};
 
+	// --- Modération des comptes (suspension) ---
+	let users: AdminUser[] = [];
+	let usersDown = false;
+	let userBusyId: number | null = null;
+	let moderationMsg = '';
+
+	async function fetchUsersList() {
+		if (!$auth.token) return;
+		try {
+			users = await fetchUsers($auth.token);
+			usersDown = false;
+		} catch {
+			users = [];
+			usersDown = true;
+		}
+	}
+
+	async function onToggleSuspend(u: AdminUser) {
+		if (!$auth.token) return;
+		userBusyId = u.ID;
+		moderationMsg = '';
+		try {
+			const { suspended } = u.suspended
+				? await unsuspendUser($auth.token, u.ID)
+				: await suspendUser($auth.token, u.ID);
+			users = users.map((x) => (x.ID === u.ID ? { ...x, suspended } : x));
+		} catch (e) {
+			moderationMsg = e instanceof Error ? e.message : 'Action impossible.';
+		} finally {
+			userBusyId = null;
+		}
+	}
+
 	onMount(() => {
 		// Page reservee aux administrateurs.
 		if ($auth.user?.role !== 'admin') {
@@ -139,6 +173,7 @@
 		}
 		refreshAll();
 		fetchFraudAlerts();
+		fetchUsersList();
 	});
 </script>
 
@@ -291,6 +326,42 @@
 			</section>
 		</div>
 	{/if}
+
+	<!-- Modération des comptes -->
+	{#if moderationMsg}
+		<div class="msg msg-error">{moderationMsg}</div>
+	{/if}
+	<section class="panel">
+		<div class="eyebrow">Modération</div>
+		<h2 class="panel-title">Comptes utilisateurs</h2>
+		{#if usersDown}
+			<div class="empty">auth-service indisponible.</div>
+		{:else if users.length === 0}
+			<div class="empty">Aucun utilisateur.</div>
+		{:else}
+			<div class="mod-list mod-list-scroll">
+				{#each users as u (u.ID)}
+					<div class="mod-row">
+						<div class="mod-info">
+							<span class="mod-name">{u.name}</span>
+							<span class="mod-sub">{u.email} · {u.role}</span>
+						</div>
+						{#if u.suspended}
+							<span class="mod-badge mod-badge-suspended">Suspendu</span>
+						{/if}
+						<button
+							class="mod-action"
+							class:mod-action-danger={!u.suspended}
+							disabled={userBusyId === u.ID}
+							onclick={() => onToggleSuspend(u)}
+						>
+							{u.suspended ? 'Réactiver' : 'Suspendre'}
+						</button>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</section>
 
 	<!-- Alertes fraude -->
 	<section class="panel">
@@ -626,6 +697,80 @@
 		flex-shrink: 0;
 		width: 84px;
 		text-align: right;
+	}
+
+	/* Modération */
+	.mod-list {
+		display: flex;
+		flex-direction: column;
+		margin-top: 6px;
+	}
+	.mod-list-scroll {
+		max-height: 320px;
+		overflow-y: auto;
+	}
+	.mod-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 0;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.08);
+	}
+	.mod-info {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.mod-name {
+		font-size: 13px;
+		color: #ece5da;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.mod-sub {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11px;
+		color: #766d60;
+	}
+	.mod-badge {
+		flex-shrink: 0;
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		padding: 3px 8px;
+		border-radius: 20px;
+	}
+	.mod-badge-suspended {
+		background: rgba(215, 156, 134, 0.14);
+		color: #d79c86;
+	}
+	.mod-action {
+		flex-shrink: 0;
+		padding: 6px 12px;
+		border-radius: 6px;
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: rgba(255, 255, 255, 0.02);
+		color: #a39a8c;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.03em;
+		cursor: pointer;
+		transition: background 150ms;
+	}
+	.mod-action:hover:not(:disabled) {
+		background: rgba(255, 255, 255, 0.06);
+	}
+	.mod-action:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.mod-action-danger {
+		border-color: rgba(215, 156, 134, 0.4);
+		color: #d79c86;
 	}
 
 	/* Alertes fraude */

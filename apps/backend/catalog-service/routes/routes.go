@@ -54,6 +54,8 @@ func InitRouter() *gin.Engine {
 	router.GET("/article", controllers.GetAllArticles)
 	router.GET("/article/:id", controllers.GetArticle)
 	router.GET("/category", controllers.GetAllCategories)
+	router.GET("/sellers/:id/rating", controllers.GetSellerRating)
+	router.GET("/sellers/:id/reviews", controllers.GetSellerReviews)
 
 	// Routes protégées (écriture réservée aux utilisateurs authentifiés)
 	protected := router.Group("/")
@@ -71,6 +73,7 @@ func InitRouter() *gin.Engine {
 		protected.GET("/me/sales", controllers.GetMySales)
 		protected.PATCH("/order/:id/accept", controllers.AcceptOrder)
 		protected.PATCH("/order/:id/reject", controllers.RejectOrder)
+		protected.POST("/order/:id/review", controllers.CreateReview)
 
 		// Wishlist
 		protected.GET("/me/wishlist", controllers.GetMyWishlist)
@@ -83,6 +86,7 @@ func InitRouter() *gin.Engine {
 	admin.Use(middlewares.AuthRequired(), middlewares.AdminRequired())
 	{
 		admin.GET("/stats", controllers.GetAdminStats)
+		admin.GET("/articles", controllers.GetAllArticlesAdmin)
 	}
 
 	// Creation de categories : reservee aux administrateurs (moderation du catalogue).
