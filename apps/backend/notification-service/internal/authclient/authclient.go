@@ -46,7 +46,7 @@ func (c *Client) GetUser(ctx context.Context, id uint) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("auth-service: statut %d pour l'utilisateur %d", res.StatusCode, id)
