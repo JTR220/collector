@@ -7,6 +7,7 @@
 	import { addToWishlist, removeFromWishlist, fetchMyWishlist } from '$lib/api/wishlist';
 	import { buyArticle } from '$lib/api/market';
 	import { fetchPriceHistory } from '$lib/api/priceTracker';
+	import { sendMessage, toUserUUID } from '$lib/api/messages';
 	import { eur, eurC, pct, sparkPath } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GChip from '$lib/components/galerie/GChip.svelte';
@@ -18,6 +19,9 @@
 	let inWishlist = $state(false);
 	let actionMsg = $state<string | null>(null);
 	let actionBusy = $state(false);
+	let contactOpen = $state(false);
+	let contactDraft = $state('');
+	let contactBusy = $state(false);
 
 	let trackedPrices = $state<number[]>([]);
 
@@ -75,19 +79,43 @@
 		}
 	}
 
+	const isOwnArticle = $derived(
+		!!article && !!$auth.user && article.sellerId === $auth.user.id
+	);
+
 	async function buyNow() {
 		const token = requireAuth();
-		if (!token || !article) return;
+		if (!token || !article || isOwnArticle) return;
 		actionBusy = true;
 		actionMsg = null;
 		try {
 			await buyArticle(token, article.ID);
 			article.sold = true;
-			actionMsg = 'Achat confirmé — retrouvez la commande dans votre profil.';
+			actionMsg = 'Demande d’achat envoyée — le vendeur doit la valider. Vous recevrez une notification.';
 		} catch (e) {
 			actionMsg = e instanceof Error ? e.message : 'Erreur lors de l’achat.';
 		} finally {
 			actionBusy = false;
+		}
+	}
+
+	async function sendContactMessage() {
+		const token = requireAuth();
+		const body = contactDraft.trim();
+		if (!token || !article || !body || isOwnArticle) return;
+		contactBusy = true;
+		try {
+			const sent = await sendMessage(token, {
+				recipientId: toUserUUID(article.sellerId),
+				body,
+				articleId: article.ID,
+				articleName: article.name
+			});
+			goto(`/messages/${sent.conversation_id}`);
+		} catch (e) {
+			actionMsg = e instanceof Error ? e.message : "Erreur lors de l'envoi du message.";
+		} finally {
+			contactBusy = false;
 		}
 	}
 
@@ -168,6 +196,10 @@
 			<div class="lot-actions">
 				{#if article.sold}
 					<button class="btn-primary" disabled>Vendu</button>
+				{:else if isOwnArticle}
+					<button class="btn-primary" disabled title="Vous ne pouvez pas acheter votre propre annonce">
+						Votre annonce
+					</button>
 				{:else}
 					<button class="btn-primary" disabled={actionBusy} onclick={buyNow}>
 						Acheter maintenant · {eur(article.prix)}
@@ -176,7 +208,26 @@
 				<button class="btn-ghost" disabled={actionBusy} onclick={toggleWishlist}>
 					{inWishlist ? '♥ Dans la wishlist' : '♡ Wishlist'}
 				</button>
+				{#if !isOwnArticle}
+					<button class="btn-ghost" onclick={() => (contactOpen = !contactOpen)}>
+						✉ Contacter le vendeur
+					</button>
+				{/if}
 			</div>
+
+			{#if contactOpen && !isOwnArticle}
+				<div class="contact-box">
+					<textarea
+						placeholder={`Bonjour, votre annonce "${article.name}" m'intéresse…`}
+						bind:value={contactDraft}
+						disabled={contactBusy}
+						rows="2"
+					></textarea>
+					<button class="btn-primary" disabled={contactBusy || !contactDraft.trim()} onclick={sendContactMessage}>
+						Envoyer
+					</button>
+				</div>
+			{/if}
 
 			{#if actionMsg}
 				<p class="action-msg">{actionMsg}</p>
@@ -421,6 +472,28 @@
 	.btn-ghost:hover:not(:disabled) {
 		border-color: #86b3a4;
 		color: #86b3a4;
+	}
+
+	.contact-box {
+		display: flex;
+		gap: 8px;
+		margin-top: 12px;
+		align-items: flex-start;
+	}
+	.contact-box textarea {
+		flex: 1;
+		resize: vertical;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		border-radius: 8px;
+		padding: 9px 12px;
+		color: #ece5da;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+	}
+	.contact-box textarea:focus {
+		outline: none;
+		border-color: #86b3a4;
 	}
 
 	.action-msg {

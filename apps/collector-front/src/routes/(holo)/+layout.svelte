@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { auth } from '$lib/stores/auth';
 	import { notifications } from '$lib/stores/notifications';
+	import { messages } from '$lib/stores/messages';
 	import GFrame from '$lib/components/galerie/GFrame.svelte';
 	import GHeader from '$lib/components/galerie/GHeader.svelte';
 
@@ -16,20 +17,24 @@
 		currentToken = $auth.token;
 		if ($auth.token) {
 			notifications.start($auth.token);
+			messages.start($auth.token);
 		} else {
 			notifications.reset();
+			messages.reset();
 		}
 	});
 
 	onDestroy(() => {
 		unsubAuth();
 		notifications.stop();
+		messages.stop();
 	});
 
 	const routeToActive: Record<string, string> = {
 		'/': 'Marché',
 		'/vendre': 'Vendre',
 		'/profil': 'Profil',
+		'/messages': 'Messages',
 		'/admin': 'Admin',
 		'/dashboard': 'Tableau de bord'
 	};

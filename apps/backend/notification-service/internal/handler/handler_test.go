@@ -29,7 +29,7 @@ func newTestRouter() *gin.Engine {
 	r := gin.New()
 	// repo=nil : les tests ci-dessous ne doivent jamais atteindre le repo
 	// (routes bloquees par le middleware avant d'atteindre le handler).
-	h := New(hub.New(), nil, testJWTSecret)
+	h := New(hub.New(), nil, testJWTSecret, nil)
 	h.RegisterRoutes(r)
 	return r
 }

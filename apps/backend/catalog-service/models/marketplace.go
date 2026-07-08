@@ -3,7 +3,7 @@ package models
 import "gorm.io/gorm"
 
 // Order : commande passée par un acheteur sur une annonce en vente directe
-// Status : paid | shipped | delivered | cancelled
+// Status : pending (attente de validation vendeur) | paid | shipped | delivered | cancelled
 type Order struct {
 	gorm.Model
 	BuyerID   uint    `json:"buyerId" gorm:"index"`

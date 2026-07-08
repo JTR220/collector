@@ -20,6 +20,23 @@ type Config struct {
 	Database DatabaseConfig
 	RabbitMQ RabbitMQConfig
 	JWT      JWTConfig
+	SMTP     SMTPConfig
+	Internal InternalConfig
+}
+
+type SMTPConfig struct {
+	Host     string `mapstructure:"SMTP_HOST"`
+	Port     string `mapstructure:"SMTP_PORT"`
+	From     string `mapstructure:"SMTP_FROM"`
+	User     string `mapstructure:"SMTP_USER"`
+	Password string `mapstructure:"SMTP_PASSWORD"`
+}
+
+// InternalConfig porte les coordonnees d'appel inter-services (resolution de
+// l'email du vendeur/acheteur aupres d'auth-service pour l'envoi d'email).
+type InternalConfig struct {
+	AuthServiceURL string `mapstructure:"AUTH_SERVICE_URL"`
+	Secret         string `mapstructure:"INTERNAL_SECRET"`
 }
 
 type ServerConfig struct {
@@ -50,6 +67,9 @@ func Load() *Config {
 	viper.SetDefault("RABBITMQ_EXCHANGE_ALERTS", "collector.alerts")
 	viper.SetDefault("RABBITMQ_QUEUE_PRICE_NOTIF", "notification-service.price.updated")
 	viper.SetDefault("RABBITMQ_QUEUE_FRAUD_NOTIF", "notification-service.fraud.alert")
+	viper.SetDefault("SMTP_PORT", "1025")
+	viper.SetDefault("SMTP_FROM", "notifications@collector.shop")
+	viper.SetDefault("AUTH_SERVICE_URL", "http://localhost:8080")
 
 	viper.AutomaticEnv()
 
@@ -68,6 +88,20 @@ func Load() *Config {
 	cfg.RabbitMQ.QueuePriceNotif = envOr("RABBITMQ_QUEUE_PRICE_NOTIF", cfg.RabbitMQ.QueuePriceNotif)
 	cfg.RabbitMQ.QueueFraudNotif = envOr("RABBITMQ_QUEUE_FRAUD_NOTIF", cfg.RabbitMQ.QueueFraudNotif)
 	cfg.JWT.Secret = envOr("JWT_SECRET", cfg.JWT.Secret)
+	cfg.SMTP.Host = envOr("SMTP_HOST", cfg.SMTP.Host)
+	cfg.SMTP.Port = envOr("SMTP_PORT", cfg.SMTP.Port)
+	cfg.SMTP.From = envOr("SMTP_FROM", cfg.SMTP.From)
+	cfg.SMTP.User = envOr("SMTP_USER", cfg.SMTP.User)
+	cfg.SMTP.Password = envOr("SMTP_PASSWORD", cfg.SMTP.Password)
+	cfg.Internal.AuthServiceURL = envOr("AUTH_SERVICE_URL", cfg.Internal.AuthServiceURL)
+	cfg.Internal.Secret = envOr("INTERNAL_SECRET", cfg.Internal.Secret)
+
+	// Fail-fast : aucun secret par defaut dans le code. docker-compose ou le
+	// Sealed Secret k8s doivent fournir JWT_SECRET (il doit etre identique a
+	// celui d'auth-service, qui signe les tokens).
+	if cfg.JWT.Secret == "" {
+		log.Fatal().Msg("JWT_SECRET est requis : definissez-le dans l'environnement")
+	}
 
 	// Fail-fast : aucun secret par defaut dans le code. docker-compose ou le
 	// Sealed Secret k8s doivent fournir JWT_SECRET (il doit etre identique a

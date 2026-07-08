@@ -47,5 +47,8 @@ func InitRouter() *gin.Engine {
 		protected.GET("/me", controllers.GetMe)
 	}
 
+	// Endpoints internes (secret partage) : reserves aux appels inter-services.
+	router.GET("/internal/users/:id", middlewares.InternalOnly(), controllers.GetUserInternal)
+
 	return router
 }

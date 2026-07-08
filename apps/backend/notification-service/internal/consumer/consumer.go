@@ -14,7 +14,10 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/JTR220/collector/notification-service/config"
+	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/hub"
+	"github.com/JTR220/collector/notification-service/internal/idconv"
+	"github.com/JTR220/collector/notification-service/internal/mailer"
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 )
@@ -57,6 +60,18 @@ func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
 		return err
 	}
 
+	// Queue: commandes (achat en attente de validation vendeur + decision)
+	qOrders, err := ch.QueueDeclare("notification-service.order.events", true, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOrders.Name, "order.created", cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOrders.Name, "order.decided", cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -65,10 +80,12 @@ type Manager struct {
 	hub  *hub.Hub
 	repo *repository.NotificationRepository
 	cfg  *config.Config
+	mail mailer.Mailer
+	auth *authclient.Client
 }
 
-func NewManager(h *hub.Hub, repo *repository.NotificationRepository, cfg *config.Config) *Manager {
-	return &Manager{hub: h, repo: repo, cfg: cfg}
+func NewManager(h *hub.Hub, repo *repository.NotificationRepository, cfg *config.Config, mail mailer.Mailer, auth *authclient.Client) *Manager {
+	return &Manager{hub: h, repo: repo, cfg: cfg, mail: mail, auth: auth}
 }
 
 // Start consomme les deux files (price/fraud) jusqu'a annulation du contexte.
@@ -116,9 +133,10 @@ func (m *Manager) runUntilClosed(ctx context.Context, ch *amqp.Channel, closeCh 
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() { defer wg.Done(); m.consumePriceUpdates(cycleCtx, ch) }()
 	go func() { defer wg.Done(); m.consumeFraudAlerts(cycleCtx, ch) }()
+	go func() { defer wg.Done(); m.consumeOrderEvents(cycleCtx, ch) }()
 	wg.Wait()
 
 	return ctx.Err() == nil
@@ -349,5 +367,160 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 		Str("reason", event.Reason).
 		Msg("fraud alert notification dispatched")
 
+	_ = msg.Ack(false)
+}
+
+// ── Order Events Consumer ────────────────────────────────────────────────────
+
+const queueOrderEvents = "notification-service.order.events"
+
+func (m *Manager) consumeOrderEvents(ctx context.Context, ch *amqp.Channel) {
+	msgs, err := ch.Consume(queueOrderEvents, "notif-order-consumer", false, false, false, false, nil)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to start order consumer")
+		return
+	}
+	log.Info().Msg("order consumer started")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+			switch msg.RoutingKey {
+			case "order.created":
+				m.handleOrderCreated(ctx, msg)
+			case "order.decided":
+				m.handleOrderDecided(ctx, msg)
+			default:
+				_ = msg.Ack(false)
+			}
+		}
+	}
+}
+
+// notifyAndEmail persiste une notification, la pousse en temps reel au
+// destinataire, puis envoie un email si son adresse est resolue via
+// auth-service. L'echec de l'email ne bloque jamais le flux (log uniquement).
+func (m *Manager) notifyAndEmail(ctx context.Context, notif *model.Notification, recipientNumericID uint, emailSubject, emailBody string) {
+	if err := m.repo.Save(ctx, notif); err != nil {
+		log.Error().Err(err).Msg("failed to persist order notification")
+	}
+
+	wsMsg := model.WebSocketMessage{
+		Event: string(notif.Type),
+		Data: map[string]interface{}{
+			"notification_id": notif.ID,
+			"item_id":         notif.ItemID,
+			"title":           notif.Title,
+			"body":            notif.Body,
+			"created_at":      notif.CreatedAt,
+		},
+	}
+	payload, _ := json.Marshal(wsMsg)
+	m.hub.SendToUser(notif.UserID, payload)
+
+	if m.auth == nil {
+		return
+	}
+	user, err := m.auth.GetUser(ctx, recipientNumericID)
+	if err != nil {
+		log.Warn().Err(err).Uint("user_id", recipientNumericID).Msg("email non envoye : resolution utilisateur echouee")
+		return
+	}
+	m.mail.Send(user.Email, emailSubject, emailBody)
+}
+
+func (m *Manager) handleOrderCreated(ctx context.Context, msg amqp.Delivery) {
+	var event model.OrderCreatedEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		log.Error().Err(err).Msg("invalid order.created payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "order.created"))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate order.created ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	title := "🛒 Nouvelle demande d'achat"
+	body := fmt.Sprintf("Un acheteur souhaite acquérir \"%s\" pour %.2f€. Validez ou refusez la commande depuis votre profil.", event.ItemName, event.Price)
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.SellerID,
+		Type:      model.TypeOrderPending,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	emailBody := fmt.Sprintf(
+		"Bonjour,\n\nUn acheteur souhaite acquérir votre annonce \"%s\" pour %.2f€.\n\nConnectez-vous à votre profil Collector.shop pour accepter ou refuser cette commande.\n\n— Collector.shop",
+		event.ItemName, event.Price,
+	)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.SellerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Msg("order.created notification dispatched")
+	_ = msg.Ack(false)
+}
+
+func (m *Manager) handleOrderDecided(ctx context.Context, msg amqp.Delivery) {
+	var event model.OrderDecisionEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		log.Error().Err(err).Msg("invalid order.decided payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "order.decided"))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate order.decided ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	notifType := model.TypeOrderRejected
+	title := "❌ Commande refusée"
+	emailBody := fmt.Sprintf("Bonjour,\n\nLe vendeur a refusé votre commande sur \"%s\" (%.2f€). La pièce est de nouveau disponible à la vente.\n\n— Collector.shop", event.ItemName, event.Price)
+	if event.Accepted {
+		notifType = model.TypeOrderAccepted
+		title = "✅ Commande acceptée"
+		emailBody = fmt.Sprintf("Bonjour,\n\nLe vendeur a accepté votre commande sur \"%s\" (%.2f€). Retrouvez le détail dans votre profil.\n\n— Collector.shop", event.ItemName, event.Price)
+	}
+	body := fmt.Sprintf("Votre commande sur \"%s\" (%.2f€) a été %s par le vendeur.", event.ItemName, event.Price, map[bool]string{true: "acceptée", false: "refusée"}[event.Accepted])
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.BuyerID,
+		Type:      notifType,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.BuyerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Bool("accepted", event.Accepted).Msg("order.decided notification dispatched")
 	_ = msg.Ack(false)
 }

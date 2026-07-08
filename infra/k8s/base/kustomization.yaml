@@ -18,7 +18,6 @@ resources:
   - auth-service/service.yaml
   - catalog-service/deployment.yaml
   - catalog-service/service.yaml
-  - catalog-service/pvc.yaml
   - price-tracker-service/deployment.yaml
   - price-tracker-service/service.yaml
   - notification-service/deployment.yaml

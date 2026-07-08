@@ -9,7 +9,10 @@ export type NotificationType =
 	| 'PRICE_SPIKE'
 	| 'FRAUD_ALERT'
 	| 'NEW_ITEM'
-	| 'ITEM_SOLD';
+	| 'ITEM_SOLD'
+	| 'ORDER_PENDING'
+	| 'ORDER_ACCEPTED'
+	| 'ORDER_REJECTED';
 
 export type NotificationAPI = {
 	id: string;

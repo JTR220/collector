@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
+	import { unreadMessagesCount } from '$lib/stores/messages';
 	import GNotifBell from './GNotifBell.svelte';
 
 	type Props = {
@@ -13,6 +14,7 @@
 	const nav = $derived([
 		{ label: 'Marché', href: '/' },
 		...($auth.user ? [{ label: 'Vendre', href: '/vendre' }] : []),
+		...($auth.user ? [{ label: 'Messages', href: '/messages' }] : []),
 		{ label: 'Profil', href: '/profil' },
 		...($auth.user?.role === 'admin'
 			? [
@@ -49,6 +51,9 @@
 		{#each nav as item}
 			<a href={item.href} class="g-nav-link" class:active={item.label === active}>
 				{item.label}
+				{#if item.label === 'Messages' && $unreadMessagesCount > 0}
+					<span class="g-nav-badge">{$unreadMessagesCount > 99 ? '99+' : $unreadMessagesCount}</span>
+				{/if}
 			</a>
 		{/each}
 	</nav>
@@ -127,6 +132,20 @@
 		color: #ece5da;
 		font-weight: 600;
 		border-bottom-color: #86b3a4;
+	}
+	.g-nav-badge {
+		display: inline-block;
+		min-width: 15px;
+		padding: 1px 4px;
+		margin-left: 4px;
+		border-radius: 999px;
+		background: #86b3a4;
+		color: #191714;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 9px;
+		font-weight: 700;
+		text-align: center;
+		vertical-align: middle;
 	}
 
 	/* User strip */

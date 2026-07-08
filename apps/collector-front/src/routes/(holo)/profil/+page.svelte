@@ -6,6 +6,9 @@
 	import { fetchMyWishlist, type WishlistItem } from '$lib/api/wishlist';
 	import {
 		fetchMyOrders,
+		fetchMySales,
+		acceptOrder,
+		rejectOrder,
 		ORDER_STATUS_LABELS,
 		type Order,
 		type OrderStatus
@@ -20,6 +23,11 @@
 	let loading = $state(true);
 	let wishlist = $state<WishlistItem[]>([]);
 	let orders = $state<Order[]>([]);
+	let sales = $state<Order[]>([]);
+	let salesBusyId = $state<number | null>(null);
+	let salesMsg = $state<string | null>(null);
+
+	const pendingSales = $derived(sales.filter((s) => s.status === 'pending'));
 
 	const initials = $derived(
 		me?.name
@@ -55,14 +63,33 @@
 		}
 		// Wishlist et commandes viennent du catalog-service : une panne de ce
 		// service ne doit PAS deconnecter — on charge ce qui repond.
-		const [w, o] = await Promise.allSettled([
+		const [w, o, s] = await Promise.allSettled([
 			fetchMyWishlist($auth.token),
-			fetchMyOrders($auth.token)
+			fetchMyOrders($auth.token),
+			fetchMySales($auth.token)
 		]);
 		if (w.status === 'fulfilled') wishlist = w.value;
 		if (o.status === 'fulfilled') orders = o.value;
+		if (s.status === 'fulfilled') sales = s.value;
 		loading = false;
 	});
+
+	async function decide(order: Order, accept: boolean) {
+		if (!$auth.token) return;
+		salesBusyId = order.ID;
+		salesMsg = null;
+		try {
+			const { order: updated } = accept
+				? await acceptOrder($auth.token, order.ID)
+				: await rejectOrder($auth.token, order.ID);
+			sales = sales.map((s) => (s.ID === updated.ID ? { ...s, status: updated.status } : s));
+			salesMsg = accept ? 'Commande acceptée.' : 'Commande refusée — la pièce redevient disponible.';
+		} catch (e) {
+			salesMsg = e instanceof Error ? e.message : 'Erreur lors du traitement de la commande.';
+		} finally {
+			salesBusyId = null;
+		}
+	}
 
 	// Historique : flux chronologique fusionnant achats et ajouts wishlist.
 	type Activity = {
@@ -126,6 +153,35 @@
 			<button class="btn-ghost" onclick={logout}>Se déconnecter</button>
 		</div>
 	</section>
+
+	{#if pendingSales.length > 0}
+		<GPanel style="margin-bottom:14px">
+			<Kicker>Ventes à valider · {pendingSales.length}</Kicker>
+			<div class="item-list">
+				{#each pendingSales as s (s.ID)}
+					<div class="sale-row">
+						<span class="item-name">{s.article?.name ?? `Lot #${s.articleId}`}</span>
+						<span class="item-price">{eur(s.price)}</span>
+						<div class="sale-actions">
+							<button
+								class="btn-accept"
+								disabled={salesBusyId === s.ID}
+								onclick={() => decide(s, true)}>Accepter</button
+							>
+							<button
+								class="btn-reject"
+								disabled={salesBusyId === s.ID}
+								onclick={() => decide(s, false)}>Refuser</button
+							>
+						</div>
+					</div>
+				{/each}
+			</div>
+			{#if salesMsg}
+				<p class="action-msg">{salesMsg}</p>
+			{/if}
+		</GPanel>
+	{/if}
 
 	<div class="two-col">
 		<!-- Wishlist -->
@@ -256,6 +312,55 @@
 	.btn-ghost:hover {
 		border-color: rgba(236, 229, 218, 0.22);
 		color: #ece5da;
+	}
+
+	/* Ventes à valider */
+	.sale-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 11px 0;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+	}
+	.sale-actions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.btn-accept,
+	.btn-reject {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		padding: 7px 14px;
+		border-radius: 6px;
+		cursor: pointer;
+		border: none;
+		transition: filter 120ms;
+	}
+	.btn-accept {
+		background: #86b3a4;
+		color: #191714;
+	}
+	.btn-reject {
+		background: transparent;
+		border: 1px solid rgba(215, 156, 134, 0.5);
+		color: #d79c86;
+	}
+	.btn-accept:hover:not(:disabled),
+	.btn-reject:hover:not(:disabled) {
+		filter: brightness(1.1);
+	}
+	.btn-accept:disabled,
+	.btn-reject:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.action-msg {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12.5px;
+		color: #86b3a4;
+		margin-top: 10px;
 	}
 
 	/* 2 colonnes */

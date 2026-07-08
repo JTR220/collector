@@ -9,7 +9,10 @@
 		PRICE_SPIKE: '▲',
 		FRAUD_ALERT: '⚠',
 		NEW_ITEM: '◆',
-		ITEM_SOLD: '✓'
+		ITEM_SOLD: '✓',
+		ORDER_PENDING: '🛒',
+		ORDER_ACCEPTED: '✓',
+		ORDER_REJECTED: '✗'
 	};
 
 	function toggle() {

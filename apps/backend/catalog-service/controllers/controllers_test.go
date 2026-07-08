@@ -29,6 +29,10 @@ func (m *mockPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, new
 		oldPrice, newPrice float64
 	}{itemID, sellerID, oldPrice, newPrice})
 }
+func (m *mockPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+}
+func (m *mockPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+}
 func (m *mockPublisher) Close() {}
 
 func setupCatalogDB(t *testing.T) {

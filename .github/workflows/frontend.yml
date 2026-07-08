@@ -4,7 +4,7 @@ name: Frontend DevSecOps CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - "apps/collector-front/**"
       - ".github/workflows/frontend.yml"
@@ -294,7 +294,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   update-manifests:
     name: GitOps — déploiement staging
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: image
     runs-on: ubuntu-latest
 
@@ -351,7 +351,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   promote-prod:
     name: GitOps — PR de promotion prod
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: update-manifests
     runs-on: ubuntu-latest
 
@@ -397,14 +397,21 @@ jobs:
             echo "Digest déjà à jour en prod, rien à promouvoir."
             exit 0
           fi
-          BRANCH="promote-prod/frontend-${GITHUB_SHA::7}"
-          git checkout -b "$BRANCH"
+          BRANCH="promote-prod/frontend"
+          git checkout -B "$BRANCH"
           git commit -m "ci(gitops): promote frontend ${GITHUB_SHA::7} to prod"
-          git push origin "$BRANCH"
+          git push --force origin "$BRANCH"
+          # Une seule branche/PR de promotion frontend, mise à jour à chaque
+          # push au lieu d'en créer une nouvelle par SHA (évite l'accumulation
+          # de branches promote-prod/frontend-<sha>).
           # "Allow GitHub Actions to create pull requests" peut être désactivé
           # sur le repo : dans ce cas la branche est quand même poussée, il
           # suffit d'ouvrir la PR à la main via le lien ci-dessous.
-          gh pr create --base master --head "$BRANCH" \
-            --title "Promote frontend ${GITHUB_SHA::7} to prod" \
-            --body "Digest validé par le pipeline CI (lint, tests, SAST, SCA, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après." \
-            || echo "::warning::PR non créée automatiquement (permissions GitHub Actions). Ouvre-la à la main : ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/${BRANCH}"
+          if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
+            gh pr create --base master --head "$BRANCH" \
+              --title "Promote frontend to prod" \
+              --body "Digest validé par le pipeline CI (lint, tests, SAST, SCA, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après." \
+              || echo "::warning::PR non créée automatiquement (permissions GitHub Actions). Ouvre-la à la main : ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/${BRANCH}"
+          else
+            gh pr edit "$BRANCH" --body "Digest validé par le pipeline CI (lint, tests, SAST, SCA, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après."
+          fi

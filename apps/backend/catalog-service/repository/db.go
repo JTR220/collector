@@ -395,9 +395,11 @@ func generateCatalog(catID func(string) uint) []models.Article {
 // (par categorie) tant qu'aucune vraie photo n'a été uploadée.
 func backfillArticleImages() {
 	var articles []models.Article
-	// Photos manquantes OU anciennes demos picsum : on (re)pose une image Unsplash themee.
+	// Photos manquantes, anciennes demos picsum ou chemins /uploads herites de
+	// l'ancien endpoint d'upload (retire) : on (re)pose une image Unsplash themee.
 	DB.Preload("Category").
-		Where("image_url IS NULL OR image_url = '' OR image_url LIKE ?", "%picsum.photos%").
+		Where("image_url IS NULL OR image_url = '' OR image_url LIKE ? OR image_url LIKE ?",
+			"%picsum.photos%", "/uploads%").
 		Find(&articles)
 	for i := range articles {
 		url := unsplashURL(articles[i].Category.Name, int(articles[i].ID))

@@ -51,8 +51,19 @@ services:
       DB_PORT: 5432
       FRONTEND_ORIGIN: http://localhost:5173
       JWT_SECRET: collector-jwt-secret-dev
+      # Secret partage avec notification-service pour l'endpoint interne
+      # /internal/users/:id (resolution d'email lors des commandes).
+      INTERNAL_SECRET: collector-internal-secret-dev
     ports:
       - "8080:8080"
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: collector-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI → http://localhost:8025
 
   catalog-service:
     build:
@@ -77,8 +88,6 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
     ports:
       - "8081:8081"
-    volumes:
-      - catalog_uploads:/app/uploads
 
   price-tracker:
     build:
@@ -126,11 +135,20 @@ services:
       # Doit etre identique a auth-service : c'est lui qui signe les tokens.
       JWT_SECRET: "collector-jwt-secret-dev"
       FRONTEND_ORIGIN: http://localhost:5173
+      # Email transactionnel (notification vendeur/acheteur sur les commandes)
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_FROM: "notifications@collector.shop"
+      # Resolution d'email aupres d'auth-service (secret partage)
+      AUTH_SERVICE_URL: "http://auth-service:8080"
+      INTERNAL_SECRET: "collector-internal-secret-dev"
     depends_on:
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      mailhog:
+        condition: service_started
 
   collector-front:
     build:
@@ -155,4 +173,3 @@ services:
 
 volumes:
   postgres_data:
-  catalog_uploads:

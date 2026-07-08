@@ -16,9 +16,11 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/JTR220/collector/notification-service/config"
+	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/consumer"
 	"github.com/JTR220/collector/notification-service/internal/handler"
 	"github.com/JTR220/collector/notification-service/internal/hub"
+	"github.com/JTR220/collector/notification-service/internal/mailer"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 )
 
@@ -67,14 +69,23 @@ func main() {
 	wsHub := hub.New()
 	go wsHub.Run()
 
-	mgr := consumer.NewManager(wsHub, repo, cfg)
+	mail := mailer.New(mailer.SMTPConfig{
+		Host:     cfg.SMTP.Host,
+		Port:     cfg.SMTP.Port,
+		From:     cfg.SMTP.From,
+		User:     cfg.SMTP.User,
+		Password: cfg.SMTP.Password,
+	})
+	authCli := authclient.New(cfg.Internal.AuthServiceURL, cfg.Internal.Secret)
+
+	mgr := consumer.NewManager(wsHub, repo, cfg, mail, authCli)
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(corsMiddleware())
 
-	h := handler.New(wsHub, repo, cfg.JWT.Secret)
+	h := handler.New(wsHub, repo, cfg.JWT.Secret, authCli)
 	h.RegisterRoutes(router)
 
 	srv := &http.Server{

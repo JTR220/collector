@@ -13,13 +13,17 @@ import (
 )
 
 const (
-	exchangeEvents  = "collector.events"
-	routingKeyPrice = "price.updated"
+	exchangeEvents         = "collector.events"
+	routingKeyPrice        = "price.updated"
+	routingKeyOrderCreated = "order.created"
+	routingKeyOrderDecided = "order.decided"
 )
 
 // Publisher publie les evenements metier du catalogue.
 type Publisher interface {
 	PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64)
+	PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64)
+	PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool)
 	Close()
 }
 
@@ -31,7 +35,11 @@ var Current Publisher = NoopPublisher{}
 type NoopPublisher struct{}
 
 func (NoopPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {}
-func (NoopPublisher) Close()                                                                {}
+func (NoopPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+}
+func (NoopPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+}
+func (NoopPublisher) Close() {}
 
 // AMQPPublisher publie sur RabbitMQ. La connexion s'etablit en arriere-plan
 // avec retry : le demarrage du service ne depend jamais du broker.
@@ -149,6 +157,70 @@ func messageID(event PriceUpdatedEvent) string {
 	h := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%.2f|%.2f|%s",
 		event.ItemID, event.SellerID, event.OldPrice, event.NewPrice, event.UpdatedAt.UTC().Format(time.RFC3339Nano))))
 	return hex.EncodeToString(h[:])
+}
+
+// PublishOrderCreated publie order.created quand un acheteur passe commande :
+// le vendeur doit valider ou refuser (notification-service s'en charge, avec
+// notification + email au vendeur).
+func (p *AMQPPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	event := OrderCreatedEvent{
+		OrderID:   ToEventUUID(orderID),
+		ItemID:    ToEventUUID(itemID),
+		ItemName:  itemName,
+		BuyerID:   ToEventUUID(buyerID),
+		SellerID:  ToEventUUID(sellerID),
+		Price:     price,
+		CreatedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOrderCreated, event, fmt.Sprintf("order.created:%d", orderID))
+}
+
+// PublishOrderDecision publie order.decided quand le vendeur accepte ou
+// refuse une commande : l'acheteur est notifie du resultat.
+func (p *AMQPPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	event := OrderDecisionEvent{
+		OrderID:   ToEventUUID(orderID),
+		ItemID:    ToEventUUID(itemID),
+		ItemName:  itemName,
+		BuyerID:   ToEventUUID(buyerID),
+		SellerID:  ToEventUUID(sellerID),
+		Price:     price,
+		Accepted:  accepted,
+		DecidedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOrderDecided, event, fmt.Sprintf("order.decided:%d:%v", orderID, accepted))
+}
+
+// publishJSON serialise et publie un evenement sur l'exchange collector.events.
+// Si le broker est indisponible, l'evenement est abandonne avec un warn : on
+// ne bloque jamais la requete HTTP appelante.
+func (p *AMQPPublisher) publishJSON(routingKey string, event interface{}, msgID string) {
+	body, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("%s non publie (marshal) : %v", routingKey, err)
+		return
+	}
+
+	p.mu.Lock()
+	ch := p.ch
+	p.mu.Unlock()
+	if ch == nil {
+		log.Printf("%s non publie (broker deconnecte)", routingKey)
+		return
+	}
+
+	err = ch.Publish(exchangeEvents, routingKey, false, false, amqp.Publishing{
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent,
+		MessageId:    msgID,
+		Timestamp:    time.Now(),
+		Body:         body,
+	})
+	if err != nil {
+		log.Printf("%s non publie (publish) : %v", routingKey, err)
+		return
+	}
+	log.Printf("%s publie", routingKey)
 }
 
 func (p *AMQPPublisher) Close() {
