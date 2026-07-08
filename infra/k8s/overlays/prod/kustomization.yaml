@@ -1,6 +1,8 @@
-# Overlay PROD — sync MANUEL dans Argo CD (le clic "Sync" est la validation
-# de mise en production). Promotion = copier le digest validé en staging dans
-# ce fichier, via une PR (protection de branche recommandée sur main).
+# Overlay PROD — suivi par Argo CD sur la branche "master" (distincte de
+# "main" utilisée par staging). Promotion = le job promote-prod (voir
+# .github/workflows/*.yml) ouvre une PR main -> master avec le digest validé ;
+# une fois mergée (revue humaine, protection de branche recommandée sur
+# master), le clic "Sync" dans l'UI Argo CD est la validation finale.
 #
 # Le front lit ses URLs d'API au runtime ($env/dynamic/public, PUBLIC_*) : la
 # MÊME image que staging est promue en prod, seule la ConfigMap

@@ -1,6 +1,8 @@
-# Étape 11 — prod : sync MANUEL (pas de bloc automated). Le clic "Sync" dans
-# l'UI d'Argo CD est la validation de mise en production. Le diff est visible
-# avant d'appliquer.
+# Étape 11 — prod : branche dediee "master" (distincte de "main" utilisee par
+# staging). La promotion se fait via une Pull Request main -> master (voir
+# le job "promote-prod" dans .github/workflows/*.yml, qui ouvre la PR sans la
+# merger) : la revue + le merge humain sur GitHub est le premier garde-fou,
+# le clic "Sync" dans l'UI Argo CD (pas de bloc automated) est le second.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -10,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/JTR220/collector.git
-    targetRevision: main
+    targetRevision: master
     path: infra/k8s/overlays/prod
   destination:
     server: https://kubernetes.default.svc

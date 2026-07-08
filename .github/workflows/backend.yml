@@ -410,28 +410,26 @@ jobs:
           git push origin main
 
   # ────────────────────────────────────────────────────────────────────────────
-  # Promotion prod — mêmes digests que staging, poussés seulement si tout le
-  # pipeline (lint, tests, gosec, govulncheck, scans Trivy, signature cosign)
-  # est vert. Argo CD reste en sync MANUEL sur collector-prod : ce job ne fait
-  # que pin les digests, le clic "Sync" dans l'UI Argo CD reste la validation
-  # humaine finale.
+  # Promotion prod — ouvre une Pull Request vers la branche "master" (celle que
+  # suit collector-prod dans Argo CD) avec les digests fraîchement validés. Ne
+  # merge JAMAIS automatiquement : la revue + le clic "Merge" sur GitHub sont
+  # le premier garde-fou humain, le clic "Sync" dans Argo CD le second.
   # ────────────────────────────────────────────────────────────────────────────
   promote-prod:
-    name: GitOps — promotion prod
+    name: GitOps — PR de promotion prod
     if: github.event_name == 'push'
     needs: update-manifests
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
-
-    concurrency:
-      group: gitops-update-manifests
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: master
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v8
         with:
@@ -454,15 +452,21 @@ jobs:
             kustomize edit set image "${name}=${ref}"
           done
 
-      - name: Commit & push
+      - name: Commit, push & open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add infra/k8s/overlays/prod/kustomization.yaml
           if git diff --cached --quiet; then
-            echo "Manifests déjà à jour, rien à committer."
+            echo "Digests déjà à jour en prod, rien à promouvoir."
             exit 0
           fi
+          BRANCH="promote-prod/backend-${GITHUB_SHA::7}"
+          git checkout -b "$BRANCH"
           git commit -m "ci(gitops): promote backend ${GITHUB_SHA::7} to prod"
-          git pull --rebase origin main
-          git push origin main
+          git push origin "$BRANCH"
+          gh pr create --base master --head "$BRANCH" \
+            --title "Promote backend ${GITHUB_SHA::7} to prod" \
+            --body "Digests validés par le pipeline CI (lint, tests, gosec, govulncheck, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après."
