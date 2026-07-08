@@ -52,7 +52,8 @@
 			<a href={item.href} class="g-nav-link" class:active={item.label === active}>
 				{item.label}
 				{#if item.label === 'Messages' && $unreadMessagesCount > 0}
-					<span class="g-nav-badge">{$unreadMessagesCount > 99 ? '99+' : $unreadMessagesCount}</span>
+					<span class="g-nav-badge">{$unreadMessagesCount > 99 ? '99+' : $unreadMessagesCount}</span
+					>
 				{/if}
 			</a>
 		{/each}

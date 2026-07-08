@@ -83,7 +83,9 @@
 				? await acceptOrder($auth.token, order.ID)
 				: await rejectOrder($auth.token, order.ID);
 			sales = sales.map((s) => (s.ID === updated.ID ? { ...s, status: updated.status } : s));
-			salesMsg = accept ? 'Commande acceptée.' : 'Commande refusée — la pièce redevient disponible.';
+			salesMsg = accept
+				? 'Commande acceptée.'
+				: 'Commande refusée — la pièce redevient disponible.';
 		} catch (e) {
 			salesMsg = e instanceof Error ? e.message : 'Erreur lors du traitement de la commande.';
 		} finally {

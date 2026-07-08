@@ -79,9 +79,7 @@
 		}
 	}
 
-	const isOwnArticle = $derived(
-		!!article && !!$auth.user && article.sellerId === $auth.user.id
-	);
+	const isOwnArticle = $derived(!!article && !!$auth.user && article.sellerId === $auth.user.id);
 
 	async function buyNow() {
 		const token = requireAuth();
@@ -91,7 +89,8 @@
 		try {
 			await buyArticle(token, article.ID);
 			article.sold = true;
-			actionMsg = 'Demande d’achat envoyée — le vendeur doit la valider. Vous recevrez une notification.';
+			actionMsg =
+				'Demande d’achat envoyée — le vendeur doit la valider. Vous recevrez une notification.';
 		} catch (e) {
 			actionMsg = e instanceof Error ? e.message : 'Erreur lors de l’achat.';
 		} finally {
@@ -197,7 +196,11 @@
 				{#if article.sold}
 					<button class="btn-primary" disabled>Vendu</button>
 				{:else if isOwnArticle}
-					<button class="btn-primary" disabled title="Vous ne pouvez pas acheter votre propre annonce">
+					<button
+						class="btn-primary"
+						disabled
+						title="Vous ne pouvez pas acheter votre propre annonce"
+					>
 						Votre annonce
 					</button>
 				{:else}
@@ -221,9 +224,12 @@
 						placeholder={`Bonjour, votre annonce "${article.name}" m'intéresse…`}
 						bind:value={contactDraft}
 						disabled={contactBusy}
-						rows="2"
-					></textarea>
-					<button class="btn-primary" disabled={contactBusy || !contactDraft.trim()} onclick={sendContactMessage}>
+						rows="2"></textarea>
+					<button
+						class="btn-primary"
+						disabled={contactBusy || !contactDraft.trim()}
+						onclick={sendContactMessage}
+					>
 						Envoyer
 					</button>
 				</div>

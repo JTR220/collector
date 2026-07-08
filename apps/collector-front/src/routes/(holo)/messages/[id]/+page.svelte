@@ -138,8 +138,7 @@
 				bind:value={draft}
 				onkeydown={onKeydown}
 				disabled={sending}
-				rows="1"
-			></textarea>
+				rows="1"></textarea>
 			<button class="send-btn" disabled={sending || !draft.trim()} onclick={send}>Envoyer</button>
 		</div>
 		{#if error}<p class="error-msg">{error}</p>{/if}
