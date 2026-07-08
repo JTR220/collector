@@ -43,7 +43,7 @@ images:
 - digest: sha256:deda429fc44246fd08e71b08676367ce2c9cd22be9a74453f08eb7c698ad8ea9
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
-- digest: sha256:24a99efcd324a4ad835c63681bed5cf736d7cc507421ddf26cfa270a37b38c94
+- digest: sha256:294fc75ef0488a0dd71908eb817ea62e33ef94d0561f599f975ad1a9fccca19c
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
 - digest: sha256:fd544264653e45a55b806009f4ab639960ec350ba45a37137be32d6f1e889840
