@@ -15,8 +15,7 @@ namespace: collector-prod
 resources:
 - ../../base
 - ingress.yaml
-  # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
-  # - sealed-collector-secrets.yaml
+- sealed-collector-secrets.yaml
 
 configMapGenerator:
   - name: collector-config
