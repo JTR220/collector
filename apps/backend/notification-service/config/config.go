@@ -103,5 +103,12 @@ func Load() *Config {
 		log.Fatal().Msg("JWT_SECRET est requis : definissez-le dans l'environnement")
 	}
 
+	// Fail-fast : aucun secret par defaut dans le code. docker-compose ou le
+	// Sealed Secret k8s doivent fournir JWT_SECRET (il doit etre identique a
+	// celui d'auth-service, qui signe les tokens).
+	if cfg.JWT.Secret == "" {
+		log.Fatal().Msg("JWT_SECRET est requis : definissez-le dans l'environnement")
+	}
+
 	return &cfg
 }
