@@ -199,7 +199,10 @@
 			{@const img = articleImage(article)}
 			<article class="card">
 				<div class="card-eyebrow">
-					<span class="card-cat">{article.category.name} · {article.year}</span>
+					<span class="card-cat"
+						>{article.category.name}{#if article.year}
+							· {article.year}{/if}</span
+					>
 					<span class="card-id">{article.slug || `#${article.ID}`}</span>
 				</div>
 
@@ -222,18 +225,20 @@
 					{#if article.sold}
 						<span class="card-sold">vendu</span>
 					{/if}
-					<span class="card-rarity">{article.rarity}</span>
+					{#if article.rarity}<span class="card-rarity">{article.rarity}</span>{/if}
 				</div>
 
 				<div class="card-body">
 					<div class="card-name-row">
 						<div>
 							<p class="card-name">{article.name}</p>
-							<p class="card-series">{article.series}</p>
+							{#if article.series}<p class="card-series">{article.series}</p>{/if}
 						</div>
-						<div class="card-chips">
-							<GChip>{article.grade}</GChip>
-						</div>
+						{#if article.grade}
+							<div class="card-chips">
+								<GChip>{article.grade}</GChip>
+							</div>
+						{/if}
 					</div>
 
 					<div class="card-divider"></div>

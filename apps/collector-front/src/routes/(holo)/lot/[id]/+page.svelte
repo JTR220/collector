@@ -196,19 +196,25 @@
 			{#if article.sold}
 				<span class="lot-sold">vendu</span>
 			{/if}
-			<span class="lot-rarity">{article.rarity}</span>
+			{#if article.rarity}<span class="lot-rarity">{article.rarity}</span>{/if}
 		</div>
 
 		<!-- Infos -->
 		<div>
-			<Kicker color="#86b3a4">{article.category.name} · {article.year} · {article.slug}</Kicker>
+			<Kicker color="#86b3a4"
+				>{[article.category.name, article.year || null, article.slug || null]
+					.filter(Boolean)
+					.join(' · ')}</Kicker
+			>
 			<h1 class="lot-title">{article.name}</h1>
-			<p class="lot-series">{article.series}</p>
+			{#if article.series}<p class="lot-series">{article.series}</p>{/if}
 
-			<div class="lot-chips">
-				<GChip>{article.grade}</GChip>
-				<GChip>{article.rarity}</GChip>
-			</div>
+			{#if article.grade || article.rarity}
+				<div class="lot-chips">
+					{#if article.grade}<GChip>{article.grade}</GChip>{/if}
+					{#if article.rarity}<GChip>{article.rarity}</GChip>{/if}
+				</div>
+			{/if}
 
 			<p class="lot-desc">{article.description}</p>
 
