@@ -15,6 +15,8 @@ resources:
 
 # Hosts d'API STAGING lus au runtime par le front (remplace les defaults base).
 # HTTPS via Let's Encrypt sur staging.chaker.pro:8443, routage par path.
+  # DNS interne au cluster : notification-service resout le nom du
+  # destinataire d'un message via GET /internal/users/:id sur auth-service
 configMapGenerator:
 - literals:
   - DB_HOST=postgres
@@ -22,8 +24,6 @@ configMapGenerator:
   - DB_NAME=collector
   - DB_USER=postgres
   - FRONTEND_ORIGIN=https://staging.chaker.pro:8443
-  # DNS interne au cluster : notification-service resout le nom du
-  # destinataire d'un message via GET /internal/users/:id sur auth-service
   - AUTH_SERVICE_URL=http://auth-service
   name: collector-config
 - behavior: replace
@@ -44,7 +44,7 @@ images:
 - digest: sha256:3fb0261b5c9fed81859d60be636c5071073f87ac18d08c5390d5f1f173855858
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
-- digest: sha256:dd28cf609b59fce5595bfe0e22033580813b269a5a69d0a07943d3855ce55674
+- digest: sha256:87c0ecf5bbeb8470e923399be01100bf8fabd7c0c70f976f5c0850f02945c6bf
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
 - digest: sha256:76a0e4bbf59bc3712951b0c6e7e89e15457c166a5aaba501711924de00ef46dd
