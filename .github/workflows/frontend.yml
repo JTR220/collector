@@ -401,6 +401,10 @@ jobs:
           git checkout -b "$BRANCH"
           git commit -m "ci(gitops): promote frontend ${GITHUB_SHA::7} to prod"
           git push origin "$BRANCH"
+          # "Allow GitHub Actions to create pull requests" peut être désactivé
+          # sur le repo : dans ce cas la branche est quand même poussée, il
+          # suffit d'ouvrir la PR à la main via le lien ci-dessous.
           gh pr create --base master --head "$BRANCH" \
             --title "Promote frontend ${GITHUB_SHA::7} to prod" \
-            --body "Digest validé par le pipeline CI (lint, tests, SAST, SCA, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après."
+            --body "Digest validé par le pipeline CI (lint, tests, SAST, SCA, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après." \
+            || echo "::warning::PR non créée automatiquement (permissions GitHub Actions). Ouvre-la à la main : ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/${BRANCH}"
