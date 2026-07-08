@@ -13,67 +13,71 @@ kind: Kustomization
 namespace: collector-prod
 
 resources:
-  - ../../base
-  - ingress.yaml
+- ../../base
+- ingress.yaml
   # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
   # - sealed-collector-secrets.yaml
 
-configMapGenerator:
-  - name: collector-config
-    literals:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=collector
-      - DB_USER=postgres
-      - FRONTEND_ORIGIN=http://collector.local
   # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
-  - name: collector-front-config
-    behavior: replace
-    literals:
-      - PUBLIC_AUTH_API_BASE_URL=http://auth.collector.local
-      - PUBLIC_CATALOG_API_BASE_URL=http://api.collector.local
-      - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://price.collector.local
-      - PUBLIC_NOTIFICATION_API_BASE_URL=http://notifications.collector.local
+configMapGenerator:
+- literals:
+  - DB_HOST=postgres
+  - DB_PORT=5432
+  - DB_NAME=collector
+  - DB_USER=postgres
+  - FRONTEND_ORIGIN=http://collector.local
+  name: collector-config
+- behavior: replace
+  literals:
+  - PUBLIC_AUTH_API_BASE_URL=http://auth.collector.local
+  - PUBLIC_CATALOG_API_BASE_URL=http://api.collector.local
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://price.collector.local
+  - PUBLIC_NOTIFICATION_API_BASE_URL=http://notifications.collector.local
+  name: collector-front-config
 
 # Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
 #   - name: ghcr.io/jtr220/collector/auth-service
 #     digest: sha256:abc123...
 images:
-  - name: ghcr.io/jtr220/collector/auth-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/catalog-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/price-tracker-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/notification-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/collector-front
-    newTag: bootstrap
+- digest: sha256:a562df3dc1e217b94c14e744dd12aa70f381ff73071c93b66db0211930b773c6
+  name: ghcr.io/jtr220/collector/auth-service
+  newName: ghcr.io/jtr220/collector/auth-service
+- digest: sha256:15b8ef6e151e9f01eb273d110d8d2a2702ff831264e70224701d7bc10b2a4a4d
+  name: ghcr.io/jtr220/collector/catalog-service
+  newName: ghcr.io/jtr220/collector/catalog-service
+- name: ghcr.io/jtr220/collector/collector-front
+  newTag: bootstrap
+- digest: sha256:f6e961cb8ffcecd64d26ae88d28f4705c04e96e014ad83acef5a33cbf63ecb1f
+  name: ghcr.io/jtr220/collector/notification-service
+  newName: ghcr.io/jtr220/collector/notification-service
+- digest: sha256:0de27cfe79765584fa45a0a01c16f46f929f330484c12386c2a5b3a2af7c6bb5
+  name: ghcr.io/jtr220/collector/price-tracker-service
+  newName: ghcr.io/jtr220/collector/price-tracker-service
 
-patches:
   # Plus de replicas et de ressources en prod.
   # catalog-service reste à 1 replica : son volume uploads est en ReadWriteOnce.
-  - target:
-      kind: Deployment
-      name: auth-service
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 512Mi
-  - target:
-      kind: Deployment
-      name: collector-front
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target:
-      kind: Deployment
-      name: catalog-service
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 512Mi
+patches:
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 512Mi
+  target:
+    kind: Deployment
+    name: auth-service
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+  target:
+    kind: Deployment
+    name: collector-front
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 512Mi
+  target:
+    kind: Deployment
+    name: catalog-service
