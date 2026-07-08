@@ -22,6 +22,10 @@
 	let contactOpen = $state(false);
 	let contactDraft = $state('');
 	let contactBusy = $state(false);
+	let negotiateOpen = $state(false);
+	let negotiatePrice = $state('');
+	let negotiateComment = $state('');
+	let negotiateBusy = $state(false);
 
 	let trackedPrices = $state<number[]>([]);
 
@@ -115,6 +119,38 @@
 			actionMsg = e instanceof Error ? e.message : "Erreur lors de l'envoi du message.";
 		} finally {
 			contactBusy = false;
+		}
+	}
+
+	function openNegotiate() {
+		if (!article) return;
+		negotiatePrice = String(article.prix);
+		negotiateOpen = !negotiateOpen;
+	}
+
+	async function sendNegotiation() {
+		const token = requireAuth();
+		if (!token || !article || isOwnArticle) return;
+		const offer = Number(negotiatePrice);
+		if (!offer || offer <= 0) {
+			actionMsg = 'Indiquez un prix proposé valide.';
+			return;
+		}
+		negotiateBusy = true;
+		try {
+			let body = `Bonjour, seriez-vous prêt à accepter ${eur(offer)} pour "${article.name}" (prix affiché : ${eur(article.prix)}) ?`;
+			if (negotiateComment.trim()) body += `\n${negotiateComment.trim()}`;
+			const sent = await sendMessage(token, {
+				recipientId: toUserUUID(article.sellerId),
+				body,
+				articleId: article.ID,
+				articleName: article.name
+			});
+			goto(`/messages/${sent.conversation_id}`);
+		} catch (e) {
+			actionMsg = e instanceof Error ? e.message : "Erreur lors de l'envoi de l'offre.";
+		} finally {
+			negotiateBusy = false;
 		}
 	}
 
@@ -216,6 +252,9 @@
 						✉ Contacter le vendeur
 					</button>
 				{/if}
+				{#if !isOwnArticle && !article.sold}
+					<button class="btn-ghost" onclick={openNegotiate}>💬 Négocier le prix</button>
+				{/if}
 			</div>
 
 			{#if contactOpen && !isOwnArticle}
@@ -231,6 +270,35 @@
 						onclick={sendContactMessage}
 					>
 						Envoyer
+					</button>
+				</div>
+			{/if}
+
+			{#if negotiateOpen && !isOwnArticle && !article.sold}
+				<div class="negotiate-box">
+					<label class="negotiate-field">
+						<span class="negotiate-lbl">Votre offre (€)</span>
+						<input
+							class="negotiate-in"
+							type="number"
+							min="1"
+							step="0.01"
+							bind:value={negotiatePrice}
+							disabled={negotiateBusy}
+						/>
+					</label>
+					<textarea
+						class="negotiate-comment"
+						placeholder="Message facultatif…"
+						bind:value={negotiateComment}
+						disabled={negotiateBusy}
+						rows="2"></textarea>
+					<button
+						class="btn-primary"
+						disabled={negotiateBusy || !negotiatePrice}
+						onclick={sendNegotiation}
+					>
+						Envoyer l'offre
 					</button>
 				</div>
 			{/if}
@@ -500,6 +568,58 @@
 	.contact-box textarea:focus {
 		outline: none;
 		border-color: #86b3a4;
+	}
+
+	.negotiate-box {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-top: 12px;
+		padding: 12px;
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.02);
+	}
+	.negotiate-field {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		max-width: 180px;
+	}
+	.negotiate-lbl {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 11px;
+		color: #a39a8c;
+	}
+	.negotiate-in {
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		border-radius: 7px;
+		padding: 8px 10px;
+		color: #ece5da;
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 13px;
+	}
+	.negotiate-in:focus {
+		outline: none;
+		border-color: #86b3a4;
+	}
+	.negotiate-comment {
+		resize: vertical;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(236, 229, 218, 0.14);
+		border-radius: 8px;
+		padding: 9px 12px;
+		color: #ece5da;
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 13px;
+	}
+	.negotiate-comment:focus {
+		outline: none;
+		border-color: #86b3a4;
+	}
+	.negotiate-box .btn-primary {
+		align-self: flex-start;
 	}
 
 	.action-msg {

@@ -231,6 +231,17 @@
 					<span class="demo-role">Acheteur</span>
 					<span class="demo-creds">acheteur@collector.shop · acheteur123</span>
 				</button>
+				<button
+					type="button"
+					class="demo-row"
+					onclick={() => {
+						email = 'vault@collector.shop';
+						password = 'vault123';
+					}}
+				>
+					<span class="demo-role">Collector Vault</span>
+					<span class="demo-creds">vault@collector.shop · vault123</span>
+				</button>
 			</div>
 		</div>
 	</div>

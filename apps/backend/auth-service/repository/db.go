@@ -64,6 +64,10 @@ func seedUsers() {
 		// notifications (commande creee/acceptee, alerte prix) de bout en bout.
 		{"Vendeur Demo", "vendeur@collector.shop", "vendeur123", "user"},
 		{"Acheteur Demo", "acheteur@collector.shop", "acheteur123", "user"},
+		// Compte du vendeur "collector_vault" (catalog-service : catalogue
+		// etendu genere par generateCatalog, Seller = "collector_vault") afin
+		// de pouvoir se connecter et gerer ces annonces depuis le profil.
+		{"Collector Vault", "vault@collector.shop", "vault123", "user"},
 	}
 
 	for _, c := range comptes {
@@ -87,5 +91,6 @@ func seedUsers() {
 		}
 	}
 	log.Println("Seed comptes : admin@collector.shop / admin123 · test@collector.shop / test123 · " +
+		"vault@collector.shop / vault123 · " +
 		"vendeur@collector.shop / vendeur123 · acheteur@collector.shop / acheteur123")
 }

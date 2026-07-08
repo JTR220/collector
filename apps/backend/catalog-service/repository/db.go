@@ -48,6 +48,7 @@ func InitDB() {
 func SeedData() {
 	defer backfillArticleImages()
 	defer backfillDemoOrders()
+	defer backfillCollectorVault()
 	defer backfillSellerAssignments()
 
 	// Categories idempotentes (FirstOrCreate par nom) : le seed peut tourner
@@ -425,6 +426,27 @@ func backfillSellerAssignments() {
 		if res.RowsAffected > 0 {
 			log.Printf("Compte demo (ID %d) assigne a %d piece(s)", a.ownerID, res.RowsAffected)
 		}
+	}
+}
+
+// backfillCollectorVault relie tout le catalogue etendu (generateCatalog,
+// Seller = "collector_vault") au compte de demo "Collector Vault"
+// (auth-service, seed en dernier des comptes de demo : ID 5 sur une base
+// fraiche, voir seedUsers) afin de pouvoir se connecter et gerer ces
+// annonces depuis le profil. Idempotent (ne touche que les pieces encore
+// sans vendeur).
+func backfillCollectorVault() {
+	const collectorVaultID = 5
+
+	res := DB.Model(&models.Article{}).
+		Where("seller = ? AND seller_id = 0", "collector_vault").
+		Update("seller_id", collectorVaultID)
+	if res.Error != nil {
+		log.Printf("Erreur affectation collector_vault : %v", res.Error)
+		return
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("Compte collector_vault (ID %d) assigne a %d piece(s)", collectorVaultID, res.RowsAffected)
 	}
 }
 
