@@ -437,6 +437,7 @@ func backfillSellerAssignments() {
 //     une notification ORDER_PENDING a traiter dans son profil.
 //   - WAT-045 reste volontairement disponible (aucune commande) : elle sert
 //     de support a la negociation par message (notification-service).
+//
 // Idempotent : ne cree la commande que si aucune n'existe deja pour ce
 // couple (article, acheteur). Pas de publication d'evenement AMQP ici : les
 // notifications correspondantes sont seedees directement cote
