@@ -5,7 +5,9 @@ metadata:
   labels:
     app: catalog-service
 spec:
-  # Service stateless (plus de volume uploads) : scalable horizontalement.
+  # replicas: 1 impose par le volume ReadWriteOnce (catalog-uploads) : un
+  # scaling horizontal necessiterait un stockage RWX (ex. NFS) ou de deporter
+  # les photos vers un stockage objet (S3/MinIO).
   replicas: 1
   selector:
     matchLabels:
@@ -68,3 +70,12 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
+          volumeMounts:
+            # Seul repertoire inscriptible : le reste du systeme de fichiers
+            # reste en lecture seule (readOnlyRootFilesystem ci-dessus).
+            - name: uploads
+              mountPath: /data/uploads
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: catalog-uploads

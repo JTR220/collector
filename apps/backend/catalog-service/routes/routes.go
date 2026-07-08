@@ -5,6 +5,7 @@ import (
 	"catalog-service/middlewares"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,6 +35,21 @@ func InitRouter() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
+	// Photos uploadees : servies en pur statique (aucune execution possible),
+	// X-Content-Type-Options: nosniff empeche le navigateur de reinterpreter
+	// un fichier comme un autre type que celui detecte a l'upload.
+	uploadDir := os.Getenv("UPLOAD_DIR")
+	if uploadDir == "" {
+		uploadDir = "/data/uploads"
+	}
+	router.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
+			c.Header("X-Content-Type-Options", "nosniff")
+		}
+		c.Next()
+	})
+	router.StaticFS("/uploads", gin.Dir(uploadDir, false))
+
 	// Routes publiques (lecture catalogue sans authentification)
 	router.GET("/article", controllers.GetAllArticles)
 	router.GET("/article/:id", controllers.GetArticle)
@@ -46,6 +62,7 @@ func InitRouter() *gin.Engine {
 		protected.POST("/article", controllers.CreateArticle)
 		protected.PUT("/article/:id", controllers.UpdateArticle)
 		protected.DELETE("/article/:id", controllers.DeleteArticle)
+		protected.POST("/article/:id/image", controllers.UploadArticleImage)
 		protected.GET("/me/articles", controllers.GetMyArticles)
 
 		// Achats

@@ -88,6 +88,8 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
     ports:
       - "8081:8081"
+    volumes:
+      - catalog_uploads:/data/uploads
 
   price-tracker:
     build:
@@ -173,3 +175,4 @@ services:
 
 volumes:
   postgres_data:
+  catalog_uploads:

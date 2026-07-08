@@ -127,3 +127,28 @@ export async function fetchMyArticles(token: string): Promise<ArticleAPI[]> {
 		errorPrefix: 'catalog-service'
 	});
 }
+
+/**
+ * Envoie une photo pour une annonce existante (multipart). Ne passe pas par
+ * apiRequest : celui-ci force Content-Type: application/json dès qu'un body
+ * est présent, ce qui casserait le multipart (le navigateur doit fixer
+ * lui-même le boundary).
+ */
+export async function uploadArticleImage(
+	token: string,
+	id: number,
+	file: File
+): Promise<ArticleAPI> {
+	const form = new FormData();
+	form.append('image', file);
+	const res = await fetch(`${BASE_URL}/article/${id}/image`, {
+		method: 'POST',
+		headers: { Authorization: `Bearer ${token}` },
+		body: form
+	});
+	const data = await res.json().catch(() => ({}) as { article?: ArticleAPI; error?: string });
+	if (!res.ok) {
+		throw new Error(data.error ?? `catalog-service error: ${res.status}`);
+	}
+	return data.article as ArticleAPI;
+}

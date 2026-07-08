@@ -8,6 +8,7 @@
 		fetchArticle,
 		createArticle,
 		updateArticle,
+		uploadArticleImage,
 		type CategoryAPI,
 		type NewArticleInput
 	} from '$lib/api/catalog';
@@ -33,6 +34,23 @@
 	let rarity = $state('');
 	let grade = $state('');
 	let imageUrl = $state('');
+	let photoFile = $state<File | null>(null);
+	let photoError = $state('');
+
+	const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
+	function onPhotoChange(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const f = input.files?.[0] ?? null;
+		photoError = '';
+		if (f && f.size > MAX_PHOTO_SIZE) {
+			photoError = 'Fichier trop volumineux (5 Mo max).';
+			photoFile = null;
+			input.value = '';
+			return;
+		}
+		photoFile = f;
+	}
 
 	onMount(async () => {
 		if (!$isAuthenticated || !$auth.token) {
@@ -81,6 +99,7 @@
 					categoryId: Number(categoryId),
 					imageUrl: imageUrl.trim() || undefined
 				});
+				if (photoFile) await uploadArticleImage($auth.token, Number(editId), photoFile);
 				goto(`/lot/${editId}`);
 				return;
 			}
@@ -97,6 +116,7 @@
 				imageUrl: imageUrl.trim() || undefined
 			};
 			const created = await createArticle($auth.token, input);
+			if (photoFile) await uploadArticleImage($auth.token, created.ID, photoFile);
 			goto(`/lot/${created.ID}`);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Opération impossible.';
@@ -221,11 +241,23 @@
 					<input class="in" bind:value={grade} placeholder="PSA 9" disabled={!!editId} />
 				</label>
 				<label class="field span-2">
-					<span class="lbl">URL de la photo (https uniquement)</span>
+					<span class="lbl">Photo (fichier, 5 Mo max)</span>
+					<input
+						class="in in-file"
+						type="file"
+						accept="image/jpeg,image/png,image/webp,image/gif"
+						onchange={onPhotoChange}
+					/>
+					{#if photoFile}<span class="photo-picked">{photoFile.name} sélectionné</span>{/if}
+					{#if photoError}<span class="photo-err">{photoError}</span>{/if}
+				</label>
+				<label class="field span-2">
+					<span class="lbl">…ou URL de la photo (https uniquement)</span>
 					<input
 						class="in"
 						type="url"
 						bind:value={imageUrl}
+						disabled={!!photoFile}
 						placeholder={editId
 							? 'https://…  (laissez vide pour garder la photo actuelle)'
 							: 'https://…  (laissez vide pour une photo par défaut)'}
@@ -336,6 +368,20 @@
 	.in:disabled {
 		opacity: 0.45;
 		cursor: not-allowed;
+	}
+	.in-file {
+		padding: 8px 10px;
+		font-size: 13px;
+	}
+	.photo-picked {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		color: #86b3a4;
+	}
+	.photo-err {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		color: #d79c86;
 	}
 	.area {
 		min-height: 92px;
