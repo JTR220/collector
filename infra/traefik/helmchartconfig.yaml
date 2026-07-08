@@ -21,5 +21,6 @@ spec:
     ports:
       staging:
         port: 8443
-        exposedPort: 8443
+        expose:
+          default: true
         protocol: TCP
