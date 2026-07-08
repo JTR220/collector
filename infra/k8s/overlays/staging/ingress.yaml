@@ -1,75 +1,90 @@
-# Routage host-based (k3d/k3s : Traefik est l'ingress class par défaut).
-# Pas de nom de domaine possede -> hosts en <sous-domaine>.51.255.199.160.nip.io
-# (DNS public gratuit qui resout vers l'IP embarquee dans le nom, ce qui
-# permet un vrai certificat Let's Encrypt sans rien configurer cote DNS).
-# Traefik gere nativement l'upgrade WebSocket (/ws) — aucune annotation requise.
-#
-# Validation effectuee le 2026-07-07 avec letsencrypt-staging (challenge
-# HTTP-01 confirme OK, Certificate Ready=True) avant bascule sur
-# letsencrypt-prod ci-dessous pour un certificat fiable par les navigateurs.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+# Routage par path sur IP nue (k3d/k3s : Traefik est l'ingress class par defaut).
+# Pas de nom de domaine possede, et une IP ne peut pas porter de sous-domaines
+# -> un seul host (l'IP), les services sont distingues par prefixe de chemin
+# (/auth, /api, /price, /notifications), strip via Middleware Traefik.
+# TLS via certificat self-signed avec l'IP en SAN (voir certificate.yaml et
+# infra/cert-manager/cluster-issuer.yaml) : Let's Encrypt n'emet pas de
+# certificat pour une IP nue.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-auth-prefix
+spec:
+  stripPrefix:
+    prefixes:
+      - /auth
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-api-prefix
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-price-prefix
+spec:
+  stripPrefix:
+    prefixes:
+      - /price
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-notifications-prefix
+spec:
+  stripPrefix:
+    prefixes:
+      - /notifications
+---
+# IngressRoute (CRD Traefik) plutot qu'un Ingress standard : necessaire pour
+# appliquer un Middleware different par path (un Ingress "vanilla" applique
+# ses middlewares a toutes les routes, ce qui stripperait /auth des requetes
+# destinees a /api etc.)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: collector
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
+  entryPoints:
+    - websecure
   tls:
-    - hosts:
-        - collector.51.255.199.160.nip.io
-        - auth.51.255.199.160.nip.io
-        - api.51.255.199.160.nip.io
-        - price.51.255.199.160.nip.io
-        - notifications.51.255.199.160.nip.io
-      secretName: collector-staging-tls
-  rules:
-    - host: collector.51.255.199.160.nip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: collector-front
-                port:
-                  name: http
-    - host: auth.51.255.199.160.nip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: auth-service
-                port:
-                  name: http
-    - host: api.51.255.199.160.nip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: catalog-service
-                port:
-                  name: http
-    - host: price.51.255.199.160.nip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: price-tracker-service
-                port:
-                  name: http
-    - host: notifications.51.255.199.160.nip.io
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: notification-service
-                port:
-                  name: http
+    secretName: collector-selfsigned-tls
+  routes:
+    - match: PathPrefix(`/auth`)
+      kind: Rule
+      middlewares:
+        - name: strip-auth-prefix
+      services:
+        - name: auth-service
+          port: http
+    - match: PathPrefix(`/api`)
+      kind: Rule
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: catalog-service
+          port: http
+    - match: PathPrefix(`/price`)
+      kind: Rule
+      middlewares:
+        - name: strip-price-prefix
+      services:
+        - name: price-tracker-service
+          port: http
+    - match: PathPrefix(`/notifications`)
+      kind: Rule
+      middlewares:
+        - name: strip-notifications-prefix
+      services:
+        - name: notification-service
+          port: http
+    - match: PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: collector-front
+          port: http

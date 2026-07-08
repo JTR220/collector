@@ -10,25 +10,27 @@ namespace: collector-staging
 resources:
 - ../../base
 - ingress.yaml
+- certificate.yaml
 - sealed-collector-secrets.yaml
 
 # Hosts d'API STAGING lus au runtime par le front (remplace les defaults base).
-# HTTPS via cert-manager/Let's Encrypt (infra/cert-manager) sur des hosts
-# nip.io (pas de nom de domaine possede, voir ingress.yaml).
+# HTTPS via certificat self-signed sur IP nue, routage par path (voir
+# ingress.yaml et certificate.yaml) : plus de sous-domaines nip.io (bloques
+# par certains proxys reseau).
 configMapGenerator:
 - literals:
   - DB_HOST=postgres
   - DB_PORT=5432
   - DB_NAME=collector
   - DB_USER=postgres
-  - FRONTEND_ORIGIN=https://collector.51.255.199.160.nip.io
+  - FRONTEND_ORIGIN=https://51.255.199.160
   name: collector-config
 - behavior: replace
   literals:
-  - PUBLIC_AUTH_API_BASE_URL=https://auth.51.255.199.160.nip.io
-  - PUBLIC_CATALOG_API_BASE_URL=https://api.51.255.199.160.nip.io
-  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.51.255.199.160.nip.io
-  - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.51.255.199.160.nip.io
+  - PUBLIC_AUTH_API_BASE_URL=https://51.255.199.160/auth
+  - PUBLIC_CATALOG_API_BASE_URL=https://51.255.199.160/api
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://51.255.199.160/price
+  - PUBLIC_NOTIFICATION_API_BASE_URL=https://51.255.199.160/notifications
   name: collector-front-config
 
 # "bootstrap" est un placeholder : remplacé par un digest immuable

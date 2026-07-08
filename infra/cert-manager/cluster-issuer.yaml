@@ -34,3 +34,16 @@ spec:
       - http01:
           ingress:
             ingressClassName: traefik
+---
+# Let's Encrypt exige un nom de domaine dans le certificat (HTTP-01 solver) ;
+# une IP nue n'est pas eligible. Ce ClusterIssuer signe donc localement un
+# certificat X.509 avec l'IP en Subject Alternative Name (voir
+# infra/k8s/overlays/staging/certificate.yaml) : HTTPS fonctionne mais le
+# navigateur affiche un avertissement "certificat non fiable" (a accepter
+# manuellement une fois).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}

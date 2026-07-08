@@ -1,0 +1,16 @@
+# Certificat self-signed avec l'IP publique en SAN (Let's Encrypt ne delivre
+# pas de certificat pour une IP nue). Le navigateur affichera un avertissement
+# "certificat non fiable" a accepter manuellement (voir infra/cert-manager/cluster-issuer.yaml).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: collector-selfsigned-tls
+spec:
+  secretName: collector-selfsigned-tls
+  ipAddresses:
+    - 51.255.199.160
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  duration: 8760h # 1 an
+  renewBefore: 720h # 30 jours
