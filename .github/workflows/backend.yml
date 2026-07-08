@@ -49,6 +49,25 @@ jobs:
       run:
         working-directory: apps/backend/${{ matrix.service }}
 
+    # Postgres ephemere pour les tests d'integration de notification-service
+    # (requetes Postgres-specifiques : gen_random_uuid(), UUID, DISTINCT ON —
+    # non simulables en sqlite). Inoffensif pour les autres services de la
+    # matrice, qui ne lisent pas TEST_DATABASE_DSN.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: notification_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v7
 
@@ -77,6 +96,11 @@ jobs:
           working-directory: apps/backend/${{ matrix.service }}
 
       - name: Run Tests (avec détecteur de data races)
+        # TEST_DATABASE_DSN n'est consomme que par les tests d'integration de
+        # notification-service (repository_integration_test.go,
+        # handler_integration_test.go) ; les autres services l'ignorent.
+        env:
+          TEST_DATABASE_DSN: postgres://postgres:postgres@localhost:5432/notification_test?sslmode=disable
         run: |
           go test -race \
             -covermode=atomic \
