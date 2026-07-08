@@ -39,9 +39,6 @@ func InitRouter() *gin.Engine {
 	router.GET("/article/:id", controllers.GetArticle)
 	router.GET("/category", controllers.GetAllCategories)
 
-	// Photos d'articles uploadées (servies en statique)
-	router.Static("/uploads", "./uploads")
-
 	// Routes protégées (écriture réservée aux utilisateurs authentifiés)
 	protected := router.Group("/")
 	protected.Use(middlewares.AuthRequired())
@@ -53,6 +50,9 @@ func InitRouter() *gin.Engine {
 		// Achats
 		protected.POST("/article/:id/buy", controllers.BuyArticle)
 		protected.GET("/me/orders", controllers.GetMyOrders)
+		protected.GET("/me/sales", controllers.GetMySales)
+		protected.PATCH("/order/:id/accept", controllers.AcceptOrder)
+		protected.PATCH("/order/:id/reject", controllers.RejectOrder)
 
 		// Wishlist
 		protected.GET("/me/wishlist", controllers.GetMyWishlist)

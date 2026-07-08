@@ -21,3 +21,27 @@ type PriceUpdatedEvent struct {
 func ToEventUUID(id uint) string {
 	return fmt.Sprintf("00000000-0000-0000-0000-%012x", id)
 }
+
+// OrderCreatedEvent est publie quand un acheteur passe commande sur une
+// annonce : le vendeur doit valider ou refuser avant que la vente soit actee.
+type OrderCreatedEvent struct {
+	OrderID   string    `json:"order_id"`
+	ItemID    string    `json:"item_id"`
+	ItemName  string    `json:"item_name"`
+	BuyerID   string    `json:"buyer_id"`
+	SellerID  string    `json:"seller_id"`
+	Price     float64   `json:"price"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// OrderDecisionEvent est publie quand le vendeur accepte ou refuse une commande.
+type OrderDecisionEvent struct {
+	OrderID   string    `json:"order_id"`
+	ItemID    string    `json:"item_id"`
+	ItemName  string    `json:"item_name"`
+	BuyerID   string    `json:"buyer_id"`
+	SellerID  string    `json:"seller_id"`
+	Price     float64   `json:"price"`
+	Accepted  bool      `json:"accepted"`
+	DecidedAt time.Time `json:"decided_at"`
+}

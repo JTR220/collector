@@ -1,9 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -11,7 +16,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 
+	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/hub"
+	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 	"github.com/JTR220/collector/notification-service/internal/response"
 )
@@ -43,13 +50,15 @@ type Handler struct {
 	hub       *hub.Hub
 	repo      *repository.NotificationRepository
 	jwtSecret []byte
+	auth      *authclient.Client
 }
 
-func New(h *hub.Hub, repo *repository.NotificationRepository, jwtSecret string) *Handler {
+func New(h *hub.Hub, repo *repository.NotificationRepository, jwtSecret string, auth *authclient.Client) *Handler {
 	return &Handler{
 		hub:       h,
 		repo:      repo,
 		jwtSecret: []byte(jwtSecret),
+		auth:      auth,
 	}
 }
 
@@ -68,6 +77,12 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 			auth.PUT("/notifications/:id/read", h.MarkRead)
 			auth.PUT("/notifications/read-all", h.MarkAllRead)
 			auth.GET("/notifications/unread-count", h.UnreadCount)
+
+			// Messagerie directe entre utilisateurs (ex: acheteur ↔ vendeur).
+			auth.POST("/messages", h.SendMessage)
+			auth.GET("/conversations", h.GetConversations)
+			auth.GET("/conversations/:id/messages", h.GetConversationMessages)
+			auth.PUT("/conversations/:id/read", h.MarkConversationRead)
 		}
 	}
 }
@@ -222,17 +237,23 @@ func (h *Handler) JWTMiddleware() gin.HandlerFunc {
 			return
 		}
 		tokenStr := authHeader[7:]
-		userID, err := h.extractUserIDFromToken(tokenStr)
+		userID, name, err := h.extractUserFromToken(tokenStr)
 		if err != nil {
 			response.AbortError(c, http.StatusUnauthorized, "invalid token")
 			return
 		}
 		c.Set("user_id", userID)
+		c.Set("user_name", name)
 		c.Next()
 	}
 }
 
 func (h *Handler) extractUserIDFromToken(tokenStr string) (uuid.UUID, error) {
+	id, _, err := h.extractUserFromToken(tokenStr)
+	return id, err
+}
+
+func (h *Handler) extractUserFromToken(tokenStr string) (uuid.UUID, string, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
@@ -240,23 +261,205 @@ func (h *Handler) extractUserIDFromToken(tokenStr string) (uuid.UUID, error) {
 		return h.jwtSecret, nil
 	})
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, "", err
 	}
 	// Ne jamais renvoyer (uuid.Nil, nil) : un token non valide sans erreur de
 	// parsing doit quand meme etre rejete par l'appelant.
 	if !token.Valid {
-		return uuid.Nil, jwt.ErrTokenUnverifiable
+		return uuid.Nil, "", jwt.ErrTokenUnverifiable
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return uuid.Nil, jwt.ErrTokenInvalidClaims
+		return uuid.Nil, "", jwt.ErrTokenInvalidClaims
 	}
 
 	sub, ok := claims["sub"].(string)
 	if !ok {
-		return uuid.Nil, jwt.ErrTokenInvalidClaims
+		return uuid.Nil, "", jwt.ErrTokenInvalidClaims
 	}
 
-	return uuid.Parse(sub)
+	id, err := uuid.Parse(sub)
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+
+	name, _ := claims["name"].(string)
+	return id, name, nil
+}
+
+// ── Messagerie ──────────────────────────────────────────────────────────────
+
+// conversationID derive un identifiant deterministe et stable pour un fil de
+// discussion entre deux utilisateurs, eventuellement au sujet d'une annonce
+// precise (ordre des participants indifferent).
+func conversationID(a, b uuid.UUID, articleID *uuid.UUID) uuid.UUID {
+	ids := []string{a.String(), b.String()}
+	sort.Strings(ids)
+	key := ids[0] + ":" + ids[1]
+	if articleID != nil {
+		key += ":" + articleID.String()
+	}
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(key))
+}
+
+type sendMessageInput struct {
+	RecipientID string `json:"recipient_id" binding:"required"`
+	ArticleID   string `json:"article_id"`
+	ArticleName string `json:"article_name"`
+	Body        string `json:"body" binding:"required"`
+}
+
+// SendMessage godoc
+// @Summary     Envoie un message a un autre utilisateur
+// @Tags        messages
+// @Security    BearerAuth
+// @Router      /api/v1/messages [post]
+func (h *Handler) SendMessage(c *gin.Context) {
+	var input sendMessageInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.Error(c, http.StatusBadRequest, "donnees invalides")
+		return
+	}
+	body := strings.TrimSpace(input.Body)
+	if body == "" {
+		response.Error(c, http.StatusBadRequest, "message vide")
+		return
+	}
+	if len(body) > 2000 {
+		response.Error(c, http.StatusBadRequest, "message trop long (2000 caracteres max)")
+		return
+	}
+
+	recipientID, err := uuid.Parse(input.RecipientID)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "destinataire invalide")
+		return
+	}
+
+	senderID := c.MustGet("user_id").(uuid.UUID)
+	if senderID == recipientID {
+		response.Error(c, http.StatusBadRequest, "vous ne pouvez pas vous envoyer un message")
+		return
+	}
+	senderName, _ := c.Get("user_name")
+	senderNameStr, _ := senderName.(string)
+	if senderNameStr == "" {
+		senderNameStr = "Utilisateur"
+	}
+
+	recipientName := "Utilisateur"
+	if h.auth != nil {
+		if user, err := h.auth.GetUser(c.Request.Context(), fromEventUUID(recipientID)); err == nil {
+			recipientName = user.Name
+		} else {
+			log.Warn().Err(err).Str("recipient_id", recipientID.String()).Msg("resolution destinataire echouee")
+		}
+	}
+
+	var articleID *uuid.UUID
+	if input.ArticleID != "" {
+		if parsed, err := uuid.Parse(input.ArticleID); err == nil {
+			articleID = &parsed
+		}
+	}
+
+	msg := &model.Message{
+		ID:             uuid.New(),
+		ConversationID: conversationID(senderID, recipientID, articleID),
+		SenderID:       senderID,
+		SenderName:     senderNameStr,
+		RecipientID:    recipientID,
+		RecipientName:  recipientName,
+		ArticleID:      articleID,
+		ArticleName:    input.ArticleName,
+		Body:           body,
+		Read:           false,
+		CreatedAt:      time.Now(),
+	}
+
+	if err := h.repo.SaveMessage(c.Request.Context(), msg); err != nil {
+		log.Error().Err(err).Msg("failed to persist message")
+		response.Error(c, http.StatusInternalServerError, "impossible d'envoyer le message")
+		return
+	}
+
+	wsMsg := model.WebSocketMessage{Event: "NEW_MESSAGE", Data: msg}
+	payload, _ := json.Marshal(wsMsg)
+	h.hub.SendToUser(recipientID, payload)
+	h.hub.SendToUser(senderID, payload)
+
+	c.JSON(http.StatusCreated, gin.H{"message": msg})
+}
+
+// GetConversations godoc
+// @Summary     Liste les fils de discussion de l'utilisateur authentifie
+// @Tags        messages
+// @Security    BearerAuth
+// @Router      /api/v1/conversations [get]
+func (h *Handler) GetConversations(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	convs, err := h.repo.GetConversations(c.Request.Context(), userID)
+	if err != nil {
+		log.Error().Err(err).Msg("GetConversations failed")
+		response.Error(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"conversations": convs})
+}
+
+// GetConversationMessages godoc
+// @Summary     Historique des messages d'un fil de discussion
+// @Tags        messages
+// @Param       id  path  string  true  "Conversation UUID"
+// @Security    BearerAuth
+// @Router      /api/v1/conversations/{id}/messages [get]
+func (h *Handler) GetConversationMessages(c *gin.Context) {
+	convID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "identifiant de conversation invalide")
+		return
+	}
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	msgs, err := h.repo.GetMessages(c.Request.Context(), convID, userID, 200)
+	if err != nil {
+		log.Error().Err(err).Msg("GetConversationMessages failed")
+		response.Error(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"messages": msgs})
+}
+
+// MarkConversationRead godoc
+// @Summary     Marque les messages recus d'un fil comme lus
+// @Tags        messages
+// @Param       id  path  string  true  "Conversation UUID"
+// @Security    BearerAuth
+// @Router      /api/v1/conversations/{id}/read [put]
+func (h *Handler) MarkConversationRead(c *gin.Context) {
+	convID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "identifiant de conversation invalide")
+		return
+	}
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	if err := h.repo.MarkConversationRead(c.Request.Context(), convID, userID); err != nil {
+		response.Error(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
+}
+
+// fromEventUUID inverse le mapping deterministe ID numerique -> UUID utilise
+// par auth-service/catalog-service ("00000000-0000-0000-0000-<hex id>").
+func fromEventUUID(id uuid.UUID) uint {
+	s := id.String()
+	if len(s) < 12 {
+		return 0
+	}
+	var n uint64
+	_, _ = fmt.Sscanf(s[len(s)-12:], "%x", &n)
+	return uint(n)
 }

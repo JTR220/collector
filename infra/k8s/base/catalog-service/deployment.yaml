@@ -5,7 +5,7 @@ metadata:
   labels:
     app: catalog-service
 spec:
-  # NB : 1 replica tant que le volume uploads est en ReadWriteOnce
+  # Service stateless (plus de volume uploads) : scalable horizontalement.
   replicas: 1
   selector:
     matchLabels:
@@ -21,8 +21,6 @@ spec:
         # nonroot de l'image distroless
         runAsUser: 65532
         runAsGroup: 65532
-        # rend le volume uploads inscriptible par nonroot
-        fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -70,10 +68,3 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-          volumeMounts:
-            - name: uploads
-              mountPath: /app/uploads
-      volumes:
-        - name: uploads
-          persistentVolumeClaim:
-            claimName: catalog-uploads

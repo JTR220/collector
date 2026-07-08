@@ -40,7 +40,7 @@ export type ArticleAPI = {
 	category: CategoryAPI;
 };
 
-/** Résout l'URL d'affichage de la photo d'un article (chemin /uploads servi par le catalog-service, ou URL absolue). */
+/** Résout l'URL d'affichage de la photo d'un article (URL absolue, ou chemin relatif hérité résolu sur le catalog-service). */
 export function articleImage(article: Pick<ArticleAPI, 'imageUrl'>): string | null {
 	if (!article.imageUrl) return null;
 	return article.imageUrl.startsWith('http') ? article.imageUrl : `${BASE_URL}${article.imageUrl}`;

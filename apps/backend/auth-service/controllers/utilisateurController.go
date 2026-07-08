@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"auth-service/config"
 	"auth-service/dto"
 	"auth-service/middlewares"
 	"auth-service/models"
@@ -28,6 +29,21 @@ const (
 	passwordMinLen = 8
 	passwordMaxLen = 72
 )
+
+// tokenTTL est la duree de vie du JWT et du cookie de session associe
+// (JWT_TTL_HOURS, 24 h par defaut).
+func tokenTTL() time.Duration {
+	return time.Duration(config.EnvInt("JWT_TTL_HOURS", 24)) * time.Hour
+}
+
+// setAuthCookie pose (ou efface, avec maxAge negatif) le cookie de session
+// httpOnly. SameSite=Lax : envoye sur la navigation et les requetes same-site,
+// jamais sur les POST cross-site (protection CSRF de base). Secure est active
+// par COOKIE_SECURE=true (staging/prod en HTTPS).
+func setAuthCookie(c *gin.Context, token string, maxAge int) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(middlewares.AuthCookieName, token, maxAge, "/", "", config.EnvBool("COOKIE_SECURE"), true)
+}
 
 func CreateUser(c *gin.Context) {
 	var input dto.RegisterInput
@@ -97,6 +113,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	ttl := tokenTTL()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
@@ -105,7 +122,7 @@ func Login(c *gin.Context) {
 		"role": user.Role,
 		// notification-service attend un claim "sub" au format UUID
 		"sub": fmt.Sprintf("00000000-0000-0000-0000-%012x", user.ID),
-		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"exp": time.Now().Add(ttl).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(middlewares.JWTSecret()))
@@ -113,6 +130,11 @@ func Login(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, "Erreur generation token")
 		return
 	}
+
+	// Le token part aussi en cookie httpOnly : c'est lui qui porte la session
+	// navigateur (involable par XSS). Le token du corps JSON reste utilise par
+	// le front en memoire de session (en-tetes Authorization, WebSocket).
+	setAuthCookie(c, tokenString, int(ttl.Seconds()))
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": tokenString,
@@ -122,6 +144,30 @@ func Login(c *gin.Context) {
 			"email": user.Email,
 			"role":  user.Role,
 		},
+	})
+}
+
+// Logout efface le cookie de session httpOnly (le front oublie de son cote
+// le token en memoire et le profil en localStorage).
+func Logout(c *gin.Context) {
+	setAuthCookie(c, "", -1)
+	c.JSON(http.StatusOK, gin.H{"message": "Deconnecte"})
+}
+
+// GetUserInternal expose le profil minimal d'un utilisateur (id, nom, email)
+// aux autres services internes (notification-service, pour l'envoi d'email).
+// Reserve par le middleware InternalOnly (secret partage), jamais expose
+// publiquement.
+func GetUserInternal(c *gin.Context) {
+	var user models.Utilisateur
+	if err := repository.DB.First(&user, c.Param("id")).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
 	})
 }
 
