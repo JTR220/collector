@@ -36,3 +36,4 @@ configMapGenerator:
       - PUBLIC_CATALOG_API_BASE_URL=http://localhost:8081
       - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://localhost:8082
       - PUBLIC_NOTIFICATION_API_BASE_URL=http://localhost:8083
+      - PUBLIC_ENV=production

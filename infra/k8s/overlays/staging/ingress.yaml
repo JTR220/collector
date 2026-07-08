@@ -5,6 +5,9 @@
 # TLS via certificat self-signed avec l'IP en SAN (voir certificate.yaml et
 # infra/cert-manager/cluster-issuer.yaml) : Let's Encrypt n'emet pas de
 # certificat pour une IP nue.
+# entryPoint "staging" (port 8443) au lieu de "websecure" (443, utilise par
+# la prod) : distingue visuellement l'URL staging de la prod. Voir
+# infra/traefik/helmchartconfig.yaml.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -51,7 +54,7 @@ metadata:
   name: collector
 spec:
   entryPoints:
-    - websecure
+    - staging
   tls:
     secretName: collector-selfsigned-tls
   routes:

@@ -1,0 +1,25 @@
+# Traefik est installe par k3s via son mecanisme HelmChartConfig (pas par ce
+# repo GitOps) : on ne peut donc pas ajouter un entryPoint via un Deployment
+# classique. Ce CRD patche la config Helm embarquee de k3s pour ouvrir un
+# entryPoint HTTPS dedie au staging (port 8443), distinct du 443 (websecure)
+# utilise par la prod -> l'URL staging se distingue visuellement de la prod
+# (https://<ip>:8443/... vs https://<ip>/...).
+#
+# A appliquer une seule fois sur le cluster (hors sync Argo CD applicative,
+# car namespace kube-system) :
+#   kubectl apply -f infra/traefik/helmchartconfig.yaml
+#
+# Necessite en plus l'ouverture du port 8443/tcp dans le firewall du VPS
+# (ex: ufw allow 8443/tcp) — etape manuelle hors GitOps.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      staging:
+        port: 8443
+        exposedPort: 8443
+        protocol: TCP

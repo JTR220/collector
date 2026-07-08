@@ -23,14 +23,15 @@ configMapGenerator:
   - DB_PORT=5432
   - DB_NAME=collector
   - DB_USER=postgres
-  - FRONTEND_ORIGIN=https://51.255.199.160
+  - FRONTEND_ORIGIN=https://51.255.199.160:8443
   name: collector-config
 - behavior: replace
   literals:
-  - PUBLIC_AUTH_API_BASE_URL=https://51.255.199.160/auth
-  - PUBLIC_CATALOG_API_BASE_URL=https://51.255.199.160/api
-  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://51.255.199.160/price
-  - PUBLIC_NOTIFICATION_API_BASE_URL=https://51.255.199.160/notifications
+  - PUBLIC_AUTH_API_BASE_URL=https://51.255.199.160:8443/auth
+  - PUBLIC_CATALOG_API_BASE_URL=https://51.255.199.160:8443/api
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://51.255.199.160:8443/price
+  - PUBLIC_NOTIFICATION_API_BASE_URL=https://51.255.199.160:8443/notifications
+  - PUBLIC_ENV=staging
   name: collector-front-config
 
 # "bootstrap" est un placeholder : remplacé par un digest immuable
