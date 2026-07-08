@@ -342,3 +342,60 @@ jobs:
           git commit -m "ci(gitops): deploy frontend ${GITHUB_SHA::7} to staging"
           git pull --rebase origin main
           git push origin main
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Promotion prod — même digest que staging, poussé seulement si tout le
+  # pipeline (lint, tests, SAST, SCA, scans Trivy, signature cosign) est vert.
+  # Argo CD reste en sync MANUEL sur collector-prod : ce job ne fait que pin le
+  # digest, le clic "Sync" dans l'UI Argo CD reste la validation humaine finale.
+  # ────────────────────────────────────────────────────────────────────────────
+  promote-prod:
+    name: GitOps — promotion prod
+    if: github.event_name == 'push'
+    needs: update-manifests
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    concurrency:
+      group: gitops-update-manifests
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Pin new image digest in prod overlay
+        working-directory: infra/k8s/overlays/prod
+        run: |
+          for f in /tmp/digests/*; do
+            ref="$(cat "$f")"
+            name="${ref%@*}"
+            echo "→ ${ref}"
+            kustomize edit set image "${name}=${ref}"
+          done
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s/overlays/prod/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "Manifests déjà à jour, rien à committer."
+            exit 0
+          fi
+          git commit -m "ci(gitops): promote frontend ${GITHUB_SHA::7} to prod"
+          git pull --rebase origin main
+          git push origin main
