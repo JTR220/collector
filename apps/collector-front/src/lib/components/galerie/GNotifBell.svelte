@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth';
 	import { notifications } from '$lib/stores/notifications';
+	import { fromEventUuid } from '$lib/utils/eventId';
+	import type { NotificationAPI } from '$lib/api/notifications';
 
 	let open = $state(false);
 
@@ -21,6 +24,14 @@
 
 	function onRead(id: string) {
 		if ($auth.token) notifications.markRead($auth.token, id);
+	}
+
+	// Clic sur une notification liée à un article (achat, négociation…) :
+	// marque lue puis ouvre la fiche pour traiter la demande directement.
+	function onOpen(notif: NotificationAPI) {
+		onRead(notif.id);
+		open = false;
+		if (notif.item_id) goto(`/lot/${fromEventUuid(notif.item_id)}`);
 	}
 
 	function onReadAll() {
@@ -62,7 +73,11 @@
 				<ul class="list">
 					{#each $notifications.items.slice(0, 12) as notif (notif.id)}
 						<li>
-							<button class="item" class:item-unread={!notif.read} onclick={() => onRead(notif.id)}>
+							<button
+								class="item"
+								class:item-unread={!notif.read}
+								onclick={() => (notif.item_id ? onOpen(notif) : onRead(notif.id))}
+							>
 								<span class="item-icon">{typeIcons[notif.type] ?? '◆'}</span>
 								<span class="item-body">
 									<span class="item-title">{notif.title}</span>

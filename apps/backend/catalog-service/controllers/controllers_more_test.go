@@ -241,7 +241,7 @@ func TestGetMyOrders_Success(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 10, CategoryID: cat.ID, SellerID: 2}
 	repository.DB.Create(&art)
-	repository.DB.Create(&models.Order{BuyerID: 1, SellerID: 2, ArticleID: art.ID, Price: 10, Status: "pending"})
+	repository.DB.Create(&models.Order{BuyerID: 1, SellerID: 2, ArticleID: art.ID, Price: 10, Status: models.OrderStatusPending})
 
 	c, w := newCtx(t, 1, "", nil)
 	GetMyOrders(c)
@@ -259,7 +259,7 @@ func TestGetMySales_Success(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 10, CategoryID: cat.ID, SellerID: 1}
 	repository.DB.Create(&art)
-	repository.DB.Create(&models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: "pending"})
+	repository.DB.Create(&models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: models.OrderStatusPending})
 
 	c, w := newCtx(t, 1, "", nil)
 	GetMySales(c)
@@ -277,7 +277,7 @@ func TestAcceptOrder_Success(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 10, CategoryID: cat.ID, SellerID: 1, Sold: true}
 	repository.DB.Create(&art)
-	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: "pending"}
+	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: models.OrderStatusPending}
 	repository.DB.Create(&order)
 
 	c, w := newCtx(t, 1, "", gin.Params{{Key: "id", Value: itoa(order.ID)}})
@@ -287,8 +287,8 @@ func TestAcceptOrder_Success(t *testing.T) {
 	}
 	var reloaded models.Order
 	repository.DB.First(&reloaded, order.ID)
-	if reloaded.Status != "paid" {
-		t.Errorf("statut attendu 'paid', obtenu %q", reloaded.Status)
+	if reloaded.Status != models.OrderStatusPaid {
+		t.Errorf("statut attendu %q, obtenu %q", models.OrderStatusPaid, reloaded.Status)
 	}
 }
 
@@ -297,7 +297,7 @@ func TestRejectOrder_ReleasesArticle(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 10, CategoryID: cat.ID, SellerID: 1, Sold: true}
 	repository.DB.Create(&art)
-	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: "pending"}
+	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: models.OrderStatusPending}
 	repository.DB.Create(&order)
 
 	c, w := newCtx(t, 1, "", gin.Params{{Key: "id", Value: itoa(order.ID)}})
@@ -307,8 +307,8 @@ func TestRejectOrder_ReleasesArticle(t *testing.T) {
 	}
 	var reloadedOrder models.Order
 	repository.DB.First(&reloadedOrder, order.ID)
-	if reloadedOrder.Status != "cancelled" {
-		t.Errorf("statut attendu 'cancelled', obtenu %q", reloadedOrder.Status)
+	if reloadedOrder.Status != models.OrderStatusCancelled {
+		t.Errorf("statut attendu %q, obtenu %q", models.OrderStatusCancelled, reloadedOrder.Status)
 	}
 	var reloadedArt models.Article
 	repository.DB.First(&reloadedArt, art.ID)
@@ -322,7 +322,7 @@ func TestDecideOrder_NotOwnerForbidden(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 10, CategoryID: cat.ID, SellerID: 1}
 	repository.DB.Create(&art)
-	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: "pending"}
+	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: models.OrderStatusPending}
 	repository.DB.Create(&order)
 
 	// user 99 n'est pas le vendeur de la commande
@@ -338,7 +338,7 @@ func TestDecideOrder_AlreadyTreatedConflict(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 10, CategoryID: cat.ID, SellerID: 1}
 	repository.DB.Create(&art)
-	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: "paid"}
+	order := models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 10, Status: models.OrderStatusPaid}
 	repository.DB.Create(&order)
 
 	c, w := newCtx(t, 1, "", gin.Params{{Key: "id", Value: itoa(order.ID)}})
@@ -364,7 +364,7 @@ func TestGetAdminStats_Success(t *testing.T) {
 	cat := seedCategory(t)
 	art := models.Article{Name: "A", Description: "d", Prix: 100, CategoryID: cat.ID, SellerID: 1, Sold: true}
 	repository.DB.Create(&art)
-	repository.DB.Create(&models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 100, Status: "paid"})
+	repository.DB.Create(&models.Order{BuyerID: 2, SellerID: 1, ArticleID: art.ID, Price: 100, Status: models.OrderStatusPaid})
 
 	c, w := newCtx(t, 1, "", nil)
 	GetAdminStats(c)

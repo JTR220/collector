@@ -13,6 +13,7 @@
 		type Order,
 		type OrderStatus
 	} from '$lib/api/market';
+	import { fetchMyArticles, deleteArticle, type ArticleAPI } from '$lib/api/catalog';
 	import { eur } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GAvatar from '$lib/components/galerie/GAvatar.svelte';
@@ -26,8 +27,17 @@
 	let sales = $state<Order[]>([]);
 	let salesBusyId = $state<number | null>(null);
 	let salesMsg = $state<string | null>(null);
+	let myArticles = $state<ArticleAPI[]>([]);
+	let articleBusyId = $state<number | null>(null);
+	let articlesMsg = $state<string | null>(null);
 
 	const pendingSales = $derived(sales.filter((s) => s.status === 'pending'));
+
+	const articleStats = $derived({
+		listed: myArticles.filter((a) => !a.sold).length,
+		sold: myArticles.filter((a) => a.sold).length,
+		totalViews: myArticles.reduce((sum, a) => sum + a.views, 0)
+	});
 
 	const initials = $derived(
 		me?.name
@@ -63,16 +73,33 @@
 		}
 		// Wishlist et commandes viennent du catalog-service : une panne de ce
 		// service ne doit PAS deconnecter — on charge ce qui repond.
-		const [w, o, s] = await Promise.allSettled([
+		const [w, o, s, a] = await Promise.allSettled([
 			fetchMyWishlist($auth.token),
 			fetchMyOrders($auth.token),
-			fetchMySales($auth.token)
+			fetchMySales($auth.token),
+			fetchMyArticles($auth.token)
 		]);
 		if (w.status === 'fulfilled') wishlist = w.value;
 		if (o.status === 'fulfilled') orders = o.value;
 		if (s.status === 'fulfilled') sales = s.value;
+		if (a.status === 'fulfilled') myArticles = a.value;
 		loading = false;
 	});
+
+	async function removeArticle(article: ArticleAPI) {
+		if (!$auth.token) return;
+		if (!confirm(`Retirer « ${article.name} » du catalogue ?`)) return;
+		articleBusyId = article.ID;
+		articlesMsg = null;
+		try {
+			await deleteArticle($auth.token, article.ID);
+			myArticles = myArticles.filter((a) => a.ID !== article.ID);
+		} catch (e) {
+			articlesMsg = e instanceof Error ? e.message : "Impossible de retirer l'annonce.";
+		} finally {
+			articleBusyId = null;
+		}
+	}
 
 	async function decide(order: Order, accept: boolean) {
 		if (!$auth.token) return;
@@ -162,7 +189,9 @@
 			<div class="item-list">
 				{#each pendingSales as s (s.ID)}
 					<div class="sale-row">
-						<span class="item-name">{s.article?.name ?? `Lot #${s.articleId}`}</span>
+						<a class="item-name" href={`/lot/${s.articleId}`}
+							>{s.article?.name ?? `Lot #${s.articleId}`}</a
+						>
 						<span class="item-price">{eur(s.price)}</span>
 						<div class="sale-actions">
 							<button
@@ -184,6 +213,25 @@
 			{/if}
 		</GPanel>
 	{/if}
+
+	<!-- Statistiques -->
+	<GPanel style="margin-bottom:14px">
+		<Kicker>Statistiques</Kicker>
+		<div class="stats-row">
+			<div class="stat-tile">
+				<span class="stat-value">{articleStats.listed}</span>
+				<span class="stat-label">En vente</span>
+			</div>
+			<div class="stat-tile">
+				<span class="stat-value">{articleStats.sold}</span>
+				<span class="stat-label">Vendues</span>
+			</div>
+			<div class="stat-tile">
+				<span class="stat-value">{articleStats.totalViews}</span>
+				<span class="stat-label">Vues cumulées</span>
+			</div>
+		</div>
+	</GPanel>
 
 	<div class="two-col">
 		<!-- Wishlist -->
@@ -222,6 +270,36 @@
 			</div>
 		</GPanel>
 	</div>
+
+	<!-- Mes annonces -->
+	<GPanel style="margin-top:14px">
+		<Kicker>Mes annonces · {myArticles.length}</Kicker>
+		<div class="item-list">
+			{#each myArticles as a (a.ID)}
+				<div class="listing-row">
+					<a class="item-name" href={`/lot/${a.ID}`}>{a.name}</a>
+					<span class="item-views" title="Vues">👁 {a.views}</span>
+					<GChip>{a.sold ? 'Vendue' : 'En vente'}</GChip>
+					<span class="item-price">{eur(a.prix)}</span>
+					<div class="listing-actions">
+						<a class="btn-ghost-sm" href={`/vendre?edit=${a.ID}`}>Modifier</a>
+						<button
+							class="btn-reject-sm"
+							disabled={articleBusyId === a.ID}
+							onclick={() => removeArticle(a)}>Supprimer</button
+						>
+					</div>
+				</div>
+			{:else}
+				<p class="item-empty">
+					Aucune annonce pour l'instant. <a href="/vendre">Mettez une pièce en vente</a>.
+				</p>
+			{/each}
+		</div>
+		{#if articlesMsg}
+			<p class="action-msg">{articlesMsg}</p>
+		{/if}
+	</GPanel>
 
 	<!-- Historique d'activité -->
 	<div class="history-wrap">
@@ -365,6 +443,84 @@
 		margin-top: 10px;
 	}
 
+	/* Statistiques */
+	.stats-row {
+		display: flex;
+		gap: 14px;
+		margin-top: 10px;
+		flex-wrap: wrap;
+	}
+	.stat-tile {
+		flex: 1;
+		min-width: 120px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 12px 16px;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(236, 229, 218, 0.08);
+	}
+	.stat-value {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 22px;
+		color: #ece5da;
+	}
+	.stat-label {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 11.5px;
+		color: #a39a8c;
+	}
+
+	/* Mes annonces */
+	.listing-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 11px 0;
+		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+	}
+	.item-views {
+		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-size: 11.5px;
+		color: #766d60;
+		flex-shrink: 0;
+	}
+	.listing-actions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.btn-ghost-sm,
+	.btn-reject-sm {
+		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		padding: 6px 12px;
+		border-radius: 6px;
+		cursor: pointer;
+		text-decoration: none;
+		transition: filter 120ms;
+	}
+	.btn-ghost-sm {
+		background: transparent;
+		border: 1px solid rgba(236, 229, 218, 0.16);
+		color: #a39a8c;
+	}
+	.btn-reject-sm {
+		background: transparent;
+		border: 1px solid rgba(215, 156, 134, 0.5);
+		color: #d79c86;
+	}
+	.btn-ghost-sm:hover,
+	.btn-reject-sm:hover:not(:disabled) {
+		filter: brightness(1.15);
+	}
+	.btn-reject-sm:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
 	/* 2 colonnes */
 	.two-col {
 		display: grid;
@@ -405,8 +561,10 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		text-decoration: none;
 	}
-	.item-row:hover .item-name {
+	.item-row:hover .item-name,
+	a.item-name:hover {
 		color: #86b3a4;
 	}
 	.item-price {

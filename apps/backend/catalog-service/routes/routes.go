@@ -46,6 +46,7 @@ func InitRouter() *gin.Engine {
 		protected.POST("/article", controllers.CreateArticle)
 		protected.PUT("/article/:id", controllers.UpdateArticle)
 		protected.DELETE("/article/:id", controllers.DeleteArticle)
+		protected.GET("/me/articles", controllers.GetMyArticles)
 
 		// Achats
 		protected.POST("/article/:id/buy", controllers.BuyArticle)

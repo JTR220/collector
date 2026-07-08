@@ -13,6 +13,7 @@
 		type MessageSocket
 	} from '$lib/api/messages';
 	import { messages as messagesStore } from '$lib/stores/messages';
+	import { fromEventUuid } from '$lib/utils/eventId';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
@@ -33,7 +34,9 @@
 				: thread[0].sender_name
 			: '…'
 	);
-	const articleName = $derived(thread.find((m) => m.article_name)?.article_name ?? null);
+	const articleRef = $derived(thread.find((m) => m.article_id));
+	const articleName = $derived(articleRef?.article_name ?? null);
+	const articleId = $derived(articleRef?.article_id ? fromEventUuid(articleRef.article_id) : null);
 
 	async function scrollToBottom() {
 		await tick();
@@ -118,7 +121,9 @@
 	<GPanel style="margin-top:10px;display:flex;flex-direction:column;height:60vh">
 		<div class="thread-head">
 			<Kicker>{otherName}</Kicker>
-			{#if articleName}<span class="thread-article">à propos de « {articleName} »</span>{/if}
+			{#if articleName && articleId}
+				<a class="thread-article" href={`/lot/${articleId}`}>à propos de « {articleName} »</a>
+			{/if}
 		</div>
 
 		<div class="thread-scroll" bind:this={scrollEl}>
@@ -179,6 +184,10 @@
 		font-family: 'Hanken Grotesk', system-ui, sans-serif;
 		font-size: 12px;
 		color: #86b3a4;
+		text-decoration: none;
+	}
+	.thread-article:hover {
+		text-decoration: underline;
 	}
 	.thread-scroll {
 		flex: 1;

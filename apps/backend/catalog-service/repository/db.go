@@ -451,8 +451,8 @@ func backfillDemoOrders() {
 		slug   string
 		status string
 	}{
-		{"VNL-022", "paid"},
-		{"FIG-101", "pending"},
+		{"VNL-022", models.OrderStatusPaid},
+		{"FIG-101", models.OrderStatusPending},
 	}
 
 	for _, d := range demoOrders {

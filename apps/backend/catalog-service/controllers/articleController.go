@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // sanitizeImageURL ne garde une URL de photo fournie par le vendeur que si
@@ -91,7 +92,26 @@ func GetArticle(c *gin.Context) {
 		return
 	}
 
+	// Compteur de vues informatif (fiche consultee) : incrementation atomique
+	// en base puis reflet immediat dans la reponse, sans re-frapper la DB.
+	repository.DB.Model(&models.Article{}).Where("id = ?", article.ID).UpdateColumn("views", gorm.Expr("views + 1"))
+	article.Views++
+
 	c.JSON(http.StatusOK, article)
+}
+
+// GetMyArticles renvoie toutes les annonces de l'utilisateur courant (vendues
+// incluses), pour la gestion depuis son profil — contrairement a
+// GetAllArticles qui n'expose que le catalogue public encore en vente.
+func GetMyArticles(c *gin.Context) {
+	var articles []models.Article
+	if err := repository.DB.Preload("Category").
+		Where("seller_id = ?", currentUserID(c)).
+		Order("id desc").Find(&articles).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer vos annonces")
+		return
+	}
+	c.JSON(http.StatusOK, articles)
 }
 
 // GetAllArticles renvoie le catalogue, avec pagination optionnelle

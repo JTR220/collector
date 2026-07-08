@@ -27,6 +27,7 @@ export type ArticleAPI = {
 	imageUrl: string;
 	saleType: 'drop' | 'direct';
 	sold: boolean;
+	views: number;
 	delta: number;
 	priceHistory: number[];
 	glyph: string;
@@ -85,4 +86,43 @@ export async function createArticle(token: string, input: NewArticleInput): Prom
 		errorPrefix: 'catalog-service'
 	});
 	return data.article;
+}
+
+export type EditArticleInput = {
+	name: string;
+	description: string;
+	prix: number;
+	fraisPort: number;
+	categoryId: number;
+};
+
+/** Modifie une annonce existante (nom, description, prix, port, catégorie). */
+export async function updateArticle(
+	token: string,
+	id: number,
+	input: EditArticleInput
+): Promise<ArticleAPI> {
+	const data = await apiRequest<{ article: ArticleAPI }>(BASE_URL, `/article/${id}`, {
+		token,
+		init: { method: 'PUT', body: JSON.stringify(input) },
+		errorPrefix: 'catalog-service'
+	});
+	return data.article;
+}
+
+/** Retire définitivement une annonce du catalogue. */
+export async function deleteArticle(token: string, id: number): Promise<void> {
+	await apiRequest(BASE_URL, `/article/${id}`, {
+		token,
+		init: { method: 'DELETE' },
+		errorPrefix: 'catalog-service'
+	});
+}
+
+/** Annonces de l'utilisateur courant (vendues incluses), pour la gestion depuis son profil. */
+export async function fetchMyArticles(token: string): Promise<ArticleAPI[]> {
+	return apiRequest<ArticleAPI[]>(BASE_URL, '/me/articles', {
+		token,
+		errorPrefix: 'catalog-service'
+	});
 }

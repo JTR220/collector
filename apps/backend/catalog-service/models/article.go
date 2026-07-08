@@ -57,6 +57,7 @@ type Article struct {
 	ImageURL     string       `json:"imageUrl"`
 	SaleType     string       `json:"saleType"` // drop | direct
 	Sold         bool         `json:"sold"`
+	Views        uint         `json:"views"`
 	Delta        float64      `json:"delta"`
 	PriceHistory PriceHistory `json:"priceHistory" gorm:"type:text"`
 	Glyph        string       `json:"glyph"`

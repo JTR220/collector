@@ -42,7 +42,7 @@ func BuyArticle(c *gin.Context) {
 		FraisPort: article.FraisPort,
 		// La commande reste en attente jusqu'a validation du vendeur (voir
 		// AcceptOrder / RejectOrder) : l'achat n'est pas actif immediatement.
-		Status: "pending",
+		Status: models.OrderStatusPending,
 	}
 
 	// Transaction avec revendication atomique de l'article (UPDATE conditionne
@@ -123,14 +123,14 @@ func decideOrder(c *gin.Context, accept bool) {
 		return
 	}
 
-	newStatus := "cancelled"
+	newStatus := models.OrderStatusCancelled
 	if accept {
-		newStatus = "paid"
+		newStatus = models.OrderStatusPaid
 	}
 
 	err := repository.DB.Transaction(func(tx *gorm.DB) error {
 		res := tx.Model(&models.Order{}).
-			Where("id = ? AND status = ?", order.ID, "pending").
+			Where("id = ? AND status = ?", order.ID, models.OrderStatusPending).
 			Update("status", newStatus)
 		if res.Error != nil {
 			return res.Error

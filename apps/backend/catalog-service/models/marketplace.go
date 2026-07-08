@@ -2,8 +2,18 @@ package models
 
 import "gorm.io/gorm"
 
+// Statuts possibles d'Order.Status, centralises ici pour eviter les chaines
+// magiques dupliquees entre controllers, seed de demo et tests.
+const (
+	OrderStatusPending   = "pending" // attente de validation vendeur
+	OrderStatusPaid      = "paid"
+	OrderStatusShipped   = "shipped"
+	OrderStatusDelivered = "delivered"
+	OrderStatusCancelled = "cancelled"
+)
+
 // Order : commande passée par un acheteur sur une annonce en vente directe
-// Status : pending (attente de validation vendeur) | paid | shipped | delivered | cancelled
+// Status : l'une des constantes OrderStatus* ci-dessus.
 type Order struct {
 	gorm.Model
 	BuyerID   uint    `json:"buyerId" gorm:"index"`

@@ -1,16 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
 	import {
 		fetchCategories,
+		fetchArticle,
 		createArticle,
+		updateArticle,
 		type CategoryAPI,
 		type NewArticleInput
 	} from '$lib/api/catalog';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GSelect from '$lib/components/galerie/GSelect.svelte';
 	import Kicker from '$lib/components/galerie/Kicker.svelte';
+
+	const editId = $derived($page.url.searchParams.get('edit'));
 
 	let categories = $state<CategoryAPI[]>([]);
 	let loading = $state(true);
@@ -36,8 +41,23 @@
 		}
 		try {
 			categories = await fetchCategories();
+			if (editId) {
+				const a = await fetchArticle(editId);
+				name = a.name;
+				categoryId = String(a.categoryId);
+				prix = String(a.prix);
+				fraisPort = String(a.fraisPort);
+				description = a.description;
+				series = a.series ?? '';
+				year = a.year ? String(a.year) : '';
+				rarity = a.rarity ?? '';
+				grade = a.grade ?? '';
+				imageUrl = a.imageUrl ?? '';
+			}
 		} catch {
-			error = 'Impossible de charger les catégories. Le catalog-service est-il démarré ?';
+			error = editId
+				? 'Impossible de charger cette annonce.'
+				: 'Impossible de charger les catégories. Le catalog-service est-il démarré ?';
 		} finally {
 			loading = false;
 		}
@@ -52,6 +72,17 @@
 		submitting = true;
 		error = '';
 		try {
+			if (editId) {
+				await updateArticle($auth.token, Number(editId), {
+					name: name.trim(),
+					description: description.trim(),
+					prix: Number(prix),
+					fraisPort: Number(fraisPort),
+					categoryId: Number(categoryId)
+				});
+				goto(`/lot/${editId}`);
+				return;
+			}
 			const input: NewArticleInput = {
 				name: name.trim(),
 				description: description.trim(),
@@ -67,20 +98,21 @@
 			const created = await createArticle($auth.token, input);
 			goto(`/lot/${created.ID}`);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Mise en vente impossible.';
+			error = e instanceof Error ? e.message : 'Opération impossible.';
 			submitting = false;
 		}
 	}
 </script>
 
-<svelte:head><title>Vendre · Collector.shop</title></svelte:head>
+<svelte:head><title>{editId ? 'Modifier' : 'Vendre'} · Collector.shop</title></svelte:head>
 
 <section class="head">
-	<Kicker>Mettre en vente</Kicker>
-	<h1 class="title">Vendez votre pièce</h1>
+	<Kicker>{editId ? "Modifier l'annonce" : 'Mettre en vente'}</Kicker>
+	<h1 class="title">{editId ? 'Modifiez votre annonce' : 'Vendez votre pièce'}</h1>
 	<p class="sub">
-		Renseignez la fiche : elle sera publiée à votre nom sur le marché, en vente directe. Vous
-		pourrez la retirer à tout moment depuis votre profil.
+		{editId
+			? 'Le titre, la description, le prix, les frais de port et la catégorie sont modifiables. Les autres champs sont fixés à la création.'
+			: 'Renseignez la fiche : elle sera publiée à votre nom sur le marché, en vente directe. Vous pourrez la retirer à tout moment depuis votre profil.'}
 	</p>
 </section>
 
@@ -154,23 +186,34 @@
 		</GPanel>
 
 		<GPanel>
-			<Kicker>Détails (optionnel)</Kicker>
+			<Kicker>{editId ? 'Détails (fixés à la création)' : 'Détails (optionnel)'}</Kicker>
 			<div class="fields">
 				<label class="field">
 					<span class="lbl">Série / édition</span>
-					<input class="in" bind:value={series} placeholder="Base Set, 1re édition" />
+					<input
+						class="in"
+						bind:value={series}
+						placeholder="Base Set, 1re édition"
+						disabled={!!editId}
+					/>
 				</label>
 				<label class="field">
 					<span class="lbl">Année</span>
-					<input class="in" type="number" bind:value={year} placeholder="1999" />
+					<input
+						class="in"
+						type="number"
+						bind:value={year}
+						placeholder="1999"
+						disabled={!!editId}
+					/>
 				</label>
 				<label class="field">
 					<span class="lbl">Rareté</span>
-					<input class="in" bind:value={rarity} placeholder="Holo Rare" />
+					<input class="in" bind:value={rarity} placeholder="Holo Rare" disabled={!!editId} />
 				</label>
 				<label class="field">
 					<span class="lbl">Grade</span>
-					<input class="in" bind:value={grade} placeholder="PSA 9" />
+					<input class="in" bind:value={grade} placeholder="PSA 9" disabled={!!editId} />
 				</label>
 				<label class="field span-2">
 					<span class="lbl">URL de la photo (https uniquement)</span>
@@ -179,14 +222,15 @@
 						type="url"
 						bind:value={imageUrl}
 						placeholder="https://…  (laissez vide pour une photo par défaut)"
+						disabled={!!editId}
 					/>
 				</label>
 			</div>
 
 			<div class="actions">
-				<a class="btn-ghost" href="/">Annuler</a>
+				<a class="btn-ghost" href={editId ? `/lot/${editId}` : '/'}>Annuler</a>
 				<button class="btn" type="submit" disabled={submitting}>
-					{submitting ? 'Publication…' : 'Mettre en vente'}
+					{submitting ? 'Enregistrement…' : editId ? 'Enregistrer' : 'Mettre en vente'}
 				</button>
 			</div>
 		</GPanel>
@@ -282,6 +326,10 @@
 	.in:focus {
 		border-color: rgba(134, 179, 164, 0.5);
 		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+	}
+	.in:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
 	}
 	.area {
 		min-height: 92px;

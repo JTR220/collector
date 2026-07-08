@@ -40,7 +40,7 @@ func GetAdminStats(c *gin.Context) {
 		fail(repository.DB.Model(&models.Categorie{}).Count(&categories)) ||
 		fail(repository.DB.Model(&models.Order{}).Count(&totalOrders)) ||
 		// GMV = somme des prix des commandes non annulees.
-		fail(repository.DB.Model(&models.Order{}).Where("status <> ?", "cancelled").
+		fail(repository.DB.Model(&models.Order{}).Where("status <> ?", models.OrderStatusCancelled).
 			Select("COALESCE(SUM(price), 0)").Scan(&gmv)) ||
 		// Prix moyen des annonces (indicateur de positionnement du catalogue).
 		fail(repository.DB.Model(&models.Article{}).
@@ -63,7 +63,12 @@ func GetAdminStats(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, "Impossible de calculer les statistiques")
 		return
 	}
-	ordersByStatus := map[string]int64{"paid": 0, "shipped": 0, "delivered": 0, "cancelled": 0}
+	ordersByStatus := map[string]int64{
+		models.OrderStatusPaid:      0,
+		models.OrderStatusShipped:   0,
+		models.OrderStatusDelivered: 0,
+		models.OrderStatusCancelled: 0,
+	}
 	for _, r := range statusRows {
 		ordersByStatus[r.Status] = r.Count
 	}
