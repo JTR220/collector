@@ -209,6 +209,28 @@
 					<span class="demo-role">Test</span>
 					<span class="demo-creds">test@collector.shop · test123</span>
 				</button>
+				<button
+					type="button"
+					class="demo-row"
+					onclick={() => {
+						email = 'vendeur@collector.shop';
+						password = 'vendeur123';
+					}}
+				>
+					<span class="demo-role">Vendeur</span>
+					<span class="demo-creds">vendeur@collector.shop · vendeur123</span>
+				</button>
+				<button
+					type="button"
+					class="demo-row"
+					onclick={() => {
+						email = 'acheteur@collector.shop';
+						password = 'acheteur123';
+					}}
+				>
+					<span class="demo-role">Acheteur</span>
+					<span class="demo-creds">acheteur@collector.shop · acheteur123</span>
+				</button>
 			</div>
 		</div>
 	</div>
@@ -504,7 +526,7 @@
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		color: #86b3a4;
-		width: 42px;
+		width: 58px;
 	}
 	.demo-creds {
 		font-family: 'IBM Plex Mono', ui-monospace, monospace;

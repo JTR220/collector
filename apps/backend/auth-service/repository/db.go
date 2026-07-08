@@ -59,6 +59,11 @@ func seedUsers() {
 	}{
 		{"Administrateur", "admin@collector.shop", "admin123", "admin"},
 		{"Testeur", "test@collector.shop", "test123", "user"},
+		// Comptes vendeur/acheteur : possedent/achetent de vraies pieces du
+		// catalogue (cf catalog-service SeedData) pour tester le flux de
+		// notifications (commande creee/acceptee, alerte prix) de bout en bout.
+		{"Vendeur Demo", "vendeur@collector.shop", "vendeur123", "user"},
+		{"Acheteur Demo", "acheteur@collector.shop", "acheteur123", "user"},
 	}
 
 	for _, c := range comptes {
@@ -81,5 +86,6 @@ func seedUsers() {
 			log.Println("Seed utilisateur ignore (create) :", err)
 		}
 	}
-	log.Println("Seed comptes : admin@collector.shop / admin123 · test@collector.shop / test123")
+	log.Println("Seed comptes : admin@collector.shop / admin123 · test@collector.shop / test123 · " +
+		"vendeur@collector.shop / vendeur123 · acheteur@collector.shop / acheteur123")
 }

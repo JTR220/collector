@@ -47,6 +47,7 @@ func InitDB() {
 
 func SeedData() {
 	defer backfillArticleImages()
+	defer backfillSellerAssignments()
 
 	// Categories idempotentes (FirstOrCreate par nom) : le seed peut tourner
 	// plusieurs fois sans doublon ni suppression de donnees existantes.
@@ -389,6 +390,28 @@ func generateCatalog(catID func(string) uint) []models.Article {
 		}
 	}
 	return out
+}
+
+// backfillSellerAssignments relie quelques pieces vedettes au compte "Vendeur
+// Demo" (auth-service, seed dans l'ordre admin=1, test=2, vendeur=3,
+// acheteur=4 sur une base fraiche) afin de pouvoir tester le flux de
+// notifications reel : "Acheteur Demo" achete une piece -> ORDER_PENDING
+// recu par le vendeur -> acceptation/refus -> ORDER_ACCEPTED/REJECTED recu
+// par l'acheteur. Idempotent (ne touche que les pieces encore sans vendeur).
+func backfillSellerAssignments() {
+	const vendeurDemoID = 3
+	slugsVendeurDemo := []string{"PKM-001", "GBC-014", "CMX-007"}
+
+	res := DB.Model(&models.Article{}).
+		Where("slug IN ? AND seller_id = 0", slugsVendeurDemo).
+		Update("seller_id", vendeurDemoID)
+	if res.Error != nil {
+		log.Printf("Erreur affectation vendeur demo : %v", res.Error)
+		return
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("Vendeur demo (ID %d) assigne a %d piece(s)", vendeurDemoID, res.RowsAffected)
+	}
 }
 
 // backfillArticleImages donne aux articles sans photo une image Unsplash themee
