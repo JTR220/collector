@@ -78,7 +78,8 @@
 					description: description.trim(),
 					prix: Number(prix),
 					fraisPort: Number(fraisPort),
-					categoryId: Number(categoryId)
+					categoryId: Number(categoryId),
+					imageUrl: imageUrl.trim() || undefined
 				});
 				goto(`/lot/${editId}`);
 				return;
@@ -111,7 +112,7 @@
 	<h1 class="title">{editId ? 'Modifiez votre annonce' : 'Vendez votre pièce'}</h1>
 	<p class="sub">
 		{editId
-			? 'Le titre, la description, le prix, les frais de port et la catégorie sont modifiables. Les autres champs sont fixés à la création.'
+			? 'Le titre, la description, le prix, les frais de port, la catégorie et la photo sont modifiables. Série, année, rareté et grade restent fixés à la création.'
 			: 'Renseignez la fiche : elle sera publiée à votre nom sur le marché, en vente directe. Vous pourrez la retirer à tout moment depuis votre profil.'}
 	</p>
 </section>
@@ -186,7 +187,11 @@
 		</GPanel>
 
 		<GPanel>
-			<Kicker>{editId ? 'Détails (fixés à la création)' : 'Détails (optionnel)'}</Kicker>
+			<Kicker
+				>{editId
+					? 'Détails (série/année/rareté/grade fixés à la création)'
+					: 'Détails (optionnel)'}</Kicker
+			>
 			<div class="fields">
 				<label class="field">
 					<span class="lbl">Série / édition</span>
@@ -221,8 +226,9 @@
 						class="in"
 						type="url"
 						bind:value={imageUrl}
-						placeholder="https://…  (laissez vide pour une photo par défaut)"
-						disabled={!!editId}
+						placeholder={editId
+							? 'https://…  (laissez vide pour garder la photo actuelle)'
+							: 'https://…  (laissez vide pour une photo par défaut)'}
 					/>
 				</label>
 			</div>

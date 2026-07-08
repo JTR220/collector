@@ -94,9 +94,10 @@ export type EditArticleInput = {
 	prix: number;
 	fraisPort: number;
 	categoryId: number;
+	imageUrl?: string;
 };
 
-/** Modifie une annonce existante (nom, description, prix, port, catégorie). */
+/** Modifie une annonce existante (nom, description, prix, port, catégorie, photo). */
 export async function updateArticle(
 	token: string,
 	id: number,

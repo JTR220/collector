@@ -189,6 +189,13 @@ func UpdateArticle(c *gin.Context) {
 	article.Description = input.Description
 	article.Prix = input.Prix
 	article.FraisPort = input.FraisPort
+	// Champ facultatif : laisse la photo actuelle inchangee si le vendeur ne
+	// fournit rien ou une URL invalide (pas de retour silencieux au visuel
+	// par defaut, contrairement a la creation ou une annonce sans photo est
+	// normale).
+	if sanitized := sanitizeImageURL(input.ImageURL); sanitized != "" {
+		article.ImageURL = sanitized
+	}
 	article.CategoryID = input.CategoryID
 	if input.Prix != oldPrix {
 		article.PriceHistory = append(article.PriceHistory, input.Prix)
