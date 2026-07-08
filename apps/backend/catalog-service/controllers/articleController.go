@@ -7,6 +7,7 @@ import (
 	"catalog-service/response"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,23 @@ func sanitizeImageURL(raw string) string {
 	return raw
 }
 
+// sellerDisplayName construit le pseudo public du vendeur a partir des claims
+// du token : le nom du compte si present, sinon la partie locale de l'email.
+// L'adresse email complete ne doit jamais fuiter dans le catalogue public.
+func sellerDisplayName(c *gin.Context) string {
+	if v, ok := c.Get("name"); ok {
+		if name, _ := v.(string); name != "" {
+			return name
+		}
+	}
+	if v, ok := c.Get("email"); ok {
+		if email, _ := v.(string); email != "" {
+			return strings.SplitN(email, "@", 2)[0]
+		}
+	}
+	return "collectionneur"
+}
+
 func CreateArticle(c *gin.Context) {
 	var article models.Article
 
@@ -38,12 +56,11 @@ func CreateArticle(c *gin.Context) {
 	}
 
 	// Collector fonctionne comme eBay : n'importe quel utilisateur connecte peut
-	// mettre en vente. On rattache l'annonce a son auteur (le sellerId client est
-	// ignore) et on force la vente directe.
+	// mettre en vente. On rattache l'annonce a son auteur (le sellerId et le
+	// pseudo vendeur envoyes par le client sont ignores : anti-usurpation) et
+	// on force la vente directe.
 	article.SellerID = currentUserID(c)
-	if email, ok := c.Get("email"); ok && article.Seller == "" {
-		article.Seller, _ = email.(string)
-	}
+	article.Seller = sellerDisplayName(c)
 	article.SaleType = "direct"
 	article.Sold = false
 	// Visuel par defaut (Unsplash themee) si le vendeur n'a pas fourni de photo
@@ -77,10 +94,21 @@ func GetArticle(c *gin.Context) {
 	c.JSON(http.StatusOK, article)
 }
 
+// GetAllArticles renvoie le catalogue, avec pagination optionnelle
+// (?limit=&offset=) pour que les clients puissent borner la reponse quand le
+// catalogue grossit. Sans parametre, le comportement historique est conserve.
 func GetAllArticles(c *gin.Context) {
 	var articles []models.Article
 
-	if err := repository.DB.Preload("Category").Order("id desc").Find(&articles).Error; err != nil {
+	query := repository.DB.Preload("Category").Order("id desc")
+	if limit, err := strconv.Atoi(c.Query("limit")); err == nil && limit > 0 {
+		query = query.Limit(limit)
+		if offset, err := strconv.Atoi(c.Query("offset")); err == nil && offset > 0 {
+			query = query.Offset(offset)
+		}
+	}
+
+	if err := query.Find(&articles).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer les articles")
 		return
 	}

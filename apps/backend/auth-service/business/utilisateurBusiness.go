@@ -1,5 +1,0 @@
-package business
-
-func SaveUser() {
-
-}

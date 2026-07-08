@@ -1,3 +1,4 @@
+import { apiRequest } from './http';
 import { BASE_URL, type ArticleAPI } from './catalog';
 
 export type OrderStatus = 'paid' | 'shipped' | 'delivered' | 'cancelled';
@@ -21,19 +22,8 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 	cancelled: 'Annulée'
 };
 
-async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(`${BASE_URL}${path}`, {
-		...init,
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${token}`,
-			...init?.headers
-		}
-	});
-	const data = await res.json().catch(() => ({}));
-	if (!res.ok) throw new Error(data.error ?? `catalog-service error: ${res.status}`);
-	return data as T;
-}
+const request = <T>(path: string, token: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: 'catalog-service' });
 
 export const buyArticle = (token: string, articleId: number) =>
 	request<{ order: Order }>(`/article/${articleId}/buy`, token, { method: 'POST' });

@@ -30,12 +30,22 @@ func main() {
 	// ── Config ───────────────────────────────────────────────
 	cfg := config.Load()
 
+	// Fail-fast : aucun fallback de secret dans le code (docker-compose ou
+	// Sealed Secret k8s doivent fournir JWT_SECRET).
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Fatal().Msg("JWT_SECRET est requis : definissez-le dans l'environnement")
+	}
+
 	// ── Database ─────────────────────────────────────────────
 	db, err := sqlx.Connect("postgres", cfg.Database.DSN)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot connect to postgres")
 	}
 	defer func() { _ = db.Close() }()
+	// Borne le pool de connexions (PostgreSQL est partage entre les services).
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
 	log.Info().Msg("connected to postgres")
 
 	repo := repository.NewPriceRepository(db)

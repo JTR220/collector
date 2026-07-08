@@ -4,12 +4,16 @@ import (
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/response"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // ── Achats ───────────────────────────────────────────────────────────────
+
+var errAlreadySold = errors.New("article deja vendu")
 
 func BuyArticle(c *gin.Context) {
 	userID := currentUserID(c)
@@ -36,13 +40,30 @@ func BuyArticle(c *gin.Context) {
 		FraisPort: article.FraisPort,
 		Status:    "paid",
 	}
-	if err := repository.DB.Create(&order).Error; err != nil {
+
+	// Transaction avec revendication atomique de l'article (UPDATE conditionne
+	// sur sold=false) : deux acheteurs simultanes ne peuvent pas creer deux
+	// commandes pour la meme piece, le second recoit un 409.
+	err := repository.DB.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&models.Article{}).
+			Where("id = ? AND sold = ?", article.ID, false).
+			Update("sold", true)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return errAlreadySold
+		}
+		return tx.Create(&order).Error
+	})
+	if errors.Is(err, errAlreadySold) {
+		response.Error(c, http.StatusConflict, "Cette piece est deja vendue")
+		return
+	}
+	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Impossible d'enregistrer la commande")
 		return
 	}
-
-	article.Sold = true
-	repository.DB.Save(&article)
 
 	repository.DB.Preload("Article").Preload("Article.Category").First(&order, order.ID)
 	c.JSON(http.StatusCreated, gin.H{"order": order})

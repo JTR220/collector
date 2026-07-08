@@ -1,10 +1,15 @@
 import { env } from '$env/dynamic/public';
 import { browser } from '$app/environment';
+import { apiRequest } from './http';
 
 const BASE_URL = env.PUBLIC_NOTIFICATION_API_BASE_URL ?? 'http://localhost:8083';
 
 export type NotificationType =
-	'PRICE_DROP' | 'PRICE_SPIKE' | 'FRAUD_ALERT' | 'NEW_ITEM' | 'ITEM_SOLD';
+	| 'PRICE_DROP'
+	| 'PRICE_SPIKE'
+	| 'FRAUD_ALERT'
+	| 'NEW_ITEM'
+	| 'ITEM_SOLD';
 
 export type NotificationAPI = {
 	id: string;
@@ -22,18 +27,8 @@ export type WebSocketMessage = {
 	data: Record<string, unknown>;
 };
 
-async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(`${BASE_URL}${path}`, {
-		...init,
-		headers: {
-			Authorization: `Bearer ${token}`,
-			...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-			...init?.headers
-		}
-	});
-	if (!res.ok) throw new Error(`notification-service ${path} error: ${res.status}`);
-	return res.json();
-}
+const request = <T>(path: string, token: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: `notification-service ${path}` });
 
 export async function fetchNotifications(
 	token: string,

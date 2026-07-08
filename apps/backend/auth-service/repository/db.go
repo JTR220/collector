@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
@@ -24,9 +25,19 @@ func InitDB() {
 	)
 
 	var err error
-	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	// TranslateError : mappe les violations de contrainte (email unique) sur
+	// gorm.ErrDuplicatedKey pour renvoyer un vrai 409 cote controleur.
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		log.Fatal("Echec de la connexion a la base de donnees : ", err)
+	}
+
+	// Borne le pool de connexions : sans limite, un pic de trafic peut epuiser
+	// max_connections de PostgreSQL (base partagee entre les services).
+	if sqlDB, poolErr := DB.DB(); poolErr == nil {
+		sqlDB.SetMaxOpenConns(25)
+		sqlDB.SetMaxIdleConns(5)
+		sqlDB.SetConnMaxLifetime(30 * time.Minute)
 	}
 
 	err = DB.AutoMigrate(&models.Utilisateur{})

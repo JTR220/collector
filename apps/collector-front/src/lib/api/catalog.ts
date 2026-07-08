@@ -1,4 +1,6 @@
 import { env } from '$env/dynamic/public';
+import { apiRequest } from './http';
+
 export const BASE_URL = env.PUBLIC_CATALOG_API_BASE_URL ?? 'http://localhost:8081';
 
 export type CategoryAPI = {
@@ -77,12 +79,10 @@ export type NewArticleInput = {
 
 /** Met une pièce en vente. Le vendeur (sellerId) est déduit du token côté serveur. */
 export async function createArticle(token: string, input: NewArticleInput): Promise<ArticleAPI> {
-	const res = await fetch(`${BASE_URL}/article`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-		body: JSON.stringify(input)
+	const data = await apiRequest<{ article: ArticleAPI }>(BASE_URL, '/article', {
+		token,
+		init: { method: 'POST', body: JSON.stringify(input) },
+		errorPrefix: 'catalog-service'
 	});
-	const data = await res.json().catch(() => ({}));
-	if (!res.ok) throw new Error(data.error ?? `catalog-service error: ${res.status}`);
-	return data.article as ArticleAPI;
+	return data.article;
 }

@@ -177,6 +177,36 @@ func TestBuyAlreadySoldReturns409(t *testing.T) {
 	}
 }
 
+func TestCreateArticleForcesSellerIdentityFromToken(t *testing.T) {
+	setupCatalogDB(t)
+	cat := seedCategory(t)
+
+	// Le client tente d'usurper un autre vendeur : sellerId et seller doivent
+	// etre ecrases par l'identite du token (user 42, email tester@example.com).
+	c, w := newCtx(t, 42,
+		`{"name":"Lot","description":"d","prix":10,"fraisPort":2,"categoryId":`+itoa(cat.ID)+`,"seller":"usurpateur","sellerId":1}`,
+		nil)
+	CreateArticle(c)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status attendu 201, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var art models.Article
+	if err := repository.DB.Order("id desc").First(&art).Error; err != nil {
+		t.Fatalf("article non cree : %v", err)
+	}
+	if art.SellerID != 42 {
+		t.Errorf("sellerId attendu 42 (token), obtenu %d", art.SellerID)
+	}
+	if art.Seller == "usurpateur" {
+		t.Error("le pseudo vendeur envoye par le client ne doit pas etre accepte")
+	}
+	if strings.Contains(art.Seller, "@") {
+		t.Errorf("l'email complet ne doit jamais fuiter dans le champ seller, obtenu %q", art.Seller)
+	}
+}
+
 func TestWishlistAddListRemove(t *testing.T) {
 	setupCatalogDB(t)
 	cat := seedCategory(t)

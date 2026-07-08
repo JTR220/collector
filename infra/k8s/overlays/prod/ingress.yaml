@@ -1,13 +1,22 @@
-# Routage host-based prod. En local k3d, ajouter dans le hosts (127.0.0.1) :
-#   collector.local  auth.collector.local  api.collector.local
-#   notifications.collector.local  price.collector.local
+# Routage host-based prod sur chaker.pro et ses sous-domaines.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: collector
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: collector-prod-tls
+      hosts:
+        - chaker.pro
+        - auth.chaker.pro
+        - api.chaker.pro
+        - price.chaker.pro
+        - notifications.chaker.pro
   rules:
-    - host: collector.local
+    - host: chaker.pro
       http:
         paths:
           - path: /
@@ -17,7 +26,7 @@ spec:
                 name: collector-front
                 port:
                   name: http
-    - host: auth.collector.local
+    - host: auth.chaker.pro
       http:
         paths:
           - path: /
@@ -27,7 +36,7 @@ spec:
                 name: auth-service
                 port:
                   name: http
-    - host: api.collector.local
+    - host: api.chaker.pro
       http:
         paths:
           - path: /
@@ -37,7 +46,7 @@ spec:
                 name: catalog-service
                 port:
                   name: http
-    - host: price.collector.local
+    - host: price.chaker.pro
       http:
         paths:
           - path: /
@@ -47,7 +56,7 @@ spec:
                 name: price-tracker-service
                 port:
                   name: http
-    - host: notifications.collector.local
+    - host: notifications.chaker.pro
       http:
         paths:
           - path: /

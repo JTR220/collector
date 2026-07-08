@@ -144,10 +144,12 @@ services:
       - auth-service
       - catalog-service
     environment:
-      VITE_CATALOG_API_BASE_URL: http://localhost:8081
-      VITE_AUTH_API_BASE_URL: http://localhost:8080
-      VITE_NOTIFICATION_API_BASE_URL: http://localhost:8083
-      VITE_PRICE_TRACKER_API_BASE_URL: http://localhost:8082
+      # Lues au runtime par $env/dynamic/public (préfixe PUBLIC_ obligatoire) —
+      # les anciennes VITE_* n'étaient plus lues par le code.
+      PUBLIC_CATALOG_API_BASE_URL: http://localhost:8081
+      PUBLIC_AUTH_API_BASE_URL: http://localhost:8080
+      PUBLIC_NOTIFICATION_API_BASE_URL: http://localhost:8083
+      PUBLIC_PRICE_TRACKER_API_BASE_URL: http://localhost:8082
     ports:
       - "5173:5173"
 

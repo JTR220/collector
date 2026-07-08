@@ -5,6 +5,7 @@ import (
 	"auth-service/middlewares"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,8 +35,11 @@ func InitRouter() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	router.POST("/utilisateur", controllers.CreateUser)
-	router.POST("/login", controllers.Login)
+	// Anti brute force : les endpoints d'authentification sont limites par IP
+	// (fenetre glissante, en memoire — suffisant en mono-instance).
+	authLimiter := middlewares.RateLimit(10, time.Minute)
+	router.POST("/utilisateur", authLimiter, controllers.CreateUser)
+	router.POST("/login", authLimiter, controllers.Login)
 
 	protected := router.Group("/")
 	protected.Use(middlewares.AuthRequired())

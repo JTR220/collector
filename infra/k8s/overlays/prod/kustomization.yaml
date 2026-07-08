@@ -13,8 +13,8 @@ kind: Kustomization
 namespace: collector-prod
 
 resources:
-  - ../../base
-  - ingress.yaml
+- ../../base
+- ingress.yaml
   # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
   # - sealed-collector-secrets.yaml
 
@@ -25,55 +25,59 @@ configMapGenerator:
       - DB_PORT=5432
       - DB_NAME=collector
       - DB_USER=postgres
-      - FRONTEND_ORIGIN=http://collector.local
+      - FRONTEND_ORIGIN=https://chaker.pro
   # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
   - name: collector-front-config
     behavior: replace
     literals:
-      - PUBLIC_AUTH_API_BASE_URL=http://auth.collector.local
-      - PUBLIC_CATALOG_API_BASE_URL=http://api.collector.local
-      - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://price.collector.local
-      - PUBLIC_NOTIFICATION_API_BASE_URL=http://notifications.collector.local
+      - PUBLIC_AUTH_API_BASE_URL=https://auth.chaker.pro
+      - PUBLIC_CATALOG_API_BASE_URL=https://api.chaker.pro
+      - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.chaker.pro
+      - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.chaker.pro
 
 # Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
 #   - name: ghcr.io/jtr220/collector/auth-service
 #     digest: sha256:abc123...
 images:
-  - name: ghcr.io/jtr220/collector/auth-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/catalog-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/price-tracker-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/notification-service
-    newTag: bootstrap
-  - name: ghcr.io/jtr220/collector/collector-front
-    newTag: bootstrap
+- digest: sha256:49a716c752555fb013369cef6bfc15438925abeff8de9e94d7dca4944df26bea
+  name: ghcr.io/jtr220/collector/auth-service
+  newName: ghcr.io/jtr220/collector/auth-service
+- digest: sha256:deda429fc44246fd08e71b08676367ce2c9cd22be9a74453f08eb7c698ad8ea9
+  name: ghcr.io/jtr220/collector/catalog-service
+  newName: ghcr.io/jtr220/collector/catalog-service
+- name: ghcr.io/jtr220/collector/collector-front
+  newTag: bootstrap
+- digest: sha256:fd544264653e45a55b806009f4ab639960ec350ba45a37137be32d6f1e889840
+  name: ghcr.io/jtr220/collector/notification-service
+  newName: ghcr.io/jtr220/collector/notification-service
+- digest: sha256:5d48e604b2f6cec0016f17e4c90191577b9cd380723c43345cae2ba1ed5b1a94
+  name: ghcr.io/jtr220/collector/price-tracker-service
+  newName: ghcr.io/jtr220/collector/price-tracker-service
 
-patches:
   # Plus de replicas et de ressources en prod.
   # catalog-service reste à 1 replica : son volume uploads est en ReadWriteOnce.
-  - target:
-      kind: Deployment
-      name: auth-service
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 512Mi
-  - target:
-      kind: Deployment
-      name: collector-front
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target:
-      kind: Deployment
-      name: catalog-service
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 512Mi
+patches:
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 512Mi
+  target:
+    kind: Deployment
+    name: auth-service
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+  target:
+    kind: Deployment
+    name: collector-front
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 512Mi
+  target:
+    kind: Deployment
+    name: catalog-service
