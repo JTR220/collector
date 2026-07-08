@@ -18,22 +18,22 @@ resources:
   # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
   # - sealed-collector-secrets.yaml
 
-  # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
 configMapGenerator:
-- literals:
-  - DB_HOST=postgres
-  - DB_PORT=5432
-  - DB_NAME=collector
-  - DB_USER=postgres
-  - FRONTEND_ORIGIN=http://collector.local
-  name: collector-config
-- behavior: replace
-  literals:
-  - PUBLIC_AUTH_API_BASE_URL=http://auth.collector.local
-  - PUBLIC_CATALOG_API_BASE_URL=http://api.collector.local
-  - PUBLIC_PRICE_TRACKER_API_BASE_URL=http://price.collector.local
-  - PUBLIC_NOTIFICATION_API_BASE_URL=http://notifications.collector.local
-  name: collector-front-config
+  - name: collector-config
+    literals:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=collector
+      - DB_USER=postgres
+      - FRONTEND_ORIGIN=https://chaker.pro
+  # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
+  - name: collector-front-config
+    behavior: replace
+    literals:
+      - PUBLIC_AUTH_API_BASE_URL=https://auth.chaker.pro
+      - PUBLIC_CATALOG_API_BASE_URL=https://api.chaker.pro
+      - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.chaker.pro
+      - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.chaker.pro
 
 # Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
 #   - name: ghcr.io/jtr220/collector/auth-service

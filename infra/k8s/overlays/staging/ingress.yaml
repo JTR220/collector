@@ -1,10 +1,6 @@
-# Routage par path sur IP nue (k3d/k3s : Traefik est l'ingress class par defaut).
-# Pas de nom de domaine possede, et une IP ne peut pas porter de sous-domaines
-# -> un seul host (l'IP), les services sont distingues par prefixe de chemin
+# Routage staging par path sur staging.chaker.pro:8443.
+# Les services sont distingues par prefixe de chemin
 # (/auth, /api, /price, /notifications), strip via Middleware Traefik.
-# TLS via certificat self-signed avec l'IP en SAN (voir certificate.yaml et
-# infra/cert-manager/cluster-issuer.yaml) : Let's Encrypt n'emet pas de
-# certificat pour une IP nue.
 # entryPoint "staging" (port 8443) au lieu de "websecure" (443, utilise par
 # la prod) : distingue visuellement l'URL staging de la prod. Voir
 # infra/traefik/helmchartconfig.yaml.
@@ -56,37 +52,37 @@ spec:
   entryPoints:
     - staging
   tls:
-    secretName: collector-selfsigned-tls
+    secretName: collector-staging-tls
   routes:
-    - match: PathPrefix(`/auth`)
+    - match: Host(`staging.chaker.pro`) && PathPrefix(`/auth`)
       kind: Rule
       middlewares:
         - name: strip-auth-prefix
       services:
         - name: auth-service
           port: http
-    - match: PathPrefix(`/api`)
+    - match: Host(`staging.chaker.pro`) && PathPrefix(`/api`)
       kind: Rule
       middlewares:
         - name: strip-api-prefix
       services:
         - name: catalog-service
           port: http
-    - match: PathPrefix(`/price`)
+    - match: Host(`staging.chaker.pro`) && PathPrefix(`/price`)
       kind: Rule
       middlewares:
         - name: strip-price-prefix
       services:
         - name: price-tracker-service
           port: http
-    - match: PathPrefix(`/notifications`)
+    - match: Host(`staging.chaker.pro`) && PathPrefix(`/notifications`)
       kind: Rule
       middlewares:
         - name: strip-notifications-prefix
       services:
         - name: notification-service
           port: http
-    - match: PathPrefix(`/`)
+    - match: Host(`staging.chaker.pro`) && PathPrefix(`/`)
       kind: Rule
       services:
         - name: collector-front

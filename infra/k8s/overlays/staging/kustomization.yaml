@@ -14,23 +14,21 @@ resources:
 - sealed-collector-secrets.yaml
 
 # Hosts d'API STAGING lus au runtime par le front (remplace les defaults base).
-# HTTPS via certificat self-signed sur IP nue, routage par path (voir
-# ingress.yaml et certificate.yaml) : plus de sous-domaines nip.io (bloques
-# par certains proxys reseau).
+# HTTPS via Let's Encrypt sur staging.chaker.pro:8443, routage par path.
 configMapGenerator:
 - literals:
   - DB_HOST=postgres
   - DB_PORT=5432
   - DB_NAME=collector
   - DB_USER=postgres
-  - FRONTEND_ORIGIN=https://51.255.199.160:8443
+  - FRONTEND_ORIGIN=https://staging.chaker.pro:8443
   name: collector-config
 - behavior: replace
   literals:
-  - PUBLIC_AUTH_API_BASE_URL=https://51.255.199.160:8443/auth
-  - PUBLIC_CATALOG_API_BASE_URL=https://51.255.199.160:8443/api
-  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://51.255.199.160:8443/price
-  - PUBLIC_NOTIFICATION_API_BASE_URL=https://51.255.199.160:8443/notifications
+  - PUBLIC_AUTH_API_BASE_URL=https://staging.chaker.pro:8443/auth
+  - PUBLIC_CATALOG_API_BASE_URL=https://staging.chaker.pro:8443/api
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://staging.chaker.pro:8443/price
+  - PUBLIC_NOTIFICATION_API_BASE_URL=https://staging.chaker.pro:8443/notifications
   - PUBLIC_ENV=staging
   name: collector-front-config
 
