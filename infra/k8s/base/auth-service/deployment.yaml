@@ -38,6 +38,13 @@ spec:
                 secretKeyRef:
                   name: collector-secrets
                   key: JWT_SECRET
+            # partagé avec notification-service : authentifie ses appels internes
+            # GET /internal/users/:id (middlewares.InternalOnly)
+            - name: INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-secrets
+                  key: INTERNAL_SECRET
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:

@@ -35,6 +35,11 @@ function createNotifications() {
 			}
 
 			socket = connectNotifications(token, (msg) => {
+				// NEW_MESSAGE est un evenement de messagerie (deja gere par stores/messages.ts
+				// via une connexion dediee) : l'ignorer ici, sinon l'expediteur d'un message
+				// voit apparaitre une "notification" pour son propre envoi.
+				if (msg.event === 'NEW_MESSAGE') return;
+
 				const data = msg.data ?? {};
 				const incoming: NotificationAPI = {
 					id: String(data.notification_id ?? crypto.randomUUID()),

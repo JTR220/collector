@@ -52,6 +52,13 @@ spec:
                 secretKeyRef:
                   name: collector-secrets
                   key: JWT_SECRET
+            # partagé avec auth-service : authentifie les appels internes
+            # GET /internal/users/:id (resolution du nom du destinataire d'un message)
+            - name: INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-secrets
+                  key: INTERNAL_SECRET
             - name: RABBITMQ_EXCHANGE_EVENTS
               value: "collector.events"
             - name: RABBITMQ_EXCHANGE_ALERTS

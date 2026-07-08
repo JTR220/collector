@@ -25,6 +25,9 @@ configMapGenerator:
       - DB_NAME=collector
       - DB_USER=postgres
       - FRONTEND_ORIGIN=https://chaker.pro
+      # DNS interne au cluster : notification-service resout le nom du
+      # destinataire d'un message via GET /internal/users/:id sur auth-service
+      - AUTH_SERVICE_URL=http://auth-service
   # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
   - name: collector-front-config
     behavior: replace
