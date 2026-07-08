@@ -45,6 +45,9 @@ func main() {
 	if err := repo.Migrate(); err != nil {
 		log.Fatal().Err(err).Msg("migration failed")
 	}
+	if err := repo.SeedDemoData(context.Background()); err != nil {
+		log.Warn().Err(err).Msg("seed demo data failed (non-fatal)")
+	}
 
 	// Verification de connectivite au demarrage (fail-fast) : la connexion
 	// reelle et sa reconnexion automatique sont gerees par Manager.Start.

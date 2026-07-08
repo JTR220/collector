@@ -97,10 +97,13 @@ func GetArticle(c *gin.Context) {
 // GetAllArticles renvoie le catalogue, avec pagination optionnelle
 // (?limit=&offset=) pour que les clients puissent borner la reponse quand le
 // catalogue grossit. Sans parametre, le comportement historique est conserve.
+// Les pieces deja vendues sont exclues : une fois achetee, une annonce
+// disparait du catalogue public (l'historique acheteur/vendeur passe par
+// /me/orders et /me/sales, pas par cette route).
 func GetAllArticles(c *gin.Context) {
 	var articles []models.Article
 
-	query := repository.DB.Preload("Category").Order("id desc")
+	query := repository.DB.Preload("Category").Order("id desc").Where("sold = ?", false)
 	if limit, err := strconv.Atoi(c.Query("limit")); err == nil && limit > 0 {
 		query = query.Limit(limit)
 		if offset, err := strconv.Atoi(c.Query("offset")); err == nil && offset > 0 {

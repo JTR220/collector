@@ -47,6 +47,7 @@ func InitDB() {
 
 func SeedData() {
 	defer backfillArticleImages()
+	defer backfillDemoOrders()
 	defer backfillSellerAssignments()
 
 	// Categories idempotentes (FirstOrCreate par nom) : le seed peut tourner
@@ -392,25 +393,100 @@ func generateCatalog(catID func(string) uint) []models.Article {
 	return out
 }
 
-// backfillSellerAssignments relie quelques pieces vedettes au compte "Vendeur
-// Demo" (auth-service, seed dans l'ordre admin=1, test=2, vendeur=3,
+// backfillSellerAssignments relie quelques pieces vedettes aux comptes de
+// demo (auth-service, seed dans l'ordre admin=1, test=2, vendeur=3,
 // acheteur=4 sur une base fraiche) afin de pouvoir tester le flux de
-// notifications reel : "Acheteur Demo" achete une piece -> ORDER_PENDING
-// recu par le vendeur -> acceptation/refus -> ORDER_ACCEPTED/REJECTED recu
-// par l'acheteur. Idempotent (ne touche que les pieces encore sans vendeur).
+// notifications/messagerie de bout en bout : "Vendeur Demo" possede 3
+// pieces, "Testeur" en possede 3 autres, sur lesquelles backfillDemoOrders
+// et le seed cote notification-service (SeedDemoData) viennent brancher des
+// commandes et des messages. Idempotent (ne touche que les pieces encore
+// sans vendeur).
 func backfillSellerAssignments() {
-	const vendeurDemoID = 3
-	slugsVendeurDemo := []string{"PKM-001", "GBC-014", "CMX-007"}
-
-	res := DB.Model(&models.Article{}).
-		Where("slug IN ? AND seller_id = 0", slugsVendeurDemo).
-		Update("seller_id", vendeurDemoID)
-	if res.Error != nil {
-		log.Printf("Erreur affectation vendeur demo : %v", res.Error)
-		return
+	const (
+		testDemoID    = 2
+		vendeurDemoID = 3
+	)
+	assignments := []struct {
+		ownerID uint
+		slugs   []string
+	}{
+		{vendeurDemoID, []string{"PKM-001", "GBC-014", "CMX-007"}},
+		{testDemoID, []string{"VNL-022", "FIG-101", "WAT-045"}},
 	}
-	if res.RowsAffected > 0 {
-		log.Printf("Vendeur demo (ID %d) assigne a %d piece(s)", vendeurDemoID, res.RowsAffected)
+
+	for _, a := range assignments {
+		res := DB.Model(&models.Article{}).
+			Where("slug IN ? AND seller_id = 0", a.slugs).
+			Update("seller_id", a.ownerID)
+		if res.Error != nil {
+			log.Printf("Erreur affectation compte demo (ID %d) : %v", a.ownerID, res.Error)
+			continue
+		}
+		if res.RowsAffected > 0 {
+			log.Printf("Compte demo (ID %d) assigne a %d piece(s)", a.ownerID, res.RowsAffected)
+		}
+	}
+}
+
+// backfillDemoOrders cree des commandes de demo sur les pieces de "Testeur"
+// (ID 2, voir backfillSellerAssignments) pour illustrer le flux notifications
+// sans avoir a rejouer l'achat a la main depuis l'UI :
+//   - VNL-022 : commande de "Vendeur Demo" deja acceptee (paid) -> demontre
+//     qu'une piece vendue disparait du catalogue public (GetAllArticles).
+//   - FIG-101 : commande de "Vendeur Demo" encore en attente -> Testeur a
+//     une notification ORDER_PENDING a traiter dans son profil.
+//   - WAT-045 reste volontairement disponible (aucune commande) : elle sert
+//     de support a la negociation par message (notification-service).
+// Idempotent : ne cree la commande que si aucune n'existe deja pour ce
+// couple (article, acheteur). Pas de publication d'evenement AMQP ici : les
+// notifications correspondantes sont seedees directement cote
+// notification-service (SeedDemoData), pas rejouees via le bus.
+func backfillDemoOrders() {
+	const (
+		testDemoID    = 2
+		vendeurDemoID = 3
+	)
+	demoOrders := []struct {
+		slug   string
+		status string
+	}{
+		{"VNL-022", "paid"},
+		{"FIG-101", "pending"},
+	}
+
+	for _, d := range demoOrders {
+		var article models.Article
+		if err := DB.Where("slug = ?", d.slug).First(&article).Error; err != nil {
+			continue
+		}
+
+		var count int64
+		DB.Model(&models.Order{}).
+			Where("article_id = ? AND buyer_id = ?", article.ID, vendeurDemoID).
+			Count(&count)
+		if count > 0 {
+			continue
+		}
+
+		order := models.Order{
+			BuyerID:   vendeurDemoID,
+			SellerID:  testDemoID,
+			ArticleID: article.ID,
+			Price:     article.Prix,
+			FraisPort: article.FraisPort,
+			Status:    d.status,
+		}
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&models.Article{}).Where("id = ?", article.ID).Update("sold", true).Error; err != nil {
+				return err
+			}
+			return tx.Create(&order).Error
+		})
+		if err != nil {
+			log.Printf("Erreur commande demo %s: %v", d.slug, err)
+			continue
+		}
+		log.Printf("Commande demo creee : %s (%s)", d.slug, d.status)
 	}
 }
 
