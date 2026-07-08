@@ -46,7 +46,7 @@ func newMockDetector(t *testing.T, rules config.DetectionRules) (*detector.Detec
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := repository.NewPriceRepository(sqlxDB)
 	d := detector.New(repo, rules)
-	return d, mock, func() { db.Close() }
+	return d, mock, func() { _ = db.Close() }
 }
 
 func TestAnalyze_SpikeDetected(t *testing.T) {

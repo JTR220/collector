@@ -49,7 +49,7 @@ func dialWS(t *testing.T, srv *httptest.Server) *websocket.Conn {
 	if err != nil {
 		t.Fatalf("dial websocket: %v", err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	return conn
 }
 
@@ -107,7 +107,7 @@ func TestClient_DisconnectUnregisters(t *testing.T) {
 	conn := dialWS(t, srv)
 	waitForConnectedCount(t, h, 1)
 
-	conn.Close()
+	_ = conn.Close()
 	// Laisse le temps a ReadPump de detecter la fermeture et de se
 	// desenregistrer aupres du hub.
 	deadline := time.Now().Add(2 * time.Second)

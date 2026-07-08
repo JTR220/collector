@@ -113,7 +113,7 @@ func newMockRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := repository.NewPriceRepository(sqlxDB)
 	r := gin.New()

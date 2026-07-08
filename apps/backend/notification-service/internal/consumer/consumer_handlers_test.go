@@ -45,7 +45,7 @@ func newTestManager(t *testing.T) (*Manager, sqlmock.Sqlmock) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := repository.New(sqlxDB)
 	h := hub.New()
