@@ -55,7 +55,29 @@ func (r *NotificationRepository) Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_messages_participants  ON messages(sender_id, recipient_id);
 	CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread ON messages(recipient_id, read);
 	`
-	_, err := r.db.Exec(schema)
+
+	ctx := context.Background()
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close() }()
+
+	// Verrou consultatif Postgres : en CI, plusieurs packages de test
+	// (internal/repository, internal/handler) se connectent au meme
+	// TEST_DATABASE_DSN et appellent Migrate() en parallele. Sans verrou,
+	// deux "CREATE TABLE IF NOT EXISTS" concurrents peuvent constater tous
+	// les deux que la table n'existe pas encore et se marcher dessus sur le
+	// catalogue systeme (pg_type_typname_nsp_index). Le verrou serialise
+	// l'execution du DDL ; les advisory locks sont scoped a la connexion,
+	// d'ou l'usage explicite de conn plutot que r.db pour lock/DDL/unlock.
+	const migrateLockKey = 727163
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrateLockKey); err != nil {
+		return err
+	}
+	defer func() { _, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", migrateLockKey) }()
+
+	_, err = conn.ExecContext(ctx, schema)
 	return err
 }
 
