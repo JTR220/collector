@@ -295,7 +295,7 @@ jobs:
           mkdir -p /tmp/digests
           echo "${IMAGE}@${{ steps.push.outputs.digest }}" > /tmp/digests/collector-front
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: digest-collector-front

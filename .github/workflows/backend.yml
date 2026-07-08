@@ -108,7 +108,7 @@ jobs:
             ./...
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-${{ matrix.service }}
@@ -320,7 +320,7 @@ jobs:
           mkdir -p /tmp/digests
           echo "${IMAGE}@${{ steps.push.outputs.digest }}" > "/tmp/digests/${{ matrix.service }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: digest-${{ matrix.service }}
