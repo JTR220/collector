@@ -142,9 +142,7 @@
 		salesBusyId = order.ID;
 		salesMsg = null;
 		try {
-			const { order: updated } = accept
-				? await acceptOrder(order.ID)
-				: await rejectOrder(order.ID);
+			const { order: updated } = accept ? await acceptOrder(order.ID) : await rejectOrder(order.ID);
 			sales = sales.map((s) => (s.ID === updated.ID ? { ...s, status: updated.status } : s));
 			salesMsg = accept
 				? 'Commande acceptée.'
