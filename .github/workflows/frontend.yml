@@ -295,7 +295,7 @@ jobs:
           mkdir -p /tmp/digests
           echo "${IMAGE}@${{ steps.push.outputs.digest }}" > /tmp/digests/collector-front
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: digest-collector-front
@@ -328,7 +328,7 @@ jobs:
           merge-multiple: true
 
       - name: Install kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       - name: Pin new image digest in staging overlay
         working-directory: infra/k8s/overlays/staging
@@ -382,7 +382,7 @@ jobs:
           merge-multiple: true
 
       - name: Install kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       - name: Pin new image digest in prod overlay
         working-directory: infra/k8s/overlays/prod
