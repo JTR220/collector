@@ -65,7 +65,9 @@ const MAX_BACKOFF_MS = 30000;
 // Authentifie par le cookie httpOnly de session : le navigateur le joint
 // automatiquement a la requete d'upgrade WS (meme domaine/sous-domaine),
 // impossible de toute facon de le lire en JS pour le poser en ?token=.
-export function connectNotifications(onMessage: (msg: WebSocketMessage) => void): NotificationSocket {
+export function connectNotifications(
+	onMessage: (msg: WebSocketMessage) => void
+): NotificationSocket {
 	if (!browser) return { close: () => {} };
 
 	const wsUrl = BASE_URL.replace(/^http/, 'ws') + '/ws';

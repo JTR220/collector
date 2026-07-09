@@ -81,26 +81,26 @@ const (
 
 type Article struct {
 	gorm.Model
-	Slug         string       `json:"slug"`
-	Name         string       `json:"name" binding:"required"`
-	Description  string       `json:"description" binding:"required"`
-	Series       string       `json:"series"`
-	Year         int          `json:"year"`
-	Rarity       string       `json:"rarity"`
-	RarityScore  int          `json:"rarityScore"`
-	Grade        string       `json:"grade"`
-	Prix         float64      `json:"prix" binding:"required"`
-	FraisPort    float64      `json:"fraisPort" binding:"required"`
-	Seller       string       `json:"seller"`
-	SellerID     uint         `json:"sellerId" gorm:"index"`
-	SellerScore  float64      `json:"sellerScore"`
-	ImageURL     string       `json:"imageUrl"`
+	Slug        string  `json:"slug"`
+	Name        string  `json:"name" binding:"required"`
+	Description string  `json:"description" binding:"required"`
+	Series      string  `json:"series"`
+	Year        int     `json:"year"`
+	Rarity      string  `json:"rarity"`
+	RarityScore int     `json:"rarityScore"`
+	Grade       string  `json:"grade"`
+	Prix        float64 `json:"prix" binding:"required"`
+	FraisPort   float64 `json:"fraisPort" binding:"required"`
+	Seller      string  `json:"seller"`
+	SellerID    uint    `json:"sellerId" gorm:"index"`
+	SellerScore float64 `json:"sellerScore"`
+	ImageURL    string  `json:"imageUrl"`
 	// Images est la galerie complete (l'ImageURL ci-dessus reste la photo de
 	// couverture, utilisee par les cartes catalogue et rester compatible avec
 	// l'existant). Stockee en JSON texte, comme PriceHistory.
-	Images       StringSlice  `json:"images" gorm:"type:text"`
-	SaleType     string       `json:"saleType"` // drop | direct
-	Sold         bool         `json:"sold"`
+	Images   StringSlice `json:"images" gorm:"type:text"`
+	SaleType string      `json:"saleType"` // drop | direct
+	Sold     bool        `json:"sold"`
 	// Status : l'une des constantes ArticleStatus* ci-dessus. Seules les
 	// annonces "approved" apparaissent dans le catalogue public
 	// (GetAllArticles, GetArticle) — voir controllers/articleController.go.

@@ -3,8 +3,8 @@
 		<span class="empty-glyph">✉</span>
 		<p class="empty-title">Sélectionnez une conversation</p>
 		<p class="empty-text">
-			Choisissez un échange dans la liste à gauche, ou contactez un vendeur depuis une fiche
-			produit pour démarrer une nouvelle conversation.
+			Choisissez un échange dans la liste à gauche, ou contactez un vendeur depuis une fiche produit
+			pour démarrer une nouvelle conversation.
 		</p>
 	</div>
 </div>

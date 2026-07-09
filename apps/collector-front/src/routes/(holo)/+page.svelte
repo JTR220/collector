@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchArticles, fetchCategories, articleImage, type ArticleAPI, type CategoryAPI } from '$lib/api/catalog';
+	import {
+		fetchArticles,
+		fetchCategories,
+		articleImage,
+		type ArticleAPI,
+		type CategoryAPI
+	} from '$lib/api/catalog';
 	import { eur, pct } from '$lib/utils/format';
 	import GSelect from '$lib/components/galerie/GSelect.svelte';
 

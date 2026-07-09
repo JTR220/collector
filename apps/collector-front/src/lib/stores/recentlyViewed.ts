@@ -30,7 +30,9 @@ function createRecentlyViewed() {
 		// Pousse l'article consulté en tête de liste (plus récent en premier),
 		// sans doublon, plafonné à MAX_ITEMS.
 		push(article: ArticleAPI) {
-			store.update((items) => [article, ...items.filter((i) => i.ID !== article.ID)].slice(0, MAX_ITEMS));
+			store.update((items) =>
+				[article, ...items.filter((i) => i.ID !== article.ID)].slice(0, MAX_ITEMS)
+			);
 		}
 	};
 }

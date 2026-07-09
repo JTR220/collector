@@ -111,7 +111,10 @@
 		if (!$auth.user || !body || thread.length === 0) return;
 
 		if (containsContactInfo(body)) {
-			blockedAttempts = [...blockedAttempts, { id: `blocked-${Date.now()}`, body, created_at: new Date().toISOString() }];
+			blockedAttempts = [
+				...blockedAttempts,
+				{ id: `blocked-${Date.now()}`, body, created_at: new Date().toISOString() }
+			];
 			draft = '';
 			scrollToBottom();
 			return;

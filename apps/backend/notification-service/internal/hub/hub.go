@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/metrics"
+	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"

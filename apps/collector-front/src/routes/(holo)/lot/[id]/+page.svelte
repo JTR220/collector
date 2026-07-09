@@ -3,7 +3,13 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
-	import { fetchArticle, fetchArticles, articleImage, articleImages, type ArticleAPI } from '$lib/api/catalog';
+	import {
+		fetchArticle,
+		fetchArticles,
+		articleImage,
+		articleImages,
+		type ArticleAPI
+	} from '$lib/api/catalog';
 	import { recentlyViewed } from '$lib/stores/recentlyViewed';
 	import { addToWishlist, removeFromWishlist, fetchMyWishlist } from '$lib/api/wishlist';
 	import {
@@ -286,7 +292,11 @@
 				{#if article.sold}
 					<button class="btn-primary" disabled>Vendu</button>
 				{:else if isOwnArticle}
-					<button class="btn-primary" disabled title="Vous ne pouvez pas acheter votre propre annonce">
+					<button
+						class="btn-primary"
+						disabled
+						title="Vous ne pouvez pas acheter votre propre annonce"
+					>
 						Votre annonce
 					</button>
 				{:else}
@@ -352,7 +362,11 @@
 						bind:value={negotiateComment}
 						disabled={negotiateBusy}
 						rows="2"></textarea>
-					<button class="btn-send" disabled={negotiateBusy || !negotiatePrice} onclick={sendNegotiation}>
+					<button
+						class="btn-send"
+						disabled={negotiateBusy || !negotiatePrice}
+						onclick={sendNegotiation}
+					>
 						Envoyer l'offre
 					</button>
 				</div>
@@ -397,14 +411,7 @@
 			style="display:block;margin-top:12px"
 		>
 			{#each [0, 1, 2, 3] as i}
-				<line
-					x1="0"
-					y1={(H * i) / 3}
-					x2={W}
-					y2={(H * i) / 3}
-					stroke="#e4dcc8"
-					stroke-width="0.5"
-				/>
+				<line x1="0" y1={(H * i) / 3} x2={W} y2={(H * i) / 3} stroke="#e4dcc8" stroke-width="0.5" />
 			{/each}
 			<path d={historyPath} stroke={up ? '#3f7a52' : '#b0432a'} stroke-width="2" fill="none" />
 		</svg>

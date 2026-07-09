@@ -150,9 +150,7 @@
 		userBusyId = u.ID;
 		moderationMsg = '';
 		try {
-			const { suspended } = u.suspended
-				? await unsuspendUser(u.ID)
-				: await suspendUser(u.ID);
+			const { suspended } = u.suspended ? await unsuspendUser(u.ID) : await suspendUser(u.ID);
 			users = users.map((x) => (x.ID === u.ID ? { ...x, suspended } : x));
 		} catch (e) {
 			moderationMsg = e instanceof Error ? e.message : 'Action impossible.';
