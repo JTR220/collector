@@ -66,6 +66,19 @@ type Categorie struct {
 	Description string `json:"description" binding:"required"`
 }
 
+// Statuts de moderation d'une annonce (voir controllers.CreateArticle,
+// ApproveArticle, RejectArticle). Le defaut DB "approved" (tag gorm
+// ci-dessous) ne s'applique qu'aux lignes ou le champ est laisse a sa valeur
+// zero Go (catalogue de demo, SeedData) : CreateArticle force explicitement
+// PendingReview pour toute nouvelle annonce creee par un utilisateur, et une
+// migration sur une base existante (ALTER TABLE ADD COLUMN ... DEFAULT)
+// classe automatiquement les annonces deja en place comme approuvees.
+const (
+	ArticleStatusPendingReview = "pending_review"
+	ArticleStatusApproved      = "approved"
+	ArticleStatusRejected      = "rejected"
+)
+
 type Article struct {
 	gorm.Model
 	Slug         string       `json:"slug"`
@@ -88,6 +101,10 @@ type Article struct {
 	Images       StringSlice  `json:"images" gorm:"type:text"`
 	SaleType     string       `json:"saleType"` // drop | direct
 	Sold         bool         `json:"sold"`
+	// Status : l'une des constantes ArticleStatus* ci-dessus. Seules les
+	// annonces "approved" apparaissent dans le catalogue public
+	// (GetAllArticles, GetArticle) — voir controllers/articleController.go.
+	Status       string       `json:"status" gorm:"default:approved;index"`
 	Views        uint         `json:"views"`
 	Delta        float64      `json:"delta"`
 	PriceHistory PriceHistory `json:"priceHistory" gorm:"type:text"`

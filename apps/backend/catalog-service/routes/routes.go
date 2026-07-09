@@ -94,6 +94,8 @@ func InitRouter() *gin.Engine {
 	{
 		admin.GET("/stats", controllers.GetAdminStats)
 		admin.GET("/articles", controllers.GetAllArticlesAdmin)
+		admin.PATCH("/articles/:id/approve", controllers.ApproveArticle)
+		admin.PATCH("/articles/:id/reject", controllers.RejectArticle)
 	}
 
 	// Creation de categories : reservee aux administrateurs (moderation du catalogue).

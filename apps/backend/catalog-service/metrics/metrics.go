@@ -45,6 +45,10 @@ var (
 		Name: "collector_catalog_image_uploads_total",
 		Help: "Article image upload attempts by result.",
 	}, []string{"result"})
+	ArticleModerationTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "collector_catalog_article_moderation_total",
+		Help: "Admin moderation decisions on articles by decision and result.",
+	}, []string{"decision", "result"})
 )
 
 func Middleware() gin.HandlerFunc {
@@ -84,6 +88,10 @@ func RecordOrderDecision(decision, result string) {
 
 func RecordImageUpload(result string) {
 	ImageUploadsTotal.WithLabelValues(result).Inc()
+}
+
+func RecordModerationDecision(decision, result string) {
+	ArticleModerationTotal.WithLabelValues(decision, result).Inc()
 }
 
 // Serve expose /metrics sur un port interne dedie (jamais route par l'ingress
