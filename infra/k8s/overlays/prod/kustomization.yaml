@@ -17,22 +17,22 @@ resources:
 - ingress.yaml
 - sealed-collector-secrets.yaml
 
-configMapGenerator:
-  - name: collector-config
-    literals:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=collector
-      - DB_USER=postgres
-      - FRONTEND_ORIGIN=https://chaker.pro
   # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
-  - name: collector-front-config
-    behavior: replace
-    literals:
-      - PUBLIC_AUTH_API_BASE_URL=https://auth.chaker.pro
-      - PUBLIC_CATALOG_API_BASE_URL=https://api.chaker.pro
-      - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.chaker.pro
-      - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.chaker.pro
+configMapGenerator:
+- literals:
+  - DB_HOST=postgres
+  - DB_PORT=5432
+  - DB_NAME=collector
+  - DB_USER=postgres
+  - FRONTEND_ORIGIN=https://chaker.pro
+  name: collector-config
+- behavior: replace
+  literals:
+  - PUBLIC_AUTH_API_BASE_URL=https://auth.chaker.pro
+  - PUBLIC_CATALOG_API_BASE_URL=https://api.chaker.pro
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.chaker.pro
+  - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.chaker.pro
+  name: collector-front-config
 
 # Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
 #   - name: ghcr.io/jtr220/collector/auth-service
@@ -44,7 +44,7 @@ images:
 - digest: sha256:deda429fc44246fd08e71b08676367ce2c9cd22be9a74453f08eb7c698ad8ea9
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
-- digest: sha256:294fc75ef0488a0dd71908eb817ea62e33ef94d0561f599f975ad1a9fccca19c
+- digest: sha256:17655f39633bc8dda1c9d93d78a4198b73768331a6f4a409440be6ae9f9d8a1e
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
 - digest: sha256:fd544264653e45a55b806009f4ab639960ec350ba45a37137be32d6f1e889840
