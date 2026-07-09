@@ -17,6 +17,9 @@ resources:
 # HTTPS via Let's Encrypt sur staging.chaker.pro:8443, routage par path.
   # DNS interne au cluster : notification-service resout le nom du
   # destinataire d'un message via GET /internal/users/:id sur auth-service
+  # HTTPS (Let's Encrypt) : le cookie de session httpOnly doit etre marque
+  # Secure. Pas de COOKIE_DOMAIN : staging est mono-host (routage par path
+  # via Traefik, voir ingress.yaml), un cookie "host-only" suffit.
 configMapGenerator:
 - literals:
   - DB_HOST=postgres
@@ -25,9 +28,6 @@ configMapGenerator:
   - DB_USER=postgres
   - FRONTEND_ORIGIN=https://staging.chaker.pro:8443
   - AUTH_SERVICE_URL=http://auth-service
-  # HTTPS (Let's Encrypt) : le cookie de session httpOnly doit etre marque
-  # Secure. Pas de COOKIE_DOMAIN : staging est mono-host (routage par path
-  # via Traefik, voir ingress.yaml), un cookie "host-only" suffit.
   - COOKIE_SECURE=true
   name: collector-config
 - behavior: replace
@@ -42,18 +42,18 @@ configMapGenerator:
 # "bootstrap" est un placeholder : remplacé par un digest immuable
 # (image@sha256:...) au premier passage de la CI.
 images:
-- digest: sha256:932988832c511a95bbec2b66fc8fe78a4cf7ca5e312eaa97d15e7012694b5f42
+- digest: sha256:212681396974500f909b8bf236a1c38a08dcb4a0f94b4f661a2fb9fa6a84c572
   name: ghcr.io/jtr220/collector/auth-service
   newName: ghcr.io/jtr220/collector/auth-service
-- digest: sha256:44d9991816923daba1a180d480c130ae89d6b68987cfc16e260d6d1c8593fa59
+- digest: sha256:146568a32bb62b1a84ccc11fe8492a3790a323ee4caa88b07e6e8e0f82663615
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
 - digest: sha256:17655f39633bc8dda1c9d93d78a4198b73768331a6f4a409440be6ae9f9d8a1e
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
-- digest: sha256:3d17cb9ac42aeec948c1cd4163adb9d7c24e7ce27344ed9806149d56ae0d112d
+- digest: sha256:9d0ad18bcb4683829d2dc81caeeeb2cb85fb3d91e9b46e636025748438a0e809
   name: ghcr.io/jtr220/collector/notification-service
   newName: ghcr.io/jtr220/collector/notification-service
-- digest: sha256:0285fb6e0da67b09bbf352931439b0c849d5022718e71c1af7ca971b68865c40
+- digest: sha256:5b0745d0390fb45716509538e37e7a5a6fa42ac61875120b9ae7fe22326ae207
   name: ghcr.io/jtr220/collector/price-tracker-service
   newName: ghcr.io/jtr220/collector/price-tracker-service
