@@ -173,6 +173,28 @@ func TestSendMessage_InvalidRecipient(t *testing.T) {
 	}
 }
 
+func TestSendMessage_EmailRejected(t *testing.T) {
+	r, _ := newMockRouter(t)
+	userID := uuid.New()
+	recipient := uuid.New()
+	body := `{"recipient_id":"` + recipient.String() + `","body":"contacte moi a jean@example.com plutot"}`
+	w := authedRequest(r, http.MethodPost, "/api/v1/messages", body, mockToken(t, userID))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status attendu 400 pour un message contenant un email, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestSendMessage_PhoneNumberRejected(t *testing.T) {
+	r, _ := newMockRouter(t)
+	userID := uuid.New()
+	recipient := uuid.New()
+	body := `{"recipient_id":"` + recipient.String() + `","body":"appelle moi au 06 12 34 56 78"}`
+	w := authedRequest(r, http.MethodPost, "/api/v1/messages", body, mockToken(t, userID))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status attendu 400 pour un message contenant un telephone, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
 func TestSendMessage_Success(t *testing.T) {
 	r, mock := newMockRouter(t)
 	userID := uuid.New()
