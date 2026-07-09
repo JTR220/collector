@@ -20,6 +20,7 @@ complète — sans le dupliquer — ce qui existe déjà :
 | [03-indicateurs-qualite.md](03-indicateurs-qualite.md) | 4 indicateurs qualité ISO 25010 vs dette technique (1 pt) |
 | [04-cartographie-competences-formation.md](04-cartographie-competences-formation.md) | Compétences + action de formation (1 pt) |
 | [05-plan-remediation-securite.md](05-plan-remediation-securite.md) | Plan de remédiation priorisé (2 pts) |
+| [06-preparation-soutenance-jury.md](06-preparation-soutenance-jury.md) | Support de révision oral : architecture, sécurité, tests, GitOps, questions jury |
 
 ## Ce qui reste hors de ce dossier (à faire en dehors du code)
 

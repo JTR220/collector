@@ -1,5 +1,4 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/stores';
 	import GHeader from '$lib/components/galerie/GHeader.svelte';
 
@@ -14,8 +13,6 @@
 	};
 	const active = $derived(routeToActive[$page.url.pathname] ?? '');
 </script>
-
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 <div class="m-frame">
 	{#if !hideHeader}

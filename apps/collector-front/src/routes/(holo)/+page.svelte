@@ -9,6 +9,16 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
+	// Collage décoratif du bandeau hero (en attente d'une vraie photo d'ambiance).
+	const heroGlyphs = [
+		{ icon: '🎴', label: 'Cartes', r: -4 },
+		{ icon: '🎮', label: 'Consoles', r: 3 },
+		{ icon: '📚', label: 'Comics', r: -2 },
+		{ icon: '💿', label: 'Vinyles', r: 4 },
+		{ icon: '🧸', label: 'Designer toys', r: -3 },
+		{ icon: '⌚', label: 'Horlogerie', r: 2 }
+	];
+
 	onMount(async () => {
 		try {
 			[articles, categories] = await Promise.all([fetchArticles(), fetchCategories()]);
@@ -101,8 +111,14 @@
 		<a class="hero-cta" href="#grille">Découvrir la sélection</a>
 	</div>
 	<div class="hero-art" aria-hidden="true">
-		<span class="hero-art-icon">🖼</span>
-		<span class="hero-art-label">Photo d'ambiance collection</span>
+		<div class="hero-collage">
+			{#each heroGlyphs as g}
+				<div class="hero-tile" style="--r:{g.r}deg">
+					<span class="hero-tile-icon">{g.icon}</span>
+					<span class="hero-tile-label">{g.label}</span>
+				</div>
+			{/each}
+		</div>
 	</div>
 </section>
 
@@ -308,25 +324,40 @@
 		flex: none;
 		width: 340px;
 		height: 220px;
-		border-radius: 16px;
-		border: 1.5px dashed rgba(246, 241, 230, 0.35);
-		background: rgba(246, 241, 230, 0.06);
+	}
+	.hero-collage {
+		width: 100%;
+		height: 100%;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 12px;
+		padding: 4px;
+	}
+	.hero-tile {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 8px;
+		gap: 6px;
+		background: var(--c-bg);
+		border-radius: 10px;
+		box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+		transform: rotate(var(--r));
+		transition: transform 150ms;
 	}
-	.hero-art-icon {
-		font-size: 26px;
-		opacity: 0.6;
+	.hero-tile:hover {
+		transform: rotate(0deg) scale(1.05);
 	}
-	.hero-art-label {
+	.hero-tile-icon {
+		font-size: 24px;
+	}
+	.hero-tile-label {
 		font-family: var(--f-body);
-		font-size: 11.5px;
-		color: #c9e0ce;
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		color: var(--c-ink);
 		text-align: center;
-		max-width: 200px;
 	}
 	@media (max-width: 900px) {
 		.hero-art {

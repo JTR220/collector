@@ -1,0 +1,45 @@
+# Expose l'UI Argo CD en HTTPS sur argocd.chaker.pro, via Traefik (deja en
+# place pour staging/prod) + cert-manager (letsencrypt-prod, deja utilise par
+# infra/k8s/overlays/prod/ingress.yaml).
+#
+# Argo CD termine du TLS lui-meme par defaut (certificat auto-signe sur le
+# port 443 du service argocd-server) : pour laisser Traefik terminer le TLS
+# public (Let's Encrypt) et lui parler en clair derriere, il faut d'abord
+# passer argocd-server en mode "insecure" (HTTP interne uniquement) :
+#
+#   kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge \
+#     -p '{"data":{"server.insecure":"true"}}'
+#   kubectl rollout restart deployment argocd-server -n argocd
+#
+# Namespace "argocd" installe par Helm (voir infra/README.md), pas gere par
+# une Application Argo CD -> ce manifeste s'applique a la main, hors GitOps :
+#
+#   kubectl apply -f infra/argocd/ingress.yaml
+#
+# Necessite au prealable un enregistrement DNS "argocd.chaker.pro" -> IP du
+# VPS (meme zone que chaker.pro / staging.chaker.pro), a ajouter manuellement
+# chez le registrar/DNS (hors GitOps).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: argocd-server-tls
+      hosts:
+        - argocd.chaker.pro
+  rules:
+    - host: argocd.chaker.pro
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  name: http
