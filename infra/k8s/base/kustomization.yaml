@@ -16,15 +16,20 @@ resources:
   - rabbitmq/service.yaml
   - auth-service/deployment.yaml
   - auth-service/service.yaml
+  - auth-service/servicemonitor.yaml
   - catalog-service/deployment.yaml
   - catalog-service/service.yaml
   - catalog-service/pvc.yaml
+  - catalog-service/servicemonitor.yaml
   - price-tracker-service/deployment.yaml
   - price-tracker-service/service.yaml
+  - price-tracker-service/servicemonitor.yaml
   - notification-service/deployment.yaml
   - notification-service/service.yaml
+  - notification-service/servicemonitor.yaml
   - collector-front/deployment.yaml
   - collector-front/service.yaml
+  - monitoring/grafana-dashboard-configmap.yaml
 
 # URLs d'API consommées au runtime par le front ($env/dynamic/public).
 # Valeurs localhost par défaut ; chaque overlay les remplace (behavior: replace)
