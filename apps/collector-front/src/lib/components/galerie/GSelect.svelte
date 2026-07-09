@@ -96,6 +96,15 @@
 		display: block;
 		width: 100%;
 	}
+	.gs-compact {
+		display: inline-block;
+		width: auto;
+		flex: none;
+	}
+	.gs-compact .gs-btn {
+		width: auto;
+		min-width: 150px;
+	}
 	.gs-btn {
 		display: flex;
 		align-items: center;
@@ -115,9 +124,6 @@
 		transition:
 			border-color 150ms,
 			box-shadow 150ms;
-	}
-	.gs-compact .gs-btn {
-		min-width: 0;
 	}
 	.gs-btn:hover {
 		border-color: var(--c-ink);

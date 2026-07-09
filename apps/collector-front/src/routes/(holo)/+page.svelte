@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { auth } from '$lib/stores/auth';
 	import { fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
 	import { eur, pct } from '$lib/utils/format';
-	import GSpark from '$lib/components/galerie/GSpark.svelte';
 	import GSelect from '$lib/components/galerie/GSelect.svelte';
-	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
 	let articles = $state<ArticleAPI[]>([]);
 	let loading = $state(true);
@@ -87,21 +84,6 @@
 		availableOnly = false;
 		sort = 'recent';
 	}
-
-	// Sparkline fictive dérivée du prix (pour la démo)
-	function demoSpark(prix: number, delta: number): number[] {
-		const base = prix / (1 + delta / 100);
-		return [
-			base * 0.88,
-			base * 0.91,
-			base * 0.94,
-			base * 0.97,
-			base,
-			prix * 0.98,
-			prix * 0.99,
-			prix
-		];
-	}
 </script>
 
 <svelte:head><title>Collector.shop · Marché</title></svelte:head>
@@ -117,11 +99,10 @@
 		</p>
 		<a class="hero-cta" href="#grille">Découvrir la sélection</a>
 	</div>
-	{#if $auth.user}
-		<a class="hero-sell" href="/vendre">+ Vendre une pièce</a>
-	{:else}
-		<a class="hero-sell" href="/login">Se connecter pour vendre</a>
-	{/if}
+	<div class="hero-art" aria-hidden="true">
+		<span class="hero-art-icon">🖼</span>
+		<span class="hero-art-label">Photo d'ambiance collection</span>
+	</div>
 </section>
 
 <!-- Filtres catégorie (pills) -->
@@ -156,6 +137,7 @@
 		bind:value={filterRarity}
 		ariaLabel="Rareté"
 		placeholder="Toutes raretés"
+		compact
 		options={[
 			{ value: '', label: 'Toutes raretés' },
 			...rarities.map((r) => ({ value: r, label: r }))
@@ -165,12 +147,14 @@
 		bind:value={filterGrade}
 		ariaLabel="Grade"
 		placeholder="Tous grades"
+		compact
 		options={[{ value: '', label: 'Tous grades' }, ...grades.map((g) => ({ value: g, label: g }))]}
 	/>
 	<GSelect
 		bind:value={filterMax}
 		ariaLabel="Prix maximum"
 		placeholder="Tous prix"
+		compact
 		options={[
 			{ value: 0, label: 'Tous prix' },
 			{ value: 100, label: '≤ 100 €' },
@@ -210,10 +194,8 @@
 	<!-- Grille de cartes -->
 	<section class="grid-section" id="grille">
 		{#each filtered as article (article.ID)}
-			{@const spark = demoSpark(article.prix, article.delta)}
-			{@const up = article.delta >= 0}
 			{@const img = articleImage(article)}
-			<article class="card">
+			<a class="card" href={`/lot/${article.ID}`}>
 				<div class="card-art">
 					{#if img}
 						<img
@@ -234,27 +216,13 @@
 				<div class="card-body">
 					<div class="card-top-row">
 						{#if article.grade}<span class="card-condition">{article.grade}</span>{/if}
-						{#if article.rarity}<span class="card-rarity">{article.rarity}</span>{/if}
+						<span class="card-wish" aria-hidden="true"></span>
 					</div>
 					<p class="card-name">{article.name}</p>
-					{#if article.series}<p class="card-series">{article.series}</p>{/if}
-
-					<div class="card-price-row">
-						<span class="card-price">{eur(article.prix)}</span>
-						<div class="card-spark-col">
-							<GSpark values={spark} color={up ? '#3f7a52' : '#b0432a'} w={70} h={22} dot={false} />
-							<span class="card-delta" style="color:{up ? '#3f7a52' : '#b0432a'}"
-								>{pct(article.delta)}</span
-							>
-						</div>
-					</div>
-					<p class="card-seller">
-						Vendu par {article.seller} · Particulier vérifié
-					</p>
-
-					<a class="card-cta" href={`/lot/${article.ID}`}>Voir le lot</a>
+					<span class="card-price">{eur(article.prix)}</span>
+					<p class="card-seller">Vendu par {article.seller} · Particulier vérifié</p>
 				</div>
-			</article>
+			</a>
 		{/each}
 	</section>
 
@@ -335,21 +303,34 @@
 		filter: brightness(1.08);
 		color: #fff;
 	}
-	.hero-sell {
-		flex-shrink: 0;
-		font-family: var(--f-body);
-		font-size: 13px;
-		font-weight: 600;
-		padding: 11px 20px;
-		border-radius: 8px;
-		background: var(--c-bg);
-		color: var(--c-ink);
-		text-decoration: none;
-		transition: filter 120ms;
+	.hero-art {
+		flex: none;
+		width: 340px;
+		height: 220px;
+		border-radius: 16px;
+		border: 1.5px dashed rgba(246, 241, 230, 0.35);
+		background: rgba(246, 241, 230, 0.06);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
 	}
-	.hero-sell:hover {
-		filter: brightness(0.96);
-		color: var(--c-ink);
+	.hero-art-icon {
+		font-size: 26px;
+		opacity: 0.6;
+	}
+	.hero-art-label {
+		font-family: var(--f-body);
+		font-size: 11.5px;
+		color: #c9e0ce;
+		text-align: center;
+		max-width: 200px;
+	}
+	@media (max-width: 900px) {
+		.hero-art {
+			display: none;
+		}
 	}
 
 	/* ── Pills catégories ── */
@@ -523,6 +504,11 @@
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+		text-decoration: none;
+		transition: border-color 120ms;
+	}
+	.card:hover {
+		border-color: var(--c-ink);
 	}
 
 	.card-art {
@@ -571,8 +557,9 @@
 	}
 	.card-top-row {
 		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		gap: 6px;
-		flex-wrap: wrap;
 	}
 	.card-condition {
 		font-family: var(--f-body);
@@ -583,14 +570,13 @@
 		padding: 3px 8px;
 		border-radius: 5px;
 	}
-	.card-rarity {
-		font-family: var(--f-body);
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--c-text-tertiary);
-		background: var(--c-badge-moderation-bg);
-		padding: 3px 8px;
-		border-radius: 5px;
+	.card-wish {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		border: 1.5px solid var(--c-icon-muted);
+		flex-shrink: 0;
+		margin-left: auto;
 	}
 	.card-name {
 		font-size: 14px;
@@ -598,19 +584,7 @@
 		color: var(--c-text);
 		line-height: 1.35;
 		margin: 0;
-	}
-	.card-series {
-		font-family: var(--f-body);
-		font-size: 11.5px;
-		color: var(--c-text-muted);
-		margin: -4px 0 0;
-	}
-
-	.card-price-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
-		margin-top: 2px;
+		min-height: 38px;
 	}
 	.card-price {
 		font-family: var(--f-serif);
@@ -618,54 +592,11 @@
 		font-weight: 600;
 		color: var(--c-ink);
 	}
-	.card-spark-col {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 2px;
-	}
-	.card-delta {
-		font-family: var(--f-body);
-		font-size: 10.5px;
-		font-weight: 600;
-	}
-
 	.card-seller {
 		font-family: var(--f-body);
 		font-size: 12px;
 		color: var(--c-text-muted);
 		margin: 0;
-	}
-
-	.card-cta {
-		display: block;
-		text-align: center;
-		text-decoration: none;
-		box-sizing: border-box;
-		width: 100%;
-		padding: 10px;
-		border-radius: 8px;
-		border: 1px solid var(--c-border);
-		background: transparent;
-		color: var(--c-ink);
-		font-family: var(--f-body);
-		font-size: 12.5px;
-		font-weight: 600;
-		cursor: pointer;
-		transition:
-			border-color 120ms,
-			background 120ms;
-		margin-top: auto;
-	}
-	.card-cta:hover {
-		border-color: var(--c-ink);
-		background: var(--c-badge-verified-bg);
-	}
-	/* Lien étendu : toute la carte est cliquable via le CTA */
-	.card-cta::after {
-		content: '';
-		position: absolute;
-		inset: 0;
 	}
 
 	/* ── Ticker ── */
