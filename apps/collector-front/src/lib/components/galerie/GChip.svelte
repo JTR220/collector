@@ -11,14 +11,15 @@
 
 <style>
 	.g-chip {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 10.5px;
+		font-family: var(--f-body);
+		font-size: 11px;
+		font-weight: 600;
 		letter-spacing: 0.02em;
-		color: #a39a8c;
+		color: var(--c-ink);
 		padding: 3px 8px;
-		border-radius: 4px;
-		border: 1px solid rgba(236, 229, 218, 0.1);
-		background: rgba(255, 255, 255, 0.05);
+		border-radius: 5px;
+		border: none;
+		background: var(--c-badge-verified-bg);
 		white-space: nowrap;
 	}
 </style>

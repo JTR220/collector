@@ -252,7 +252,7 @@
 		min-height: 100vh;
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		background: #191714;
+		background: var(--c-bg);
 	}
 	@media (max-width: 768px) {
 		.page {
@@ -262,8 +262,7 @@
 
 	/* ── Left panel ── */
 	.page-left {
-		background: #211e1a;
-		border-right: 1px solid rgba(236, 229, 218, 0.1);
+		background: linear-gradient(135deg, #1e3b2c, #2a4e3a);
 		display: flex;
 		flex-direction: column;
 		padding: 40px 48px;
@@ -282,18 +281,19 @@
 	.brand-diamond {
 		width: 9px;
 		height: 9px;
-		background: #86b3a4;
+		background: var(--c-accent);
 		border-radius: 2px;
 		transform: rotate(45deg);
 		display: inline-block;
 	}
 	.brand-name {
-		font-family: 'Newsreader', Georgia, serif;
+		font-family: var(--f-serif);
+		font-weight: 700;
 		font-size: 20px;
-		color: #ece5da;
+		color: var(--c-bg);
 	}
 	.brand-dim {
-		color: #766d60;
+		color: #c9e0ce;
 	}
 
 	.page-left-body {
@@ -301,17 +301,17 @@
 		padding-bottom: 40px;
 	}
 	.page-tagline {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: 48px;
-		line-height: 1.05;
-		color: #ece5da;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 44px;
+		line-height: 1.1;
+		color: var(--c-bg);
 		margin: 0 0 18px;
 	}
 	.page-desc {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 15px;
-		color: #a39a8c;
+		color: #d8e6db;
 		line-height: 1.6;
 		max-width: 400px;
 		margin: 0 0 32px;
@@ -327,14 +327,15 @@
 		gap: 2px;
 	}
 	.page-stat-val {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-serif);
 		font-size: 22px;
-		color: #ece5da;
+		font-weight: 600;
+		color: var(--c-bg);
 	}
 	.page-stat-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #766d60;
+		color: #c9e0ce;
 		letter-spacing: 0.04em;
 	}
 
@@ -351,26 +352,26 @@
 		max-width: 400px;
 	}
 	.card-eyebrow {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11px;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;
 		font-weight: 600;
-		color: #86b3a4;
+		color: var(--c-ink);
 		margin-bottom: 14px;
 	}
 	.card-title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: 46px;
-		line-height: 0.95;
-		color: #ece5da;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 40px;
+		line-height: 1.05;
+		color: var(--c-text);
 		margin: 0 0 12px;
 	}
 	.card-subtitle {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		line-height: 1.5;
 		margin-bottom: 24px;
 	}
@@ -380,20 +381,20 @@
 		padding: 10px 14px;
 		border-radius: 7px;
 		border: 1px solid;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
 		margin-bottom: 16px;
 		line-height: 1.4;
 	}
 	.msg-error {
-		border-color: rgba(215, 156, 134, 0.3);
-		background: rgba(215, 156, 134, 0.06);
-		color: #d79c86;
+		border-color: rgba(176, 67, 42, 0.3);
+		background: #fbe9e3;
+		color: var(--c-error);
 	}
 	.msg-success {
-		border-color: rgba(134, 192, 153, 0.3);
-		background: rgba(134, 192, 153, 0.06);
-		color: #86c099;
+		border-color: rgba(63, 122, 82, 0.3);
+		background: var(--c-badge-verified-bg);
+		color: var(--c-success);
 	}
 
 	/* Champs */
@@ -402,34 +403,31 @@
 	}
 	.field-label {
 		display: block;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11px;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
-		color: #766d60;
+		color: var(--c-text-muted);
 		margin-bottom: 6px;
 	}
 	.field-input {
 		width: 100%;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(236, 229, 218, 0.12);
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
 		border-radius: 7px;
 		padding: 11px 14px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 14px;
 		outline: none;
-		transition:
-			border-color 150ms,
-			box-shadow 150ms;
+		transition: border-color 150ms;
 		box-sizing: border-box;
 	}
 	.field-input::placeholder {
-		color: rgba(236, 229, 218, 0.2);
+		color: var(--c-text-muted);
 	}
 	.field-input:focus {
-		border-color: rgba(134, 179, 164, 0.5);
-		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+		border-color: var(--c-ink);
 	}
 
 	/* Bouton */
@@ -439,9 +437,9 @@
 		padding: 13px;
 		border-radius: 7px;
 		border: none;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
 		font-size: 13px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
@@ -465,8 +463,8 @@
 	.spinner {
 		width: 16px;
 		height: 16px;
-		border: 2px solid rgba(25, 23, 20, 0.3);
-		border-top-color: #191714;
+		border: 2px solid rgba(255, 255, 255, 0.35);
+		border-top-color: #fff;
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 	}
@@ -478,15 +476,15 @@
 
 	.divider {
 		border: none;
-		border-top: 1px solid rgba(236, 229, 218, 0.08);
+		border-top: 1px solid var(--c-border);
 		margin: 22px 0 16px;
 	}
 
 	.toggle-btn {
 		background: none;
 		border: none;
-		color: #766d60;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text-muted);
+		font-family: var(--f-body);
 		font-size: 12px;
 		letter-spacing: 0.04em;
 		cursor: pointer;
@@ -496,23 +494,23 @@
 		text-align: center;
 	}
 	.toggle-btn:hover {
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
 
 	/* Encart comptes de démo */
 	.demo {
 		margin-top: 20px;
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		border: 1px solid var(--c-border);
 		border-radius: 9px;
 		padding: 12px;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--c-bg);
 	}
 	.demo-label {
 		display: block;
 		font-size: 10.5px;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
-		color: #766d60;
+		color: var(--c-text-muted);
 		margin-bottom: 8px;
 	}
 	.demo-row {
@@ -529,19 +527,19 @@
 		transition: background 120ms;
 	}
 	.demo-row:hover {
-		background: rgba(134, 179, 164, 0.08);
+		background: var(--c-badge-verified-bg);
 	}
 	.demo-role {
 		flex-shrink: 0;
 		font-size: 10.5px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
-		color: #86b3a4;
+		color: var(--c-ink);
 		width: 58px;
 	}
 	.demo-creds {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 </style>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	let {
 		children,
-		color = '#766d60',
+		color = '#8a7a64',
 		style = ''
 	}: { children?: import('svelte').Snippet; color?: string; style?: string } = $props();
 </script>
@@ -10,7 +10,7 @@
 
 <style>
 	.kicker {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11px;
 		letter-spacing: 0.2em;
 		text-transform: uppercase;

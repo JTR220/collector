@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
-	import { fetchArticle, articleImage, type ArticleAPI } from '$lib/api/catalog';
+	import { fetchArticle, fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
 	import { addToWishlist, removeFromWishlist, fetchMyWishlist } from '$lib/api/wishlist';
 	import {
 		buyArticle,
@@ -17,7 +17,6 @@
 	import { cart } from '$lib/stores/cart';
 	import { eur, eurC, pct, sparkPath } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
-	import GChip from '$lib/components/galerie/GChip.svelte';
 	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
 	let article = $state<ArticleAPI | null>(null);
@@ -37,6 +36,7 @@
 	let trackedPrices = $state<number[]>([]);
 	let sellerRating = $state<SellerRating | null>(null);
 	let sellerReviews = $state<Review[]>([]);
+	let related = $state<ArticleAPI[]>([]);
 
 	onMount(async () => {
 		try {
@@ -52,7 +52,6 @@
 			loading = false;
 		}
 
-		// Historique temps reel du price-tracker (echec silencieux si indisponible)
 		if (article) {
 			try {
 				const hist = await fetchPriceHistory(article.ID);
@@ -69,6 +68,15 @@
 			} catch {
 				sellerRating = null;
 				sellerReviews = [];
+			}
+
+			try {
+				const all = await fetchArticles();
+				related = all
+					.filter((a) => a.ID !== article!.ID && a.category.name === article!.category.name)
+					.slice(0, 4);
+			} catch {
+				related = [];
 			}
 		}
 	});
@@ -203,96 +211,96 @@
 	<a class="back-link" href="/">← Retour à la vitrine</a>
 {:else}
 	{@const img = articleImage(article)}
-	<a class="back-link" href="/">← Vitrine</a>
+	<a class="back-link" href="/">Accueil / {article.category.name} / <span>{article.name}</span></a>
 
 	<section class="lot-grid">
-		<!-- Photo produit (glyph en repli) -->
-		<div class="lot-art">
-			<span class="lot-glyph">{article.glyph}</span>
-			{#if img}
-				<img
-					class="lot-art-img"
-					src={img}
-					alt={article.name}
-					onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
-				/>
-			{/if}
-			{#if article.sold}
-				<span class="lot-sold">vendu</span>
-			{/if}
-			{#if article.rarity}<span class="lot-rarity">{article.rarity}</span>{/if}
+		<!-- Galerie photo -->
+		<div class="gallery">
+			<div class="gallery-main">
+				{#if img}
+					<img
+						class="gallery-img"
+						src={img}
+						alt={article.name}
+						onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+					/>
+				{:else}
+					<span class="gallery-glyph">{article.glyph}</span>
+				{/if}
+				{#if article.sold}
+					<span class="lot-sold">vendu</span>
+				{/if}
+			</div>
+			<div class="gallery-thumbs">
+				{#each Array(4) as _, i}
+					<div class="gallery-thumb">
+						{#if img}<img src={img} alt="" />{/if}
+					</div>
+				{/each}
+			</div>
 		</div>
 
 		<!-- Infos -->
-		<div>
-			<Kicker color="#86b3a4"
-				>{[article.category.name, article.year || null, article.slug || null]
-					.filter(Boolean)
-					.join(' · ')}</Kicker
-			>
-			<h1 class="lot-title">{article.name}</h1>
-			{#if article.series}<p class="lot-series">{article.series}</p>{/if}
-
-			{#if article.grade || article.rarity}
-				<div class="lot-chips">
-					{#if article.grade}<GChip>{article.grade}</GChip>{/if}
-					{#if article.rarity}<GChip>{article.rarity}</GChip>{/if}
-				</div>
-			{/if}
-
-			<p class="lot-desc">{article.description}</p>
-
-			<div class="lot-price-row">
-				<div>
-					<div class="price-label">Cote actuelle</div>
-					<div class="price-val">{eur(article.prix)}</div>
-					<div class="price-delta" style="color:{up ? '#86c099' : '#d79c86'}">
-						{pct(article.delta)} sur la période
-					</div>
-				</div>
-				<div style="text-align:right">
-					<div class="price-label">Frais de port</div>
-					<div class="price-sub">{eurC(article.fraisPort)}</div>
-					<div class="price-label" style="margin-top:8px">Estim. resell</div>
-					<div class="price-sub resell">{eur(article.resellPrice)}</div>
-				</div>
+		<div class="lot-info">
+			<div class="lot-badges">
+				{#if article.grade}<span class="badge-condition">{article.grade}</span>{/if}
+				<span class="badge-verified">✓ Vérifié par Collector</span>
+				{#if article.rarity}<span class="badge-rarity">{article.rarity}</span>{/if}
 			</div>
 
-			<div class="lot-actions">
+			<h1 class="lot-title">{article.name}</h1>
+			{#if article.series}<p class="lot-series">{article.series}</p>{/if}
+			<div class="lot-price">{eur(article.prix)}</div>
+
+			<div class="seller-card">
+				<div class="seller-avatar">{article.seller.slice(0, 2).toUpperCase()}</div>
+				<div class="seller-meta">
+					<span class="seller-name">{article.seller}</span>
+					<span class="seller-rating">
+						Particulier vérifié
+						{#if sellerRating && sellerRating.count > 0}
+							· {sellerRating.average.toFixed(1)} ★ ({sellerRating.count} ventes)
+						{/if}
+					</span>
+				</div>
+				{#if !isOwnArticle}
+					<button class="btn-outline" onclick={() => (contactOpen = !contactOpen)}>
+						Contacter
+					</button>
+				{/if}
+			</div>
+
+			<div class="cta-row">
 				{#if article.sold}
 					<button class="btn-primary" disabled>Vendu</button>
 				{:else if isOwnArticle}
-					<button
-						class="btn-primary"
-						disabled
-						title="Vous ne pouvez pas acheter votre propre annonce"
-					>
+					<button class="btn-primary" disabled title="Vous ne pouvez pas acheter votre propre annonce">
 						Votre annonce
 					</button>
 				{:else}
-					<button class="btn-primary" disabled={actionBusy} onclick={buyNow}>
-						Acheter maintenant · {eur(article.prix)}
-					</button>
-				{/if}
-				<button class="btn-ghost" disabled={actionBusy} onclick={toggleWishlist}>
-					{inWishlist ? '♥ Dans la wishlist' : '♡ Wishlist'}
-				</button>
-				{#if !isOwnArticle && !article.sold}
 					{@const currentId = article.ID}
 					{@const inCart = $cart.some((i) => i.ID === currentId)}
-					<button class="btn-ghost" disabled={inCart} onclick={addToCart}>
-						{inCart ? '✓ Dans le panier' : '🛒 Ajouter au panier'}
+					<button class="btn-primary" disabled={inCart} onclick={addToCart}>
+						{inCart ? '✓ Dans le panier' : 'Ajouter au panier'}
+					</button>
+					<button class="btn-primary-alt" disabled={actionBusy} onclick={buyNow}>
+						Acheter maintenant
 					</button>
 				{/if}
-				{#if !isOwnArticle}
-					<button class="btn-ghost" onclick={() => (contactOpen = !contactOpen)}>
-						✉ Contacter le vendeur
-					</button>
-				{/if}
-				{#if !isOwnArticle && !article.sold}
-					<button class="btn-ghost" onclick={openNegotiate}>💬 Négocier le prix</button>
-				{/if}
+				<button
+					class="btn-square"
+					disabled={actionBusy}
+					onclick={toggleWishlist}
+					title={inWishlist ? 'Retirer de la wishlist' : 'Ajouter à la wishlist'}
+					aria-label="Wishlist"
+				>
+					{inWishlist ? '♥' : '♡'}
+				</button>
 			</div>
+
+			{#if !isOwnArticle && !article.sold}
+				<button class="link-negotiate" onclick={openNegotiate}>💬 Négocier le prix</button>
+			{/if}
 
 			{#if contactOpen && !isOwnArticle}
 				<div class="contact-box">
@@ -302,7 +310,7 @@
 						disabled={contactBusy}
 						rows="2"></textarea>
 					<button
-						class="btn-primary"
+						class="btn-primary-alt"
 						disabled={contactBusy || !contactDraft.trim()}
 						onclick={sendContactMessage}
 					>
@@ -330,11 +338,7 @@
 						bind:value={negotiateComment}
 						disabled={negotiateBusy}
 						rows="2"></textarea>
-					<button
-						class="btn-primary"
-						disabled={negotiateBusy || !negotiatePrice}
-						onclick={sendNegotiation}
-					>
+					<button class="btn-primary-alt" disabled={negotiateBusy || !negotiatePrice} onclick={sendNegotiation}>
 						Envoyer l'offre
 					</button>
 				</div>
@@ -344,35 +348,32 @@
 				<p class="action-msg">{actionMsg}</p>
 			{/if}
 
-			<div class="lot-seller">
-				<Kicker>Vendeur</Kicker>
-				<div class="seller-row">
-					<span class="seller-name">@{article.seller}</span>
-					{#if sellerRating && sellerRating.count > 0}
-						<span class="seller-score"
-							>★ {sellerRating.average.toFixed(2)} / 5 · {sellerRating.count} avis</span
-						>
-					{:else}
-						<span class="seller-score seller-score-empty">Pas encore d'avis</span>
-					{/if}
-				</div>
-				{#if sellerReviews.length > 0}
-					<div class="review-list">
-						{#each sellerReviews.slice(0, 5) as r (r.ID)}
-							<div class="review-row">
-								<span class="review-stars">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
-								<span class="review-author">{r.reviewerName}</span>
-								{#if r.comment}<span class="review-comment">{r.comment}</span>{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
+			<p class="lot-desc">{article.description}</p>
+
+			<div class="trust-row">
+				<span>Livraison assurée sous 3 à 5 jours</span>
+				<span class="dot">·</span>
+				<span>Paiement 100% sécurisé</span>
+				<span class="dot">·</span>
+				<span>Frais de port {eurC(article.fraisPort)}</span>
 			</div>
+
+			{#if sellerReviews.length > 0}
+				<div class="review-list">
+					{#each sellerReviews.slice(0, 5) as r (r.ID)}
+						<div class="review-row">
+							<span class="review-stars">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+							<span class="review-author">{r.reviewerName}</span>
+							{#if r.comment}<span class="review-comment">{r.comment}</span>{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</section>
 
 	<!-- Historique de prix -->
-	<GPanel style="margin-top:18px">
+	<GPanel style="margin-top:24px">
 		<Kicker>Historique de cote · 8 derniers relevés</Kicker>
 		<svg
 			viewBox="0 0 {W} {H}"
@@ -387,11 +388,11 @@
 					y1={(H * i) / 3}
 					x2={W}
 					y2={(H * i) / 3}
-					stroke="rgba(236,229,218,0.06)"
+					stroke="#e4dcc8"
 					stroke-width="0.5"
 				/>
 			{/each}
-			<path d={historyPath} stroke={up ? '#86c099' : '#d79c86'} stroke-width="2" fill="none" />
+			<path d={historyPath} stroke={up ? '#3f7a52' : '#b0432a'} stroke-width="2" fill="none" />
 		</svg>
 		<div class="history-vals">
 			{#each historySeries as p}
@@ -399,178 +400,260 @@
 			{/each}
 		</div>
 	</GPanel>
+
+	<!-- Vous aimerez aussi -->
+	{#if related.length > 0}
+		<section class="related">
+			<h2 class="related-title">Vous aimerez aussi</h2>
+			<div class="related-grid">
+				{#each related as r (r.ID)}
+					{@const rImg = articleImage(r)}
+					<a class="related-card" href={`/lot/${r.ID}`}>
+						<div class="related-art">
+							{#if rImg}<img src={rImg} alt={r.name} />{/if}
+						</div>
+						<div class="related-body">
+							<p class="related-name">{r.name}</p>
+							<p class="related-price">{eur(r.prix)}</p>
+						</div>
+					</a>
+				{/each}
+			</div>
+		</section>
+	{/if}
 {/if}
 
 <style>
 	.state-msg {
 		text-align: center;
 		padding: 60px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #766d60;
-		letter-spacing: 0.12em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 	.state-msg.error {
-		color: #d79c86;
+		color: var(--c-error);
 	}
 
 	.back-link {
 		display: inline-block;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 12.5px;
-		color: #a39a8c;
+		font-family: var(--f-body);
+		font-size: 13px;
+		color: var(--c-text-muted);
 		text-decoration: none;
-		margin-bottom: 16px;
+		margin: 20px 0 16px;
+	}
+	.back-link span {
+		color: var(--c-text);
 	}
 	.back-link:hover {
-		color: #ece5da;
+		color: var(--c-ink);
 	}
 
 	.lot-grid {
 		display: grid;
-		grid-template-columns: 0.8fr 1.2fr;
-		gap: 32px;
+		grid-template-columns: 1.1fr 0.9fr;
+		gap: 56px;
 		align-items: start;
 	}
-	@media (max-width: 768px) {
+	@media (max-width: 900px) {
 		.lot-grid {
 			grid-template-columns: 1fr;
+			gap: 24px;
 		}
 	}
 
-	.lot-art {
-		aspect-ratio: 3/4;
-		border-radius: 12px;
+	/* Galerie */
+	.gallery {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	.gallery-main {
 		position: relative;
-		background: radial-gradient(120% 90% at 30% 20%, #4a6a5a 0%, #2a3a32 55%, #191714 100%);
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		height: 460px;
+		border-radius: 16px;
+		background: radial-gradient(120% 90% at 30% 20%, #2a4e3a 0%, #1e3b2c 55%, #16301f 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		overflow: hidden;
 	}
-	.lot-glyph {
-		font-family: 'Newsreader', Georgia, serif;
-		font-size: 120px;
-		color: rgba(236, 229, 218, 0.85);
+	@media (max-width: 640px) {
+		.gallery-main {
+			height: 320px;
+		}
 	}
-	.lot-art-img {
+	.gallery-glyph {
+		font-family: var(--f-serif);
+		font-size: 110px;
+		color: rgba(246, 241, 230, 0.85);
+	}
+	.gallery-img {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		border-radius: 12px;
 	}
 	.lot-sold {
 		position: absolute;
-		top: 12px;
-		left: 12px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		top: 14px;
+		left: 14px;
+		font-family: var(--f-body);
 		font-size: 10px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		padding: 3px 9px;
-		border-radius: 4px;
-		color: #ece5da;
-		background: rgba(215, 156, 134, 0.85);
 		font-weight: 600;
-	}
-	.lot-rarity {
-		position: absolute;
-		bottom: 12px;
-		right: 12px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 10px;
-		letter-spacing: 0.14em;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		padding: 3px 9px;
-		border: 1px solid rgba(236, 229, 218, 0.2);
-		border-radius: 4px;
-		color: rgba(236, 229, 218, 0.6);
-		background: rgba(0, 0, 0, 0.25);
+		padding: 4px 10px;
+		border-radius: 5px;
+		color: #fff;
+		background: var(--c-accent);
+	}
+	.gallery-thumbs {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 12px;
+	}
+	.gallery-thumb {
+		height: 90px;
+		border-radius: 10px;
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
+		overflow: hidden;
+	}
+	.gallery-thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
-	.lot-title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: 42px;
-		line-height: 1.05;
-		color: #ece5da;
-		margin: 8px 0 4px;
-	}
-	.lot-series {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		color: #766d60;
-		margin: 0 0 14px;
-	}
-	.lot-chips {
+	/* Infos */
+	.lot-info {
 		display: flex;
-		gap: 6px;
-		margin-bottom: 16px;
+		flex-direction: column;
+		gap: 16px;
 	}
-	.lot-desc {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 14px;
-		color: #a39a8c;
-		line-height: 1.6;
-		max-width: 520px;
-		margin-bottom: 20px;
-	}
-
-	.lot-price-row {
+	.lot-badges {
 		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		padding: 16px;
-		border: 1px solid rgba(236, 229, 218, 0.1);
-		border-radius: 9px;
-		background: rgba(255, 255, 255, 0.03);
-		margin-bottom: 12px;
-	}
-	.price-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 10px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: #766d60;
-	}
-	.price-val {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 34px;
-		color: #ece5da;
-		font-weight: 500;
-		line-height: 1.1;
-		margin-top: 4px;
-	}
-	.price-delta {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		margin-top: 4px;
-	}
-	.price-sub {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 16px;
-		color: #ece5da;
-		margin-top: 3px;
-	}
-	.price-sub.resell {
-		color: #86b3a4;
-	}
-
-	.lot-actions {
-		display: flex;
-		gap: 10px;
+		gap: 8px;
 		flex-wrap: wrap;
 	}
-	.btn-primary {
-		padding: 12px 22px;
-		border-radius: 7px;
-		border: none;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+	.badge-condition,
+	.badge-verified,
+	.badge-rarity {
+		font-family: var(--f-body);
+		font-size: 11px;
+		font-weight: 600;
+		padding: 4px 10px;
+		border-radius: 6px;
+	}
+	.badge-condition {
+		color: var(--c-ink);
+		background: var(--c-badge-verified-bg);
+	}
+	.badge-verified {
+		color: var(--c-ink);
+		background: var(--c-badge-moderation-bg);
+	}
+	.badge-rarity {
+		color: var(--c-text-tertiary);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
+	}
+	.lot-title {
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 28px;
+		line-height: 1.25;
+		color: var(--c-text);
+		margin: 0;
+	}
+	.lot-series {
+		font-family: var(--f-body);
 		font-size: 13px;
+		color: var(--c-text-muted);
+		margin: -8px 0 0;
+	}
+	.lot-price {
+		font-family: var(--f-serif);
+		font-size: 32px;
+		font-weight: 700;
+		color: var(--c-ink);
+	}
+
+	.seller-card {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 16px;
+		border: 1px solid var(--c-border);
+		border-radius: 12px;
+		background: var(--c-surface);
+	}
+	.seller-avatar {
+		width: 44px;
+		height: 44px;
+		border-radius: 50%;
+		background: var(--c-ink);
+		color: var(--c-bg);
+		font-family: var(--f-body);
+		font-size: 14px;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+	.seller-meta {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.seller-name {
+		font-family: var(--f-body);
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--c-text);
+	}
+	.seller-rating {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-text-muted);
+	}
+	.btn-outline {
+		flex-shrink: 0;
+		padding: 9px 16px;
+		border: 1px solid var(--c-ink);
+		border-radius: 8px;
+		background: transparent;
+		color: var(--c-ink);
+		font-family: var(--f-body);
+		font-size: 13px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 120ms;
+	}
+	.btn-outline:hover {
+		background: var(--c-badge-verified-bg);
+	}
+
+	.cta-row {
+		display: flex;
+		gap: 12px;
+	}
+	.btn-primary {
+		flex: 1;
+		padding: 15px;
+		border: none;
+		border-radius: 10px;
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
+		font-size: 15px;
 		font-weight: 600;
 		cursor: pointer;
 		transition:
@@ -584,55 +667,86 @@
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
-	.btn-ghost {
-		padding: 12px 18px;
-		border-radius: 7px;
-		border: 1px solid rgba(236, 229, 218, 0.14);
+	.btn-primary-alt {
+		flex: 1;
+		padding: 15px;
+		border: 1px solid var(--c-ink);
+		border-radius: 10px;
 		background: transparent;
-		color: #a39a8c;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
+		color: var(--c-ink);
+		font-family: var(--f-body);
+		font-size: 15px;
+		font-weight: 600;
 		cursor: pointer;
-		transition:
-			border-color 120ms,
-			color 120ms;
+		transition: background 120ms;
 	}
-	.btn-ghost:hover:not(:disabled) {
-		border-color: #86b3a4;
-		color: #86b3a4;
+	.btn-primary-alt:hover:not(:disabled) {
+		background: var(--c-badge-verified-bg);
+	}
+	.btn-primary-alt:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.btn-square {
+		width: 52px;
+		height: 52px;
+		flex-shrink: 0;
+		border: 1px solid var(--c-border);
+		border-radius: 10px;
+		background: transparent;
+		font-size: 20px;
+		color: var(--c-accent);
+		cursor: pointer;
+		transition: border-color 120ms;
+	}
+	.btn-square:hover:not(:disabled) {
+		border-color: var(--c-ink);
+	}
+
+	.link-negotiate {
+		align-self: flex-start;
+		background: none;
+		border: none;
+		padding: 0;
+		font-family: var(--f-body);
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--c-text-tertiary);
+		cursor: pointer;
+	}
+	.link-negotiate:hover {
+		color: var(--c-ink);
 	}
 
 	.contact-box {
 		display: flex;
 		gap: 8px;
-		margin-top: 12px;
 		align-items: flex-start;
 	}
 	.contact-box textarea {
 		flex: 1;
 		resize: vertical;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
 		border-radius: 8px;
 		padding: 9px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 13px;
 	}
 	.contact-box textarea:focus {
 		outline: none;
-		border-color: #86b3a4;
+		border-color: var(--c-ink);
 	}
 
 	.negotiate-box {
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		margin-top: 12px;
-		padding: 12px;
-		border: 1px solid rgba(236, 229, 218, 0.14);
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.02);
+		padding: 14px;
+		border: 1px solid var(--c-border);
+		border-radius: 10px;
+		background: var(--c-surface);
 	}
 	.negotiate-field {
 		display: flex;
@@ -641,116 +755,169 @@
 		max-width: 180px;
 	}
 	.negotiate-lbl {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.negotiate-in {
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 7px;
 		padding: 8px 10px;
-		color: #ece5da;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 13px;
 	}
 	.negotiate-in:focus {
 		outline: none;
-		border-color: #86b3a4;
+		border-color: var(--c-ink);
 	}
 	.negotiate-comment {
 		resize: vertical;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 8px;
 		padding: 9px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 13px;
 	}
 	.negotiate-comment:focus {
 		outline: none;
-		border-color: #86b3a4;
+		border-color: var(--c-ink);
 	}
-	.negotiate-box .btn-primary {
+	.negotiate-box .btn-primary-alt {
 		align-self: flex-start;
+		flex: none;
+		padding: 10px 20px;
 	}
 
 	.action-msg {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #86b3a4;
-		margin-top: 12px;
+		color: var(--c-ink);
+		font-weight: 600;
 	}
 
-	.lot-seller {
-		margin-top: 20px;
+	.lot-desc {
+		font-family: var(--f-body);
+		font-size: 14px;
+		line-height: 1.6;
+		color: var(--c-text-tertiary);
+		border-top: 1px solid var(--c-border);
+		padding-top: 16px;
+		margin: 0;
 	}
-	.seller-row {
+
+	.trust-row {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-top: 8px;
-		padding: 12px 14px;
-		border: 1px solid rgba(236, 229, 218, 0.1);
-		border-radius: 8px;
-		max-width: 360px;
-	}
-	.seller-name {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 13px;
-		color: #86b3a4;
-	}
-	.seller-score {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		flex-wrap: wrap;
+		gap: 6px;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
-	.seller-score-empty {
-		color: #766d60;
-		font-style: italic;
+	.trust-row .dot {
+		color: var(--c-border);
 	}
 
 	.review-list {
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		margin-top: 10px;
 	}
 	.review-row {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 8px;
-		padding: 8px 12px;
-		border: 1px solid rgba(236, 229, 218, 0.08);
-		border-radius: 7px;
-		background: rgba(255, 255, 255, 0.02);
+		padding: 10px 12px;
+		border: 1px solid var(--c-border);
+		border-radius: 8px;
+		background: var(--c-surface);
 	}
 	.review-stars {
-		color: #e0b260;
+		color: #c1552f;
 		font-size: 12px;
 		letter-spacing: 1px;
 	}
 	.review-author {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
 		font-weight: 600;
-		color: #ece5da;
+		color: var(--c-text);
 	}
 	.review-comment {
 		flex-basis: 100%;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 
 	.history-vals {
 		display: flex;
 		justify-content: space-between;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 10px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		margin-top: 6px;
+	}
+
+	/* Vous aimerez aussi */
+	.related {
+		margin: 40px 0 24px;
+	}
+	.related-title {
+		font-family: var(--f-serif);
+		font-size: 19px;
+		font-weight: 600;
+		color: var(--c-ink);
+		margin: 0 0 20px;
+	}
+	.related-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 24px;
+	}
+	@media (max-width: 780px) {
+		.related-grid {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 14px;
+		}
+	}
+	.related-card {
+		display: block;
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: var(--r-card);
+		overflow: hidden;
+		text-decoration: none;
+	}
+	.related-art {
+		height: 150px;
+		background: var(--c-bg);
+	}
+	.related-art img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.related-body {
+		padding: 14px;
+	}
+	.related-name {
+		font-family: var(--f-body);
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--c-text);
+		line-height: 1.3;
+		margin: 0 0 6px;
+	}
+	.related-price {
+		font-family: var(--f-serif);
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--c-ink);
+		margin: 0;
 	}
 </style>

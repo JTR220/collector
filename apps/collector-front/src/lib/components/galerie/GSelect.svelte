@@ -103,12 +103,12 @@
 		gap: 10px;
 		width: 100%;
 		min-width: 150px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(236, 229, 218, 0.12);
-		border-radius: 8px;
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: var(--r-input);
 		padding: 10px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 13px;
 		cursor: pointer;
 		outline: none;
@@ -120,12 +120,12 @@
 		min-width: 0;
 	}
 	.gs-btn:hover {
-		border-color: rgba(236, 229, 218, 0.22);
+		border-color: var(--c-ink);
 	}
 	.gs-btn:focus-visible,
 	.gs-btn[aria-expanded='true'] {
-		border-color: rgba(134, 179, 164, 0.5);
-		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+		border-color: var(--c-ink);
+		box-shadow: 0 0 0 3px rgba(30, 59, 44, 0.08);
 	}
 	.gs-value {
 		white-space: nowrap;
@@ -133,10 +133,10 @@
 		text-overflow: ellipsis;
 	}
 	.gs-placeholder {
-		color: rgba(236, 229, 218, 0.4);
+		color: var(--c-text-muted);
 	}
 	.gs-chev {
-		color: #86b3a4;
+		color: var(--c-ink);
 		font-size: 11px;
 		transition: transform 150ms;
 		flex-shrink: 0;
@@ -156,10 +156,10 @@
 		list-style: none;
 		max-height: 260px;
 		overflow-y: auto;
-		background: #201d19;
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
 		border-radius: 9px;
-		box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+		box-shadow: 0 12px 30px rgba(43, 38, 32, 0.15);
 	}
 	.gs-opt {
 		display: flex;
@@ -168,8 +168,8 @@
 		gap: 8px;
 		padding: 9px 11px;
 		border-radius: 6px;
-		color: #cbc3b6;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text-tertiary);
+		font-family: var(--f-body);
 		font-size: 13px;
 		cursor: pointer;
 		transition:
@@ -177,15 +177,15 @@
 			color 120ms;
 	}
 	.gs-opt:hover {
-		background: rgba(255, 255, 255, 0.05);
-		color: #ece5da;
+		background: var(--c-bg);
+		color: var(--c-text);
 	}
 	.gs-opt-active {
-		color: #86b3a4;
-		background: rgba(134, 179, 164, 0.08);
+		color: var(--c-ink);
+		background: var(--c-badge-verified-bg);
 	}
 	.gs-check {
-		color: #86b3a4;
+		color: var(--c-ink);
 		font-size: 11px;
 		flex-shrink: 0;
 	}

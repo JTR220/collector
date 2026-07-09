@@ -67,16 +67,16 @@
 	.state-msg {
 		text-align: center;
 		padding: 60px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #766d60;
-		letter-spacing: 0.12em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 	.page-title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: 38px;
-		color: #ece5da;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 34px;
+		color: var(--c-text);
 		margin: 8px 0 0;
 	}
 	.conv-list {
@@ -88,21 +88,21 @@
 		align-items: center;
 		gap: 14px;
 		padding: 14px 4px;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 		text-decoration: none;
 	}
 	.conv-avatar {
 		width: 40px;
 		height: 40px;
 		border-radius: 50%;
-		border: 1px solid rgba(236, 229, 218, 0.16);
-		background: rgba(255, 255, 255, 0.05);
-		color: #86b3a4;
+		background: var(--c-ink);
+		color: var(--c-bg);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-family: 'Newsreader', Georgia, serif;
-		font-size: 14px;
+		font-family: var(--f-body);
+		font-size: 13px;
+		font-weight: 600;
 		flex-shrink: 0;
 	}
 	.conv-body {
@@ -118,26 +118,26 @@
 		gap: 10px;
 	}
 	.conv-name {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 14px;
 		font-weight: 600;
-		color: #ece5da;
+		color: var(--c-text);
 	}
 	.conv-date {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 11px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 	}
 	.conv-article {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11.5px;
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
 	.conv-preview {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -145,19 +145,19 @@
 	.conv-badge {
 		min-width: 20px;
 		padding: 2px 6px;
-		border-radius: 999px;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		border-radius: var(--r-pill);
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
 		font-size: 11px;
 		font-weight: 700;
 		text-align: center;
 		flex-shrink: 0;
 	}
 	.item-empty {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		line-height: 1.5;
 		padding: 12px 4px;
 	}

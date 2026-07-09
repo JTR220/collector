@@ -280,16 +280,16 @@
 		padding: 20px 0 18px;
 	}
 	.title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: clamp(28px, 4vw, 40px);
-		color: #ece5da;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: clamp(26px, 4vw, 36px);
+		color: var(--c-text);
 		margin: 8px 0 10px;
 	}
 	.sub {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 14px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		line-height: 1.55;
 		max-width: 560px;
 		margin: 0;
@@ -297,18 +297,18 @@
 	.state {
 		text-align: center;
 		padding: 60px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #a39a8c;
-		letter-spacing: 0.16em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 	.msg-error {
 		padding: 11px 15px;
 		border-radius: 7px;
-		border: 1px solid rgba(215, 156, 134, 0.3);
-		background: rgba(215, 156, 134, 0.06);
-		color: #d79c86;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		border: 1px solid rgba(176, 67, 42, 0.3);
+		background: #fbe9e3;
+		color: var(--c-error);
+		font-family: var(--f-body);
 		font-size: 13px;
 		margin-bottom: 16px;
 	}
@@ -338,32 +338,29 @@
 		grid-column: 1 / -1;
 	}
 	.lbl {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11.5px;
 		letter-spacing: 0.04em;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.in {
 		width: 100%;
 		box-sizing: border-box;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(236, 229, 218, 0.12);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 7px;
 		padding: 10px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 14px;
 		outline: none;
-		transition:
-			border-color 150ms,
-			box-shadow 150ms;
+		transition: border-color 150ms;
 	}
 	.in::placeholder {
-		color: rgba(236, 229, 218, 0.25);
+		color: var(--c-text-muted);
 	}
 	.in:focus {
-		border-color: rgba(134, 179, 164, 0.5);
-		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+		border-color: var(--c-ink);
 	}
 	.in:disabled {
 		opacity: 0.45;
@@ -374,14 +371,14 @@
 		font-size: 13px;
 	}
 	.photo-picked {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
 	.photo-err {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #d79c86;
+		color: var(--c-error);
 	}
 	.area {
 		min-height: 92px;
@@ -396,25 +393,25 @@
 	.btn-ghost {
 		display: inline-flex;
 		align-items: center;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
 		padding: 11px 20px;
 		border-radius: 8px;
-		border: 1px solid rgba(236, 229, 218, 0.12);
-		color: #a39a8c;
+		border: 1px solid var(--c-border);
+		color: var(--c-text-tertiary);
 		text-decoration: none;
 	}
 	.btn-ghost:hover {
-		color: #ece5da;
-		border-color: rgba(236, 229, 218, 0.24);
+		color: var(--c-ink);
+		border-color: var(--c-ink);
 	}
 	.btn {
 		padding: 11px 24px;
 		border-radius: 8px;
 		border: none;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
 		font-size: 13px;
 		font-weight: 700;
 		cursor: pointer;

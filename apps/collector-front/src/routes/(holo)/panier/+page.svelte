@@ -1,146 +1,162 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth, isAuthenticated } from '$lib/stores/auth';
 	import { cart, cartTotal } from '$lib/stores/cart';
-	import { buyArticle } from '$lib/api/market';
-	import { articleImage } from '$lib/api/catalog';
+	import { articleImage, type ArticleAPI } from '$lib/api/catalog';
 	import { eur } from '$lib/utils/format';
-	import GPanel from '$lib/components/galerie/GPanel.svelte';
-	import Kicker from '$lib/components/galerie/Kicker.svelte';
-
-	let checkingOut = $state(false);
-	let results = $state<Record<number, 'ok' | string>>({});
 
 	function remove(id: number) {
 		cart.remove(id);
-		const next = { ...results };
-		delete next[id];
-		results = next;
 	}
 
-	async function checkout() {
-		if (!$isAuthenticated || !$auth.token) {
-			goto('/login');
-			return;
-		}
-		const token = $auth.token;
-		checkingOut = true;
-		results = {};
-		// Sequentiel (et non Promise.all) : deux achats concurrents sur le meme
-		// article echoueraient de toute facon en base (compare-and-swap sold),
-		// autant garder des messages d'erreur lisibles un par un.
+	const groups = $derived.by(() => {
+		const bySeller = new Map<string, ArticleAPI[]>();
 		for (const item of $cart) {
-			try {
-				await buyArticle(token, item.ID);
-				results = { ...results, [item.ID]: 'ok' };
-				cart.remove(item.ID);
-			} catch (e) {
-				results = { ...results, [item.ID]: e instanceof Error ? e.message : 'Achat impossible.' };
-			}
+			const list = bySeller.get(item.seller) ?? [];
+			list.push(item);
+			bySeller.set(item.seller, list);
 		}
-		checkingOut = false;
+		return [...bySeller.entries()];
+	});
+
+	const shipping = $derived($cart.reduce((sum, i) => sum + i.fraisPort, 0));
+	const subtotal = $derived($cart.reduce((sum, i) => sum + i.prix, 0));
+
+	function goToPaiement() {
+		goto('/paiement');
 	}
 </script>
 
 <svelte:head><title>Panier · Collector.shop</title></svelte:head>
 
-<section class="head">
-	<Kicker>Panier</Kicker>
-	<h1 class="title">Votre panier</h1>
-	<p class="sub">
-		Regroupez plusieurs pièces avant de valider — chaque achat reste une commande distincte, soumise
-		à la validation de son vendeur.
-	</p>
+<section class="steps">
+	<span class="step step-active">1. Panier</span>
+	<span class="step">2. Livraison</span>
+	<span class="step">3. Paiement</span>
 </section>
 
 {#if $cart.length === 0}
-	<GPanel>
-		<p class="empty">Votre panier est vide. <a href="/">Parcourir le marché</a>.</p>
-	</GPanel>
+	<div class="empty">
+		<p>Votre panier est vide. <a href="/">Parcourir le marché</a>.</p>
+	</div>
 {:else}
-	<GPanel>
-		<div class="cart-list">
-			{#each $cart as item (item.ID)}
-				{@const img = articleImage(item)}
-				<div class="cart-row">
-					<div class="cart-thumb">
-						{#if img}<img src={img} alt={item.name} />{/if}
-					</div>
-					<div class="cart-info">
-						<a class="cart-name" href={`/lot/${item.ID}`}>{item.name}</a>
-						<span class="cart-seller">@{item.seller}</span>
-					</div>
-					<span class="cart-price">{eur(item.prix + item.fraisPort)}</span>
-					{#if results[item.ID] === 'ok'}
-						<span class="cart-result cart-result-ok">✓ Achetée</span>
-					{:else if results[item.ID]}
-						<span class="cart-result cart-result-err">{results[item.ID]}</span>
-					{:else}
+	<div class="panier-grid">
+		<div class="cart-col">
+			<h1 class="cart-title">Votre panier ({$cart.length} article{$cart.length > 1 ? 's' : ''})</h1>
+
+			{#each groups as [seller, items] (seller)}
+				<div class="seller-label">Vendu par {seller}</div>
+				{#each items as item (item.ID)}
+					{@const img = articleImage(item)}
+					<div class="cart-row">
+						<div class="cart-thumb">
+							{#if img}<img src={img} alt={item.name} />{/if}
+						</div>
+						<div class="cart-info">
+							<a class="cart-name" href={`/lot/${item.ID}`}>{item.name}</a>
+							{#if item.grade}<span class="cart-condition">{item.grade}</span>{/if}
+						</div>
+						<span class="cart-price">{eur(item.prix)}</span>
 						<button class="cart-remove" onclick={() => remove(item.ID)}>Retirer</button>
-					{/if}
-				</div>
+					</div>
+				{/each}
 			{/each}
 		</div>
 
-		<div class="cart-total-row">
-			<span class="cart-total-label">Total ({$cart.length} pièce{$cart.length > 1 ? 's' : ''})</span
-			>
-			<span class="cart-total-val">{eur($cartTotal)}</span>
+		<div class="summary-card">
+			<h2 class="summary-title">Récapitulatif</h2>
+			<div class="summary-row">
+				<span>Sous-total</span>
+				<span>{eur(subtotal)}</span>
+			</div>
+			<div class="summary-row">
+				<span>Frais de port ({groups.length} vendeur{groups.length > 1 ? 's' : ''})</span>
+				<span>{eur(shipping)}</span>
+			</div>
+			<div class="summary-divider"></div>
+			<div class="summary-total">
+				<span>Total</span>
+				<span>{eur($cartTotal)}</span>
+			</div>
+			<button class="btn-checkout" onclick={goToPaiement}>Passer à la commande</button>
+			<p class="summary-trust">
+				Paiement 100% sécurisé · Aucun échange de coordonnées entre membres
+			</p>
 		</div>
-
-		<button class="btn-checkout" disabled={checkingOut} onclick={checkout}>
-			{checkingOut ? 'Validation…' : 'Valider le panier'}
-		</button>
-	</GPanel>
+	</div>
 {/if}
 
 <style>
-	.head {
-		padding: 20px 0 18px;
-	}
-	.title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: clamp(28px, 4vw, 40px);
-		color: #ece5da;
-		margin: 8px 0 10px;
-	}
-	.sub {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 14px;
-		color: #a39a8c;
-		line-height: 1.55;
-		max-width: 560px;
-		margin: 0;
-	}
-	.empty {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+	.steps {
+		display: flex;
+		gap: 28px;
+		padding: 24px 0 32px;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #766d60;
-		padding: 12px 0;
+		color: var(--c-text-muted);
 	}
-	.empty a {
-		color: #86b3a4;
+	.step-active {
+		color: var(--c-ink);
+		font-weight: 600;
+		border-bottom: 2px solid var(--c-ink);
+		padding-bottom: 4px;
 	}
 
-	.cart-list {
-		display: flex;
-		flex-direction: column;
+	.empty {
+		font-family: var(--f-body);
+		font-size: 14px;
+		color: var(--c-text-muted);
+		padding: 40px 0;
+	}
+	.empty a {
+		color: var(--c-ink);
+		font-weight: 600;
+	}
+
+	.panier-grid {
+		display: grid;
+		grid-template-columns: 1.5fr 0.9fr;
+		gap: 48px;
+		align-items: start;
+		padding-bottom: 40px;
+	}
+	@media (max-width: 900px) {
+		.panier-grid {
+			grid-template-columns: 1fr;
+			gap: 24px;
+		}
+	}
+
+	.cart-title {
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 24px;
+		color: var(--c-text);
+		margin: 0 0 16px;
+	}
+	.seller-label {
+		font-family: var(--f-body);
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--c-text-muted);
+		margin: 20px 0 10px;
+	}
+	.seller-label:first-of-type {
+		margin-top: 0;
 	}
 	.cart-row {
 		display: flex;
+		gap: 16px;
 		align-items: center;
-		gap: 14px;
-		padding: 12px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		padding: 16px 0;
+		border-bottom: 1px solid var(--c-border);
 	}
 	.cart-thumb {
-		width: 48px;
-		height: 48px;
-		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.04);
-		overflow: hidden;
+		width: 88px;
+		height: 88px;
 		flex-shrink: 0;
+		border-radius: 10px;
+		background: var(--c-bg);
+		overflow: hidden;
 	}
 	.cart-thumb img {
 		width: 100%;
@@ -152,95 +168,103 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: 4px;
 	}
 	.cart-name {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13.5px;
-		color: #ece5da;
+		font-family: var(--f-body);
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--c-text);
 		text-decoration: none;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 	}
 	.cart-name:hover {
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
-	.cart-seller {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 11px;
-		color: #766d60;
+	.cart-condition {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-text-muted);
 	}
 	.cart-price {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 13px;
-		color: #a39a8c;
+		font-family: var(--f-serif);
+		font-size: 17px;
+		font-weight: 600;
+		color: var(--c-ink);
+		width: 90px;
+		text-align: right;
 		flex-shrink: 0;
 	}
 	.cart-remove {
 		flex-shrink: 0;
 		background: none;
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		border: 1px solid var(--c-border);
 		border-radius: 6px;
 		padding: 6px 12px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
+		font-family: var(--f-body);
 		font-size: 11.5px;
 		cursor: pointer;
 	}
 	.cart-remove:hover {
-		border-color: rgba(215, 156, 134, 0.4);
-		color: #d79c86;
-	}
-	.cart-result {
-		flex-shrink: 0;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 11.5px;
-		max-width: 200px;
-		text-align: right;
-	}
-	.cart-result-ok {
-		color: #86c099;
-	}
-	.cart-result-err {
-		color: #d79c86;
+		border-color: var(--c-error);
+		color: var(--c-error);
 	}
 
-	.cart-total-row {
+	.summary-card {
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: 16px;
+		padding: 28px;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.summary-title {
+		font-family: var(--f-serif);
+		font-size: 19px;
+		font-weight: 600;
+		color: var(--c-text);
+		margin: 0;
+	}
+	.summary-row {
 		display: flex;
 		justify-content: space-between;
-		align-items: baseline;
-		padding-top: 16px;
-		margin-top: 6px;
+		font-family: var(--f-body);
+		font-size: 14px;
+		color: var(--c-text-tertiary);
 	}
-	.cart-total-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		color: #a39a8c;
+	.summary-divider {
+		height: 1px;
+		background: var(--c-border);
 	}
-	.cart-total-val {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 22px;
-		color: #ece5da;
+	.summary-total {
+		display: flex;
+		justify-content: space-between;
+		font-family: var(--f-serif);
+		font-size: 20px;
+		font-weight: 700;
+		color: var(--c-ink);
 	}
 	.btn-checkout {
-		width: 100%;
-		margin-top: 14px;
-		padding: 13px;
-		border-radius: 8px;
+		padding: 15px;
 		border: none;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13.5px;
-		font-weight: 700;
+		border-radius: 10px;
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
+		font-size: 15px;
+		font-weight: 600;
 		cursor: pointer;
 		transition: filter 150ms;
 	}
-	.btn-checkout:hover:not(:disabled) {
+	.btn-checkout:hover {
 		filter: brightness(1.08);
 	}
-	.btn-checkout:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
+	.summary-trust {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-text-muted);
+		text-align: center;
+		margin: 0;
 	}
 </style>

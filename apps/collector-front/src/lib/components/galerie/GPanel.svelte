@@ -8,9 +8,9 @@
 
 <style>
 	.g-panel {
-		background: #221f1b;
-		border: 1px solid rgba(236, 229, 218, 0.1);
-		border-radius: 9px;
-		padding: 18px;
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: var(--r-card);
+		padding: 20px;
 	}
 </style>

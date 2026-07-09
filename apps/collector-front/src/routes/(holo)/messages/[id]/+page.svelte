@@ -154,36 +154,36 @@
 	.state-msg {
 		text-align: center;
 		padding: 60px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #766d60;
-		letter-spacing: 0.12em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 	.state-msg.error {
-		color: #d79c86;
+		color: var(--c-error);
 	}
 	.back-link {
 		display: inline-block;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 12.5px;
-		color: #a39a8c;
+		font-family: var(--f-body);
+		font-size: 13px;
+		color: var(--c-text-muted);
 		text-decoration: none;
 	}
 	.back-link:hover {
-		color: #ece5da;
+		color: var(--c-ink);
 	}
 	.thread-head {
 		display: flex;
 		align-items: baseline;
 		gap: 10px;
 		padding-bottom: 10px;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 		flex-shrink: 0;
 	}
 	.thread-article {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #86b3a4;
+		color: var(--c-ink);
 		text-decoration: none;
 	}
 	.thread-article:hover {
@@ -211,55 +211,55 @@
 		gap: 3px;
 		padding: 9px 12px;
 		border-radius: 12px;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 	}
 	.msg-row.mine .msg-bubble {
-		background: rgba(134, 179, 164, 0.16);
-		border-color: rgba(134, 179, 164, 0.3);
+		background: var(--c-badge-verified-bg);
+		border-color: #cfe3d3;
 	}
 	.msg-text {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13.5px;
-		color: #ece5da;
+		color: var(--c-text);
 		white-space: pre-wrap;
 		word-break: break-word;
 	}
 	.msg-time {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 9.5px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		align-self: flex-end;
 	}
 	.composer {
 		display: flex;
 		gap: 8px;
 		padding-top: 10px;
-		border-top: 1px solid rgba(236, 229, 218, 0.1);
+		border-top: 1px solid var(--c-border);
 		flex-shrink: 0;
 	}
 	.composer textarea {
 		flex: 1;
 		resize: none;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 8px;
 		padding: 9px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 13px;
 	}
 	.composer textarea:focus {
 		outline: none;
-		border-color: #86b3a4;
+		border-color: var(--c-ink);
 	}
 	.send-btn {
 		padding: 0 18px;
 		border-radius: 8px;
 		border: none;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
 		font-size: 13px;
 		font-weight: 600;
 		cursor: pointer;
@@ -269,9 +269,9 @@
 		cursor: not-allowed;
 	}
 	.error-msg {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #d79c86;
+		color: var(--c-error);
 		margin: 8px 0 0;
 	}
 </style>

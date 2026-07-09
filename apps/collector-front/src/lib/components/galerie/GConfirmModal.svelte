@@ -96,7 +96,7 @@
 	.gc-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(10, 9, 8, 0.62);
+		background: rgba(43, 38, 32, 0.45);
 		backdrop-filter: blur(2px);
 		display: flex;
 		align-items: center;
@@ -109,11 +109,11 @@
 	.gc-modal {
 		width: 100%;
 		max-width: 380px;
-		background: #221f1b;
-		border: 1px solid rgba(236, 229, 218, 0.12);
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
 		border-radius: 12px;
 		padding: 24px;
-		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+		box-shadow: 0 20px 50px rgba(43, 38, 32, 0.25);
 		animation: gc-in 140ms ease-out;
 	}
 
@@ -129,18 +129,18 @@
 	}
 
 	.gc-title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
+		font-family: var(--f-serif);
+		font-weight: 600;
 		font-size: 22px;
-		color: #ece5da;
+		color: var(--c-text);
 		margin: 0 0 8px;
 	}
 
 	.gc-message {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13.5px;
 		line-height: 1.5;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		margin: 0 0 18px;
 	}
 
@@ -150,12 +150,12 @@
 		gap: 9px;
 		padding: 10px 12px;
 		margin-bottom: 20px;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 8px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #ece5da;
+		color: var(--c-text);
 		cursor: pointer;
 	}
 	/* Case a cocher themee (remplace l'apparence native du navigateur) */
@@ -166,8 +166,8 @@
 		height: 16px;
 		margin: 0;
 		border-radius: 4px;
-		border: 1px solid rgba(236, 229, 218, 0.25);
-		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid var(--c-border);
+		background: var(--c-surface);
 		cursor: pointer;
 		position: relative;
 		flex-shrink: 0;
@@ -176,11 +176,11 @@
 			border-color 120ms;
 	}
 	.chk:hover {
-		border-color: rgba(236, 229, 218, 0.42);
+		border-color: var(--c-ink);
 	}
 	.chk:checked {
-		background: #86b3a4;
-		border-color: #86b3a4;
+		background: var(--c-ink);
+		border-color: var(--c-ink);
 	}
 	.chk:checked::after {
 		content: '';
@@ -189,13 +189,13 @@
 		top: 2px;
 		width: 4px;
 		height: 8px;
-		border: solid #191714;
+		border: solid var(--c-bg);
 		border-width: 0 2px 2px 0;
 		transform: rotate(45deg);
 	}
 	.chk:focus-visible {
 		outline: none;
-		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.25);
+		box-shadow: 0 0 0 3px rgba(30, 59, 44, 0.2);
 	}
 
 	.gc-actions {
@@ -207,7 +207,7 @@
 	.gc-btn {
 		padding: 10px 18px;
 		border-radius: 7px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
 		font-weight: 600;
 		cursor: pointer;
@@ -219,18 +219,18 @@
 
 	.gc-btn-cancel {
 		background: none;
-		border: 1px solid rgba(236, 229, 218, 0.14);
-		color: #a39a8c;
+		border: 1px solid var(--c-border);
+		color: var(--c-text-tertiary);
 	}
 	.gc-btn-cancel:hover {
-		color: #ece5da;
-		border-color: rgba(236, 229, 218, 0.28);
+		color: var(--c-text);
+		border-color: var(--c-ink);
 	}
 
 	.gc-btn-confirm {
 		border: none;
-		background: #86b3a4;
-		color: #191714;
+		background: var(--c-accent);
+		color: #fff;
 	}
 	.gc-btn-confirm:hover:not(:disabled) {
 		filter: brightness(1.08);
@@ -241,7 +241,7 @@
 	}
 
 	.gc-btn-danger {
-		background: #d79c86;
-		color: #2a1712;
+		background: var(--c-error);
+		color: #fff;
 	}
 </style>

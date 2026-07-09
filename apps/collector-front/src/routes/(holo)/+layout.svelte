@@ -55,6 +55,13 @@
 
 <style>
 	.g-main {
-		padding-top: 26px;
+		max-width: 1440px;
+		margin: 0 auto;
+		padding: 0 48px 40px;
+	}
+	@media (max-width: 640px) {
+		.g-main {
+			padding: 0 20px 32px;
+		}
 	}
 </style>

@@ -398,10 +398,10 @@
 	.state-msg {
 		text-align: center;
 		padding: 80px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #a39a8c;
-		letter-spacing: 0.18em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 
 	/* Identité */
@@ -417,25 +417,25 @@
 		min-width: 200px;
 	}
 	.identity-name {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: 46px;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 40px;
 		line-height: 1.05;
 		margin: 8px 0 0;
 		letter-spacing: -0.01em;
-		color: #ece5da;
+		color: var(--c-text);
 	}
 	.identity-meta {
 		display: flex;
 		gap: 10px;
 		align-items: center;
 		margin-top: 8px;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.meta-sep {
-		color: #766d60;
+		color: var(--c-border);
 	}
 	.identity-btns {
 		display: flex;
@@ -444,21 +444,21 @@
 		flex-shrink: 0;
 	}
 	.btn-ghost {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
 		padding: 9px 22px;
 		border-radius: 7px;
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		border: 1px solid var(--c-border);
 		cursor: pointer;
 		background: transparent;
-		color: #a39a8c;
+		color: var(--c-text-tertiary);
 		transition:
 			border-color 120ms,
 			color 120ms;
 	}
 	.btn-ghost:hover {
-		border-color: rgba(236, 229, 218, 0.22);
-		color: #ece5da;
+		border-color: var(--c-ink);
+		color: var(--c-ink);
 	}
 
 	/* Ventes à valider */
@@ -467,7 +467,7 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 	}
 	.sale-actions {
 		display: flex;
@@ -476,7 +476,7 @@
 	}
 	.btn-accept,
 	.btn-reject {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
 		font-weight: 600;
 		padding: 7px 14px;
@@ -486,13 +486,13 @@
 		transition: filter 120ms;
 	}
 	.btn-accept {
-		background: #86b3a4;
-		color: #191714;
+		background: var(--c-ink);
+		color: var(--c-bg);
 	}
 	.btn-reject {
 		background: transparent;
-		border: 1px solid rgba(215, 156, 134, 0.5);
-		color: #d79c86;
+		border: 1px solid var(--c-error);
+		color: var(--c-error);
 	}
 	.btn-accept:hover:not(:disabled),
 	.btn-reject:hover:not(:disabled) {
@@ -504,9 +504,10 @@
 		cursor: not-allowed;
 	}
 	.action-msg {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #86b3a4;
+		color: var(--c-ink);
+		font-weight: 600;
 		margin-top: 10px;
 	}
 
@@ -525,18 +526,19 @@
 		gap: 4px;
 		padding: 12px 16px;
 		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.08);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 	}
 	.stat-value {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-serif);
 		font-size: 22px;
-		color: #ece5da;
+		font-weight: 600;
+		color: var(--c-ink);
 	}
 	.stat-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11.5px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 
 	/* Mes annonces */
@@ -545,12 +547,12 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 	}
 	.item-views {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 11.5px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 	}
 	.listing-actions {
@@ -560,7 +562,7 @@
 	}
 	.btn-ghost-sm,
 	.btn-reject-sm {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
 		font-weight: 600;
 		padding: 6px 12px;
@@ -571,13 +573,13 @@
 	}
 	.btn-ghost-sm {
 		background: transparent;
-		border: 1px solid rgba(236, 229, 218, 0.16);
-		color: #a39a8c;
+		border: 1px solid var(--c-border);
+		color: var(--c-text-tertiary);
 	}
 	.btn-reject-sm {
 		background: transparent;
-		border: 1px solid rgba(215, 156, 134, 0.5);
-		color: #d79c86;
+		border: 1px solid var(--c-error);
+		color: var(--c-error);
 	}
 	.btn-ghost-sm:hover,
 	.btn-reject-sm:hover:not(:disabled) {
@@ -590,9 +592,9 @@
 
 	/* Avis */
 	.review-tag {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11.5px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		font-style: italic;
 		flex-shrink: 0;
 	}
@@ -601,7 +603,7 @@
 		flex-direction: column;
 		gap: 8px;
 		padding: 12px 0 16px;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 	}
 	.review-stars-input {
 		display: flex;
@@ -611,27 +613,27 @@
 		background: none;
 		border: none;
 		font-size: 18px;
-		color: rgba(236, 229, 218, 0.25);
+		color: var(--c-border);
 		cursor: pointer;
 		padding: 0;
 		line-height: 1;
 	}
 	.star-btn.star-on {
-		color: #e0b260;
+		color: var(--c-accent);
 	}
 	.review-form textarea {
 		resize: vertical;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(236, 229, 218, 0.14);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 8px;
 		padding: 9px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 13px;
 	}
 	.review-form textarea:focus {
 		outline: none;
-		border-color: #86b3a4;
+		border-color: var(--c-ink);
 	}
 	.review-form .btn-accept {
 		align-self: flex-start;
@@ -660,20 +662,20 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 		text-decoration: none;
 	}
 	.item-date {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 11px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 	}
 	.item-name {
 		flex: 1;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #ece5da;
+		color: var(--c-text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -681,23 +683,25 @@
 	}
 	.item-row:hover .item-name,
 	a.item-name:hover {
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
 	.item-price {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		font-weight: 600;
+		color: var(--c-ink);
 		flex-shrink: 0;
 	}
 	.item-empty {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		line-height: 1.5;
 		padding: 12px 0;
 	}
 	.item-empty a {
-		color: #86b3a4;
+		color: var(--c-ink);
+		font-weight: 600;
 	}
 
 	/* Historique */
@@ -714,51 +718,52 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 		text-decoration: none;
 	}
 	.tl-dot {
 		width: 7px;
 		height: 7px;
 		border-radius: 50%;
-		background: #766d60;
+		background: var(--c-border);
 		flex-shrink: 0;
 	}
 	.tl-dot.tl-buy {
-		background: #86b3a4;
+		background: var(--c-ink);
 	}
 	.tl-date {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 11px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 		width: 82px;
 	}
 	.tl-action {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 10.5px;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 		width: 68px;
 	}
 	.tl-name {
 		flex: 1;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #ece5da;
+		color: var(--c-text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.tl-row:hover .tl-name {
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
 	.tl-price {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		font-weight: 600;
+		color: var(--c-ink);
 		flex-shrink: 0;
 	}
 </style>
