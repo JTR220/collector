@@ -28,6 +28,13 @@ configMapGenerator:
       # DNS interne au cluster : notification-service resout le nom du
       # destinataire d'un message via GET /internal/users/:id sur auth-service
       - AUTH_SERVICE_URL=http://auth-service
+      # HTTPS (Let's Encrypt) : le cookie de session httpOnly doit etre marque
+      # Secure. COOKIE_DOMAIN scope le cookie au domaine parent : prod route
+      # chaque service sur un sous-domaine distinct (auth./api./price./
+      # notifications.chaker.pro, voir ingress.yaml) — sans ca, seul
+      # auth.chaker.pro (qui pose le cookie) le recevrait en retour.
+      - COOKIE_SECURE=true
+      - COOKIE_DOMAIN=.chaker.pro
   # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
   - name: collector-front-config
     behavior: replace

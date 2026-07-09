@@ -25,6 +25,10 @@ configMapGenerator:
   - DB_USER=postgres
   - FRONTEND_ORIGIN=https://staging.chaker.pro:8443
   - AUTH_SERVICE_URL=http://auth-service
+  # HTTPS (Let's Encrypt) : le cookie de session httpOnly doit etre marque
+  # Secure. Pas de COOKIE_DOMAIN : staging est mono-host (routage par path
+  # via Traefik, voir ingress.yaml), un cookie "host-only" suffit.
+  - COOKIE_SECURE=true
   name: collector-config
 - behavior: replace
   literals:
