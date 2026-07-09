@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"auth-service/middlewares"
 	"auth-service/models"
 	"auth-service/repository"
 	"encoding/json"
@@ -63,6 +64,20 @@ func performLogin(t *testing.T, body string) *httptest.ResponseRecorder {
 	return performJSON(t, Login, body)
 }
 
+// authCookieFrom extrait la valeur du cookie de session httpOnly pose par
+// Login/Logout (voir setAuthCookie) — le token n'est plus jamais dans le
+// corps JSON de la reponse.
+func authCookieFrom(t *testing.T, w *httptest.ResponseRecorder) string {
+	t.Helper()
+	for _, ck := range w.Result().Cookies() {
+		if ck.Name == middlewares.AuthCookieName {
+			return ck.Value
+		}
+	}
+	t.Fatal("cookie de session absent de la reponse")
+	return ""
+}
+
 func TestLoginSuccessEmitsExpectedClaims(t *testing.T) {
 	setupTestDB(t)
 	seedUser(t, "alice@example.com", "s3cret!")
@@ -72,17 +87,25 @@ func TestLoginSuccessEmitsExpectedClaims(t *testing.T) {
 		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 
+	// Le corps JSON ne doit plus jamais exposer le JWT (seul le profil user).
 	var resp struct {
 		Token string `json:"token"`
+		User  struct {
+			Email string `json:"email"`
+		} `json:"user"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode reponse : %v", err)
 	}
-	if resp.Token == "" {
-		t.Fatal("token vide")
+	if resp.Token != "" {
+		t.Error("le token ne doit plus figurer dans le corps JSON (seulement le cookie httpOnly)")
+	}
+	if resp.User.Email != "alice@example.com" {
+		t.Errorf("profil utilisateur attendu dans le corps JSON, obtenu %+v", resp.User)
 	}
 
-	token, err := jwt.Parse(resp.Token, func(tok *jwt.Token) (interface{}, error) {
+	tokenValue := authCookieFrom(t, w)
+	token, err := jwt.Parse(tokenValue, func(tok *jwt.Token) (interface{}, error) {
 		return []byte(testSecret), nil
 	})
 	if err != nil || !token.Valid {

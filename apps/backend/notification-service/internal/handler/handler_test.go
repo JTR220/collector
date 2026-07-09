@@ -34,11 +34,14 @@ func newTestRouter() *gin.Engine {
 	return r
 }
 
-func doRequest(r *gin.Engine, method, path, authHeader string) *httptest.ResponseRecorder {
+// doRequest simule une requete navigateur : le JWT (s'il y en a un) est
+// porte par le cookie httpOnly, seul mecanisme d'authentification — plus de
+// fallback Authorization Bearer.
+func doRequest(r *gin.Engine, method, path, cookieValue string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, nil)
-	if authHeader != "" {
-		req.Header.Set("Authorization", authHeader)
+	if cookieValue != "" {
+		req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: cookieValue})
 	}
 	r.ServeHTTP(w, req)
 	return w
@@ -74,7 +77,7 @@ func TestUnreadCountRejectsExpiredToken(t *testing.T) {
 		"sub": "00000000-0000-0000-0000-000000000001",
 		"exp": time.Now().Add(-time.Hour).Unix(),
 	})
-	w := doRequest(r, http.MethodGet, "/api/v1/notifications/unread-count", "Bearer "+token)
+	w := doRequest(r, http.MethodGet, "/api/v1/notifications/unread-count", token)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -90,7 +93,7 @@ func TestUnreadCountRejectsWrongSigningSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("signature token : %v", err)
 	}
-	w := doRequest(r, http.MethodGet, "/api/v1/notifications/unread-count", "Bearer "+signed)
+	w := doRequest(r, http.MethodGet, "/api/v1/notifications/unread-count", signed)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -104,7 +107,7 @@ func TestUnreadCountRejectsMissingSubClaim(t *testing.T) {
 		"user_id": "1",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := doRequest(r, http.MethodGet, "/api/v1/notifications/unread-count", "Bearer "+token)
+	w := doRequest(r, http.MethodGet, "/api/v1/notifications/unread-count", token)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}

@@ -63,12 +63,15 @@ func bearerToken(t *testing.T, userID uuid.UUID, name string) string {
 	})
 }
 
-func jsonBody(r http.Handler, method, path, bearer, body string) *httptest.ResponseRecorder {
+// jsonBody simule une requete navigateur : le JWT est porte par le cookie
+// httpOnly, seul mecanisme d'authentification — plus de fallback
+// Authorization Bearer.
+func jsonBody(r http.Handler, method, path, sessionToken, body string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
+	if sessionToken != "" {
+		req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: sessionToken})
 	}
 	r.ServeHTTP(w, req)
 	return w

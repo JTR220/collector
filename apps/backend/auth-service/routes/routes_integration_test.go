@@ -16,6 +16,7 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
+	"auth-service/middlewares"
 	"auth-service/models"
 	"auth-service/repository"
 	"auth-service/routes"
@@ -62,22 +63,66 @@ func TestAcceptance_RegisterLoginAndFetchProfile(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("connexion : status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}
+	// Le JWT n'est plus jamais dans le corps JSON : seul le cookie httpOnly
+	// (voir setAuthCookie) porte la session, comme un vrai navigateur.
 	var loginResp struct {
 		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &loginResp); err != nil || loginResp.Token == "" {
-		t.Fatalf("reponse de connexion sans token exploitable : %v (%s)", err, w.Body.String())
+	if err := json.Unmarshal(w.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("decode reponse login : %v", err)
 	}
+	if loginResp.Token != "" {
+		t.Error("le token ne doit plus figurer dans le corps JSON de /login")
+	}
+	sessionCookie := loginCookie(t, w)
 
 	meReq := httptest.NewRequest(http.MethodGet, "/me", nil)
-	meReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	meReq.AddCookie(sessionCookie)
 	meW := httptest.NewRecorder()
 	router.ServeHTTP(meW, meReq)
 	if meW.Code != http.StatusOK {
-		t.Fatalf("/me avec token valide : status attendu 200, obtenu %d (%s)", meW.Code, meW.Body.String())
+		t.Fatalf("/me avec cookie de session valide : status attendu 200, obtenu %d (%s)", meW.Code, meW.Body.String())
 	}
 	if !bytes.Contains(meW.Body.Bytes(), []byte(`"email":"ada@example.com"`)) {
 		t.Errorf("/me devrait renvoyer le profil de l'utilisateur connecte, obtenu %s", meW.Body.String())
+	}
+}
+
+// loginCookie extrait le cookie de session httpOnly d'une reponse /login.
+func loginCookie(t *testing.T, w *httptest.ResponseRecorder) *http.Cookie {
+	t.Helper()
+	for _, ck := range w.Result().Cookies() {
+		if ck.Name == middlewares.AuthCookieName {
+			return ck
+		}
+	}
+	t.Fatal("cookie de session absent de la reponse /login")
+	return nil
+}
+
+// ── Critère d'acceptation 5 : la deconnexion efface le cookie de session ──
+
+func TestAcceptance_LogoutClearsSessionCookie(t *testing.T) {
+	setupAuthAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+
+	jsonRequest(router, http.MethodPost, "/utilisateur",
+		`{"name":"Ada","email":"ada3@example.com","password":"motdepasse123"}`)
+	loginW := jsonRequest(router, http.MethodPost, "/login",
+		`{"email":"ada3@example.com","password":"motdepasse123"}`)
+	sessionCookie := loginCookie(t, loginW)
+
+	logoutReq := httptest.NewRequest(http.MethodPost, "/logout", nil)
+	logoutReq.AddCookie(sessionCookie)
+	logoutW := httptest.NewRecorder()
+	router.ServeHTTP(logoutW, logoutReq)
+	if logoutW.Code != http.StatusOK {
+		t.Fatalf("/logout : status attendu 200, obtenu %d (%s)", logoutW.Code, logoutW.Body.String())
+	}
+	cleared := loginCookie(t, logoutW)
+	if cleared.MaxAge >= 0 {
+		t.Errorf("maxAge negatif attendu pour effacer le cookie, obtenu %d", cleared.MaxAge)
 	}
 }
 

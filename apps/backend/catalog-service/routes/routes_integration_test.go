@@ -30,6 +30,7 @@ import (
 	"gorm.io/gorm"
 
 	"catalog-service/events"
+	"catalog-service/middlewares"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/routes"
@@ -126,11 +127,14 @@ func seedSellableArticle(t *testing.T, ownerID uint) models.Article {
 	return art
 }
 
-func doJSON(r http.Handler, method, path, bearer string) *httptest.ResponseRecorder {
+// doJSON simule une requete navigateur authentifiee par le cookie httpOnly
+// de session (seul mecanisme d'authentification — plus de fallback
+// Authorization Bearer, voir middlewares.AuthRequired).
+func doJSON(r http.Handler, method, path, sessionToken string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, bytes.NewReader(nil))
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
+	if sessionToken != "" {
+		req.AddCookie(&http.Cookie{Name: middlewares.AuthCookieName, Value: sessionToken})
 	}
 	r.ServeHTTP(w, req)
 	return w

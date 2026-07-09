@@ -3,11 +3,17 @@ package middlewares
 import (
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// AuthCookieName est le cookie httpOnly de session pose par auth-service
+// (voir auth-service/middlewares.AuthCookieName — meme nom, doit rester en
+// phase). Scope par COOKIE_DOMAIN sur le domaine parent (ex. ".chaker.pro")
+// en prod pour etre lu par tous les services, chacun sur son propre
+// sous-domaine.
+const AuthCookieName = "collector_token"
 
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -20,13 +26,14 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		authHeader := c.GetHeader("Authorization")
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+		// Seul mecanisme d'authentification : le cookie httpOnly de session
+		// (jamais de fallback Authorization Bearer — voir auth-service pour le
+		// meme choix cote emission du token).
+		tokenString, err := c.Cookie(AuthCookieName)
+		if err != nil || tokenString == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token requis"})
 			return
 		}
-
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {

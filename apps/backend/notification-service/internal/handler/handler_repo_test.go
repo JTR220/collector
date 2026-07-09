@@ -40,6 +40,9 @@ func newMockRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock) {
 	return r, mock
 }
 
+// authedRequest simule une requete navigateur : le JWT est porte par le
+// cookie httpOnly, seul mecanisme d'authentification (voir JWTMiddleware) —
+// plus de fallback Authorization Bearer.
 func authedRequest(r *gin.Engine, method, path, body, token string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	var req *http.Request
@@ -49,7 +52,7 @@ func authedRequest(r *gin.Engine, method, path, body, token string) *httptest.Re
 	} else {
 		req = httptest.NewRequest(method, path, nil)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: token})
 	r.ServeHTTP(w, req)
 	return w
 }
@@ -346,7 +349,8 @@ func TestWebSocket_MissingToken(t *testing.T) {
 func TestWebSocket_InvalidToken(t *testing.T) {
 	r, _ := newMockRouter(t)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/ws?token=not-a-jwt", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: "not-a-jwt"})
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
@@ -360,9 +364,13 @@ func TestWebSocket_ValidTokenUpgradesConnection(t *testing.T) {
 
 	userID := uuid.New()
 	token := mockToken(t, userID)
-	wsURL := "ws" + srv.URL[len("http"):] + "/ws?token=" + token
+	wsURL := "ws" + srv.URL[len("http"):] + "/ws"
 
-	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	// Le navigateur joint automatiquement le cookie de session a la requete
+	// d'upgrade WS (meme domaine) : on le simule ici via l'en-tete Cookie.
+	header := http.Header{}
+	header.Set("Cookie", (&http.Cookie{Name: AuthCookieName, Value: token}).String())
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, header)
 	if err != nil {
 		t.Fatalf("upgrade websocket : %v", err)
 	}

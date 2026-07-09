@@ -106,14 +106,17 @@ func (h *Handler) Health(c *gin.Context) {
 
 // WebSocket godoc
 // @Summary     WebSocket endpoint for real-time notifications
-// @Description Connect with ?token=<jwt> — receives JSON notification events
+// @Description Authentifie par le cookie httpOnly de session — receives JSON notification events
 // @Tags        websocket
 // @Router      /ws [get]
 func (h *Handler) WebSocket(c *gin.Context) {
-	// Extract JWT from query param (standard for WS connections)
-	tokenStr := c.Query("token")
-	if tokenStr == "" {
-		response.Error(c, http.StatusUnauthorized, "missing token")
+	// La requete d'upgrade WS est une requete HTTP normale : le navigateur y
+	// joint automatiquement le cookie de session (meme domaine/sous-domaine),
+	// pas besoin de le lire cote JS pour le poser en ?token= (impossible de
+	// toute facon, le cookie est httpOnly).
+	tokenStr, err := c.Cookie(AuthCookieName)
+	if err != nil || tokenStr == "" {
+		response.Error(c, http.StatusUnauthorized, "missing session cookie")
 		return
 	}
 
@@ -233,14 +236,20 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 // ── JWT Middleware ────────────────────────────────────────────────────────────
 
+// AuthCookieName est le cookie httpOnly de session pose par auth-service
+// (voir auth-service/middlewares.AuthCookieName — meme nom, doit rester en
+// phase).
+const AuthCookieName = "collector_token"
+
 func (h *Handler) JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			response.AbortError(c, http.StatusUnauthorized, "missing or invalid Authorization header")
+		// Seul mecanisme d'authentification : le cookie httpOnly de session
+		// (jamais de fallback Authorization Bearer).
+		tokenStr, err := c.Cookie(AuthCookieName)
+		if err != nil || tokenStr == "" {
+			response.AbortError(c, http.StatusUnauthorized, "missing session cookie")
 			return
 		}
-		tokenStr := authHeader[7:]
 		userID, name, err := h.extractUserFromToken(tokenStr)
 		if err != nil {
 			response.AbortError(c, http.StatusUnauthorized, "invalid token")

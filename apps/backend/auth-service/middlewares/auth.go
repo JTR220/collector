@@ -4,7 +4,6 @@ import (
 	"auth-service/metrics"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -14,12 +13,11 @@ import (
 // invisible pour le JavaScript de la page (protection contre le vol par XSS).
 const AuthCookieName = "collector_token"
 
-// TokenFromRequest extrait le JWT de la requete : en-tete Authorization
-// (clients API, WebSocket) en priorite, sinon cookie httpOnly (navigateur).
+// TokenFromRequest extrait le JWT du cookie httpOnly de session. Seul
+// mecanisme d'authentification navigateur : pas de fallback Authorization
+// Bearer (le JWT ne doit plus jamais transiter par du code JS-accessible,
+// que ce soit un header pose manuellement ou du localStorage).
 func TokenFromRequest(c *gin.Context) string {
-	if h := c.GetHeader("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		return strings.TrimPrefix(h, "Bearer ")
-	}
 	if v, err := c.Cookie(AuthCookieName); err == nil {
 		return v
 	}

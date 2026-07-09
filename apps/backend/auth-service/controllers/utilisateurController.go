@@ -39,12 +39,17 @@ func tokenTTL() time.Duration {
 }
 
 // setAuthCookie pose (ou efface, avec maxAge negatif) le cookie de session
-// httpOnly. SameSite=Lax : envoye sur la navigation et les requetes same-site,
-// jamais sur les POST cross-site (protection CSRF de base). Secure est active
-// par COOKIE_SECURE=true (staging/prod en HTTPS).
+// httpOnly. SameSite=Lax : envoye sur la navigation et les requetes same-site
+// (sous-domaines d'un meme domaine parent inclus), jamais sur les requetes
+// cross-site (protection CSRF de base). Secure est active par
+// COOKIE_SECURE=true (staging/prod en HTTPS). COOKIE_DOMAIN scope le cookie
+// a un domaine parent (ex. ".chaker.pro") pour qu'il soit envoye a tous les
+// services (auth./api./price./notifications., chacun sur un sous-domaine
+// distinct en prod) ; vide par defaut = cookie "host-only" (suffisant en
+// local et en staging, ou tout transite par un seul host).
 func setAuthCookie(c *gin.Context, token string, maxAge int) {
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(middlewares.AuthCookieName, token, maxAge, "/", "", config.EnvBool("COOKIE_SECURE"), true)
+	c.SetCookie(middlewares.AuthCookieName, token, maxAge, "/", config.EnvOr("COOKIE_DOMAIN", ""), config.EnvBool("COOKIE_SECURE"), true)
 }
 
 func CreateUser(c *gin.Context) {
@@ -149,14 +154,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Le token part aussi en cookie httpOnly : c'est lui qui porte la session
-	// navigateur (involable par XSS). Le token du corps JSON reste utilise par
-	// le front en memoire de session (en-tetes Authorization, WebSocket).
+	// Le token part uniquement en cookie httpOnly : c'est le seul mecanisme de
+	// session (jamais expose au JS de la page, donc jamais stockable en
+	// localStorage ni rejouable via un header Authorization pose a la main).
 	setAuthCookie(c, tokenString, int(ttl.Seconds()))
 
 	metrics.RecordLogin("success")
 	c.JSON(http.StatusOK, gin.H{
-		"token": tokenString,
 		"user": gin.H{
 			"id":    user.ID,
 			"name":  user.Name,

@@ -23,7 +23,13 @@ func InitRouter() *gin.Engine {
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+		// Le cookie de session httpOnly (voir middlewares.AuthCookieName) doit
+		// transiter sur les requetes cross-origin front -> API : Allow-Credentials
+		// cote serveur + credentials:'include' cote client (fetch). Sans ca, le
+		// navigateur n'envoie/n'accepte jamais de cookie sur une requete
+		// cross-origin, quelle que soit la valeur d'Allow-Origin.
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -45,6 +51,7 @@ func InitRouter() *gin.Engine {
 	authLimiter := middlewares.RateLimit(10, time.Minute)
 	router.POST("/utilisateur", authLimiter, controllers.CreateUser)
 	router.POST("/login", authLimiter, controllers.Login)
+	router.POST("/logout", controllers.Logout)
 
 	protected := router.Group("/")
 	protected.Use(middlewares.AuthRequired())
