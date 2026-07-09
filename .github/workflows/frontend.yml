@@ -328,7 +328,7 @@ jobs:
           merge-multiple: true
 
       - name: Install kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       - name: Pin new image digest in staging overlay
         working-directory: infra/k8s/overlays/staging
@@ -382,7 +382,7 @@ jobs:
           merge-multiple: true
 
       - name: Install kustomize
-        uses: imranismail/setup-kustomize@v2
+        uses: imranismail/setup-kustomize@v3
 
       - name: Pin new image digest in prod overlay
         working-directory: infra/k8s/overlays/prod
