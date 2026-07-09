@@ -1,6 +1,7 @@
 package main
 
 import (
+	"auth-service/metrics"
 	"auth-service/repository"
 	"auth-service/routes"
 	"log"
@@ -22,6 +23,9 @@ func main() {
 	}
 
 	repository.InitDB()
+
+	go metrics.Serve(":9100")
+
 	router := routes.InitRouter()
 	if err := router.Run(); err != nil {
 		log.Fatalf("Le serveur n'a pas pu demarrer : %v", err)

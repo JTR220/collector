@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"auth-service/metrics"
 	"net/http"
 	"os"
 	"strings"
@@ -32,12 +33,14 @@ func AuthRequired() gin.HandlerFunc {
 		// deja le demarrage dans ce cas).
 		secret := JWTSecret()
 		if secret == "" {
+			metrics.RecordJWTRejection("missing_secret")
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "Configuration serveur incomplete"})
 			return
 		}
 
 		tokenString := TokenFromRequest(c)
 		if tokenString == "" {
+			metrics.RecordJWTRejection("missing_token")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token requis"})
 			return
 		}
@@ -50,6 +53,7 @@ func AuthRequired() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
+			metrics.RecordJWTRejection("invalid_token")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token invalide ou expire"})
 			return
 		}

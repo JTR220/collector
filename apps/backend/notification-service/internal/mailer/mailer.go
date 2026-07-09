@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/smtp"
 
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,6 +23,7 @@ type Mailer interface {
 type NoopMailer struct{}
 
 func (NoopMailer) Send(to, subject, body string) {
+	metrics.RecordEmail("disabled")
 	log.Info().Str("to", to).Str("subject", subject).Msg("email non envoye (SMTP non configure) — voir body en debug")
 	log.Debug().Str("to", to).Str("body", body).Msg("contenu email")
 }
@@ -55,9 +57,11 @@ func (m *SMTPMailer) Send(to, subject, body string) {
 	}
 
 	if err := smtp.SendMail(addr, auth, m.cfg.From, []string{to}, []byte(msg)); err != nil {
+		metrics.RecordEmail("failed")
 		log.Error().Err(err).Str("to", to).Msg("envoi email echoue")
 		return
 	}
+	metrics.RecordEmail("sent")
 	log.Info().Str("to", to).Str("subject", subject).Msg("email envoye")
 }
 

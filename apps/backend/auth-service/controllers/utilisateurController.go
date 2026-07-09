@@ -3,6 +3,7 @@ package controllers
 import (
 	"auth-service/config"
 	"auth-service/dto"
+	"auth-service/metrics"
 	"auth-service/middlewares"
 	"auth-service/models"
 	"auth-service/repository"
@@ -50,11 +51,13 @@ func CreateUser(c *gin.Context) {
 	var input dto.RegisterInput
 
 	if err := c.ShouldBindJSON(&input); err != nil {
+		metrics.RecordRegistration("invalid_input")
 		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
 		return
 	}
 
 	if len(input.Password) < passwordMinLen || len(input.Password) > passwordMaxLen {
+		metrics.RecordRegistration("invalid_password")
 		response.Error(c, http.StatusBadRequest,
 			fmt.Sprintf("Le mot de passe doit faire entre %d et %d caracteres", passwordMinLen, passwordMaxLen))
 		return
@@ -62,6 +65,7 @@ func CreateUser(c *gin.Context) {
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
+		metrics.RecordRegistration("error")
 		response.Error(c, http.StatusInternalServerError, "Erreur interne")
 		return
 	}
@@ -78,13 +82,16 @@ func CreateUser(c *gin.Context) {
 
 	if err := repository.DB.Create(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			metrics.RecordRegistration("duplicate")
 			response.Error(c, http.StatusConflict, "Un compte existe deja avec cet email")
 			return
 		}
+		metrics.RecordRegistration("error")
 		response.Error(c, http.StatusInternalServerError, "Impossible de creer l'utilisateur")
 		return
 	}
 
+	metrics.RecordRegistration("success")
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Utilisateur cree avec succes",
 		"user": gin.H{
@@ -99,22 +106,26 @@ func CreateUser(c *gin.Context) {
 func Login(c *gin.Context) {
 	var input LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
+		metrics.RecordLogin("invalid_input")
 		response.Error(c, http.StatusBadRequest, "Donnees invalides")
 		return
 	}
 
 	var user models.Utilisateur
 	if err := repository.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+		metrics.RecordLogin("invalid_credentials")
 		response.Error(c, http.StatusUnauthorized, "Email ou mot de passe incorrect")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
+		metrics.RecordLogin("invalid_credentials")
 		response.Error(c, http.StatusUnauthorized, "Email ou mot de passe incorrect")
 		return
 	}
 
 	if user.Suspended {
+		metrics.RecordLogin("suspended")
 		response.Error(c, http.StatusForbidden, "Ce compte a ete suspendu")
 		return
 	}
@@ -133,6 +144,7 @@ func Login(c *gin.Context) {
 
 	tokenString, err := token.SignedString([]byte(middlewares.JWTSecret()))
 	if err != nil {
+		metrics.RecordLogin("error")
 		response.Error(c, http.StatusInternalServerError, "Erreur generation token")
 		return
 	}
@@ -142,6 +154,7 @@ func Login(c *gin.Context) {
 	// le front en memoire de session (en-tetes Authorization, WebSocket).
 	setAuthCookie(c, tokenString, int(ttl.Seconds()))
 
+	metrics.RecordLogin("success")
 	c.JSON(http.StatusOK, gin.H{
 		"token": tokenString,
 		"user": gin.H{

@@ -11,6 +11,7 @@ import (
 
 	"github.com/JTR220/collector/price-tracker-service/config"
 	"github.com/JTR220/collector/price-tracker-service/internal/detector"
+	"github.com/JTR220/collector/price-tracker-service/internal/metrics"
 	"github.com/JTR220/collector/price-tracker-service/internal/model"
 	"github.com/JTR220/collector/price-tracker-service/internal/repository"
 	"github.com/google/uuid"
@@ -51,14 +52,16 @@ func (p *Publisher) PublishAlert(alert model.FraudAlertEvent) error {
 	ch := p.ch
 	p.mu.RUnlock()
 	if ch == nil {
+		metrics.RecordRabbitMQError("publish_alert")
 		return fmt.Errorf("publisher: pas de channel AMQP disponible (broker deconnecte)")
 	}
 
 	body, err := json.Marshal(alert)
 	if err != nil {
+		metrics.RecordRabbitMQError("marshal_alert")
 		return err
 	}
-	return ch.Publish(
+	if err := ch.Publish(
 		p.exchange,    // exchange
 		"fraud.alert", // routing key
 		false,
@@ -70,7 +73,11 @@ func (p *Publisher) PublishAlert(alert model.FraudAlertEvent) error {
 			Timestamp:    time.Now(),
 			Body:         body,
 		},
-	)
+	); err != nil {
+		metrics.RecordRabbitMQError("publish_alert")
+		return err
+	}
+	return nil
 }
 
 // PriceConsumer listens to price.updated events from catalog-service
@@ -133,6 +140,7 @@ func (c *PriceConsumer) Start(ctx context.Context, url string) error {
 
 		conn, ch, err := dialAndSetup(url, &c.cfg.RabbitMQ)
 		if err != nil {
+			metrics.RecordRabbitMQError("connect")
 			log.Error().Err(err).Msg("connexion RabbitMQ (consumer) echouee, nouvel essai")
 			if !sleepOrDone(ctx, backoff) {
 				return nil
@@ -172,6 +180,7 @@ func (c *PriceConsumer) consumeUntilClosed(ctx context.Context, ch *amqp.Channel
 		nil,
 	)
 	if err != nil {
+		metrics.RecordRabbitMQError("consume")
 		log.Error().Err(err).Msg("impossible de demarrer la consommation")
 		return true
 	}
@@ -232,6 +241,7 @@ func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 
 	var event model.PriceUpdatedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordPriceEvent("invalid_payload")
 		log.Error().Err(err).Msg("failed to unmarshal price event — nacking")
 		_ = msg.Nack(false, false)
 		return
@@ -247,11 +257,13 @@ func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	}
 	firstSeen, err := c.store.MarkProcessed(ctx, messageID)
 	if err != nil {
+		metrics.RecordPriceEvent("idempotence_error")
 		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
 		_ = msg.Nack(false, true)
 		return
 	}
 	if !firstSeen {
+		metrics.RecordPriceEvent("duplicate")
 		log.Info().Str("message_id", messageID).Msg("duplicate price.updated ignored")
 		_ = msg.Ack(false)
 		return
@@ -267,6 +279,7 @@ func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 		CreatedAt: event.UpdatedAt,
 	}
 	if err := c.repo.SavePriceHistory(ctx, history); err != nil {
+		metrics.RecordPriceEvent("save_error")
 		log.Error().Err(err).Msg("failed to save price history — requeuing")
 		_ = msg.Nack(false, true)
 		return
@@ -278,9 +291,11 @@ func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	for _, alert := range alerts {
 		// Persiste l'alerte en BDD
 		if err := c.repo.SaveAlert(ctx, &alert); err != nil {
+			metrics.RecordRabbitMQError("save_alert")
 			log.Error().Err(err).Str("reason", string(alert.Reason)).Msg("failed to save fraud alert")
 			continue
 		}
+		metrics.RecordFraudAlert(string(alert.Reason))
 
 		// Publie l'alerte sur collector.alerts pour notification-service
 		alertEvent := model.FraudAlertEvent{
@@ -303,5 +318,6 @@ func (c *PriceConsumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 		}
 	}
 
+	metrics.RecordPriceEvent("success")
 	_ = msg.Ack(false)
 }

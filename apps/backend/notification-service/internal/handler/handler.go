@@ -18,6 +18,7 @@ import (
 	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/idconv"
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 	"github.com/JTR220/collector/notification-service/internal/response"
@@ -379,6 +380,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	}
 
 	if err := h.repo.SaveMessage(c.Request.Context(), msg); err != nil {
+		metrics.RecordMessage("error")
 		log.Error().Err(err).Msg("failed to persist message")
 		response.Error(c, http.StatusInternalServerError, "impossible d'envoyer le message")
 		return
@@ -389,6 +391,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	h.hub.SendToUser(recipientID, payload)
 	h.hub.SendToUser(senderID, payload)
 
+	metrics.RecordMessage("success")
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"catalog-service/controllers"
+	"catalog-service/metrics"
 	"catalog-service/middlewares"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 func InitRouter() *gin.Engine {
 	router := gin.Default()
+	router.Use(metrics.Middleware())
 
 	allowedOrigin := os.Getenv("FRONTEND_ORIGIN")
 	if allowedOrigin == "" {
@@ -34,6 +36,9 @@ func InitRouter() *gin.Engine {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	// /metrics n'est PAS servi ici : il est expose sur un port interne dedie
+	// (voir metrics.Serve dans main.go) pour ne jamais transiter par l'ingress
+	// public, qui route "/" sans filtrage de sous-chemin.
 
 	// Photos uploadees : servies en pur statique (aucune execution possible),
 	// X-Content-Type-Options: nosniff empeche le navigateur de reinterpreter

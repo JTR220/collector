@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"catalog-service/metrics"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/response"
@@ -51,14 +52,17 @@ func UploadArticleImage(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
+		metrics.RecordImageUpload("not_found")
 		response.Error(c, http.StatusNotFound, "Article introuvable")
 		return
 	}
 	if !isAdmin(c) && article.SellerID != currentUserID(c) {
+		metrics.RecordImageUpload("forbidden")
 		response.Error(c, http.StatusForbidden, "Vous ne pouvez modifier que vos propres annonces")
 		return
 	}
 	if len(article.Images) >= maxArticleImages {
+		metrics.RecordImageUpload("too_many_images")
 		response.Error(c, http.StatusBadRequest, "Nombre maximum de photos atteint (8)")
 		return
 	}
@@ -66,6 +70,7 @@ func UploadArticleImage(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 	file, _, err := c.Request.FormFile("image")
 	if err != nil {
+		metrics.RecordImageUpload("invalid_file")
 		response.Error(c, http.StatusBadRequest, "Fichier image manquant ou trop volumineux (5 Mo max)")
 		return
 	}
@@ -74,18 +79,21 @@ func UploadArticleImage(c *gin.Context) {
 	head := make([]byte, 512)
 	n, err := io.ReadFull(file, head)
 	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		metrics.RecordImageUpload("invalid_file")
 		response.Error(c, http.StatusBadRequest, "Fichier illisible")
 		return
 	}
 	contentType := http.DetectContentType(head[:n])
 	ext, ok := allowedImageTypes[contentType]
 	if !ok {
+		metrics.RecordImageUpload("unsupported_type")
 		response.Error(c, http.StatusBadRequest, "Format non supporte (jpeg, png, webp, gif uniquement)")
 		return
 	}
 
 	dir := uploadDir()
 	if err := os.MkdirAll(dir, 0o750); err != nil {
+		metrics.RecordImageUpload("storage_error")
 		response.Error(c, http.StatusInternalServerError, "Stockage indisponible")
 		return
 	}
@@ -96,6 +104,7 @@ func UploadArticleImage(c *gin.Context) {
 	// fait que filename est un UUID genere cote serveur.
 	root, err := os.OpenRoot(dir)
 	if err != nil {
+		metrics.RecordImageUpload("storage_error")
 		response.Error(c, http.StatusInternalServerError, "Stockage indisponible")
 		return
 	}
@@ -104,16 +113,19 @@ func UploadArticleImage(c *gin.Context) {
 	filename := uuid.New().String() + ext
 	dest, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
 	if err != nil {
+		metrics.RecordImageUpload("storage_error")
 		response.Error(c, http.StatusInternalServerError, "Impossible d'enregistrer la photo")
 		return
 	}
 	defer func() { _ = dest.Close() }()
 
 	if _, err := dest.Write(head[:n]); err != nil {
+		metrics.RecordImageUpload("storage_error")
 		response.Error(c, http.StatusInternalServerError, "Impossible d'enregistrer la photo")
 		return
 	}
 	if _, err := io.Copy(dest, file); err != nil {
+		metrics.RecordImageUpload("storage_error")
 		response.Error(c, http.StatusInternalServerError, "Impossible d'enregistrer la photo")
 		return
 	}
@@ -129,9 +141,11 @@ func UploadArticleImage(c *gin.Context) {
 		"image_url": article.ImageURL,
 		"images":    article.Images,
 	}).Error; err != nil {
+		metrics.RecordImageUpload("error")
 		response.Error(c, http.StatusInternalServerError, "Impossible de mettre a jour l'annonce")
 		return
 	}
 
+	metrics.RecordImageUpload("success")
 	c.JSON(http.StatusOK, gin.H{"article": article})
 }

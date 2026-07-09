@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"catalog-service/events"
+	"catalog-service/metrics"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/response"
@@ -22,14 +23,17 @@ func BuyArticle(c *gin.Context) {
 
 	var article models.Article
 	if err := repository.DB.First(&article, "id = ?", c.Param("id")).Error; err != nil {
+		metrics.RecordOrderCreated("not_found")
 		response.Error(c, http.StatusNotFound, "Article introuvable")
 		return
 	}
 	if article.Sold {
+		metrics.RecordOrderCreated("already_sold")
 		response.Error(c, http.StatusConflict, "Cette piece est deja vendue")
 		return
 	}
 	if article.SellerID != 0 && article.SellerID == userID {
+		metrics.RecordOrderCreated("own_article")
 		response.Error(c, http.StatusBadRequest, "Vous ne pouvez pas acheter votre propre annonce")
 		return
 	}
@@ -62,10 +66,12 @@ func BuyArticle(c *gin.Context) {
 		return tx.Create(&order).Error
 	})
 	if errors.Is(err, errAlreadySold) {
+		metrics.RecordOrderCreated("already_sold")
 		response.Error(c, http.StatusConflict, "Cette piece est deja vendue")
 		return
 	}
 	if err != nil {
+		metrics.RecordOrderCreated("error")
 		response.Error(c, http.StatusInternalServerError, "Impossible d'enregistrer la commande")
 		return
 	}
@@ -74,6 +80,7 @@ func BuyArticle(c *gin.Context) {
 
 	events.Current.PublishOrderCreated(order.ID, article.ID, order.BuyerID, order.SellerID, article.Name, order.Price)
 
+	metrics.RecordOrderCreated("success")
 	c.JSON(http.StatusCreated, gin.H{"order": order})
 }
 
@@ -132,10 +139,12 @@ func decideOrder(c *gin.Context, accept bool) {
 
 	var order models.Order
 	if err := repository.DB.Preload("Article").First(&order, "id = ?", c.Param("id")).Error; err != nil {
+		metrics.RecordOrderDecision(decisionLabel(accept), "not_found")
 		response.Error(c, http.StatusNotFound, "Commande introuvable")
 		return
 	}
 	if order.SellerID != userID {
+		metrics.RecordOrderDecision(decisionLabel(accept), "forbidden")
 		response.Error(c, http.StatusForbidden, "Cette commande ne vous appartient pas")
 		return
 	}
@@ -162,10 +171,12 @@ func decideOrder(c *gin.Context, accept bool) {
 		return nil
 	})
 	if errors.Is(err, errOrderNotPending) {
+		metrics.RecordOrderDecision(decisionLabel(accept), "already_decided")
 		response.Error(c, http.StatusConflict, "Cette commande a deja ete traitee")
 		return
 	}
 	if err != nil {
+		metrics.RecordOrderDecision(decisionLabel(accept), "error")
 		response.Error(c, http.StatusInternalServerError, "Impossible de traiter la commande")
 		return
 	}
@@ -173,5 +184,13 @@ func decideOrder(c *gin.Context, accept bool) {
 	order.Status = newStatus
 	events.Current.PublishOrderDecision(order.ID, order.ArticleID, order.BuyerID, order.SellerID, order.Article.Name, order.Price, accept)
 
+	metrics.RecordOrderDecision(decisionLabel(accept), "success")
 	c.JSON(http.StatusOK, gin.H{"order": order})
+}
+
+func decisionLabel(accept bool) string {
+	if accept {
+		return "accepted"
+	}
+	return "rejected"
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/JTR220/collector/notification-service/internal/model"
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
@@ -57,6 +58,7 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client.UserID] = append(h.clients[client.UserID], client)
+			metrics.SetWebSocketActiveConnections(h.connectionCountLocked())
 			h.mu.Unlock()
 			log.Info().Str("user_id", client.UserID.String()).Msg("WebSocket client connected")
 
@@ -73,6 +75,7 @@ func (h *Hub) Run() {
 			if len(h.clients[client.UserID]) == 0 {
 				delete(h.clients, client.UserID)
 			}
+			metrics.SetWebSocketActiveConnections(h.connectionCountLocked())
 			h.mu.Unlock()
 			log.Info().Str("user_id", client.UserID.String()).Msg("WebSocket client disconnected")
 
@@ -120,6 +123,14 @@ func (h *Hub) ConnectedCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+func (h *Hub) connectionCountLocked() int {
+	total := 0
+	for _, clients := range h.clients {
+		total += len(clients)
+	}
+	return total
 }
 
 // NewClient creates a client and registers it with the hub

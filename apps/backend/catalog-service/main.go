@@ -2,6 +2,7 @@ package main
 
 import (
 	"catalog-service/events"
+	"catalog-service/metrics"
 	"catalog-service/repository"
 	"catalog-service/routes"
 	"log"
@@ -27,6 +28,8 @@ func main() {
 
 	events.Init(os.Getenv("RABBITMQ_URL"))
 	defer events.Current.Close()
+
+	go metrics.Serve(":9100")
 
 	router := routes.InitRouter()
 	err = router.Run(":8081")

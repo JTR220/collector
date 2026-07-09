@@ -21,7 +21,9 @@ import (
 	"github.com/JTR220/collector/notification-service/internal/handler"
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/mailer"
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/JTR220/collector/notification-service/internal/repository"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -87,6 +89,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(corsMiddleware())
+	router.Use(metrics.Middleware())
 
 	h := handler.New(wsHub, repo, cfg.JWT.Secret, authCli)
 	h.RegisterRoutes(router)
@@ -96,6 +99,16 @@ func main() {
 		Handler:      router,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
+	}
+
+	// /metrics sur un port interne dedie, jamais route par l'ingress public
+	// (qui ne proxy que le port "http" du Service k8s) : evite d'exposer des
+	// metriques metier (messages, emails, erreurs RabbitMQ...) sur Internet.
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsSrv := &http.Server{
+		Addr:    ":9100",
+		Handler: metricsMux,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -110,6 +123,13 @@ func main() {
 		}
 	}()
 
+	go func() {
+		log.Info().Str("port", "9100").Msg("metrics server listening")
+		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error().Err(err).Msg("metrics server error")
+		}
+	}()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -121,6 +141,9 @@ func main() {
 	defer shutdownCancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error().Err(err).Msg("HTTP server shutdown error")
+	}
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("metrics server shutdown error")
 	}
 
 	log.Info().Msg("notification-service stopped")

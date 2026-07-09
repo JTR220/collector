@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"catalog-service/events"
+	"catalog-service/metrics"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/response"
@@ -52,6 +53,7 @@ func CreateArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := c.ShouldBindJSON(&article); err != nil {
+		metrics.RecordArticleCreated("invalid_input")
 		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
 		return
 	}
@@ -76,10 +78,12 @@ func CreateArticle(c *gin.Context) {
 	}
 
 	if err := repository.DB.Create(&article).Error; err != nil {
+		metrics.RecordArticleCreated("error")
 		response.Error(c, http.StatusInternalServerError, "Erreur lors de la creation de l'article")
 		return
 	}
 
+	metrics.RecordArticleCreated("success")
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "created",
 		"article": article,
