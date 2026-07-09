@@ -18,11 +18,13 @@ import (
 var errAlreadySold = errors.New("article deja vendu")
 var errOrderNotPending = errors.New("commande deja traitee")
 
+const preloadArticleCategory = "Article.Category"
+
 func BuyArticle(c *gin.Context) {
 	userID := currentUserID(c)
 
 	var article models.Article
-	if err := repository.DB.First(&article, "id = ?", c.Param("id")).Error; err != nil {
+	if err := repository.DB.First(&article, whereIDEquals, c.Param("id")).Error; err != nil {
 		metrics.RecordOrderCreated("not_found")
 		response.Error(c, http.StatusNotFound, "Article introuvable")
 		return
@@ -76,7 +78,7 @@ func BuyArticle(c *gin.Context) {
 		return
 	}
 
-	repository.DB.Preload("Article").Preload("Article.Category").First(&order, order.ID)
+	repository.DB.Preload("Article").Preload(preloadArticleCategory).First(&order, order.ID)
 
 	events.Current.PublishOrderCreated(order.ID, article.ID, order.BuyerID, order.SellerID, article.Name, order.Price)
 
@@ -86,7 +88,7 @@ func BuyArticle(c *gin.Context) {
 
 func GetMyOrders(c *gin.Context) {
 	var orders []models.Order
-	if err := repository.DB.Preload("Article").Preload("Article.Category").
+	if err := repository.DB.Preload("Article").Preload(preloadArticleCategory).
 		Where("buyer_id = ?", currentUserID(c)).Order("id desc").Find(&orders).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer vos achats")
 		return
@@ -115,7 +117,7 @@ func GetMyOrders(c *gin.Context) {
 // vendeur (y compris celles en attente de validation).
 func GetMySales(c *gin.Context) {
 	var orders []models.Order
-	if err := repository.DB.Preload("Article").Preload("Article.Category").
+	if err := repository.DB.Preload("Article").Preload(preloadArticleCategory).
 		Where("seller_id = ?", currentUserID(c)).Order("id desc").Find(&orders).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer vos ventes")
 		return
@@ -138,7 +140,7 @@ func decideOrder(c *gin.Context, accept bool) {
 	userID := currentUserID(c)
 
 	var order models.Order
-	if err := repository.DB.Preload("Article").First(&order, "id = ?", c.Param("id")).Error; err != nil {
+	if err := repository.DB.Preload("Article").First(&order, whereIDEquals, c.Param("id")).Error; err != nil {
 		metrics.RecordOrderDecision(decisionLabel(accept), "not_found")
 		response.Error(c, http.StatusNotFound, "Commande introuvable")
 		return
@@ -166,7 +168,7 @@ func decideOrder(c *gin.Context, accept bool) {
 		}
 		if !accept {
 			// Refus : la piece redevient disponible a la vente.
-			return tx.Model(&models.Article{}).Where("id = ?", order.ArticleID).Update("sold", false).Error
+			return tx.Model(&models.Article{}).Where(whereIDEquals, order.ArticleID).Update("sold", false).Error
 		}
 		return nil
 	})

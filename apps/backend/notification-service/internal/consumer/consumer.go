@@ -66,10 +66,10 @@ func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := ch.QueueBind(qOrders.Name, "order.created", cfg.ExchangeEvents, false, nil); err != nil {
+	if err := ch.QueueBind(qOrders.Name, routingKeyOrderCreated, cfg.ExchangeEvents, false, nil); err != nil {
 		return err
 	}
-	if err := ch.QueueBind(qOrders.Name, "order.decided", cfg.ExchangeEvents, false, nil); err != nil {
+	if err := ch.QueueBind(qOrders.Name, routingKeyOrderDecided, cfg.ExchangeEvents, false, nil); err != nil {
 		return err
 	}
 
@@ -214,7 +214,7 @@ func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "price.updated"))
 	if err != nil {
 		metrics.RecordNotification("price", "idempotence_error")
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -324,7 +324,7 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "fraud.alert"))
 	if err != nil {
 		metrics.RecordNotification("fraud", "idempotence_error")
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -386,7 +386,12 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 
 // ── Order Events Consumer ────────────────────────────────────────────────────
 
-const queueOrderEvents = "notification-service.order.events"
+const (
+	queueOrderEvents          = "notification-service.order.events"
+	routingKeyOrderCreated    = "order.created"
+	routingKeyOrderDecided    = "order.decided"
+	msgIdempotenceCheckFailed = "failed to check message idempotence — requeuing"
+)
 
 func (m *Manager) consumeOrderEvents(ctx context.Context, ch *amqp.Channel) {
 	msgs, err := ch.Consume(queueOrderEvents, "notif-order-consumer", false, false, false, false, nil)
@@ -406,9 +411,9 @@ func (m *Manager) consumeOrderEvents(ctx context.Context, ch *amqp.Channel) {
 				return
 			}
 			switch msg.RoutingKey {
-			case "order.created":
+			case routingKeyOrderCreated:
 				m.handleOrderCreated(ctx, msg)
-			case "order.decided":
+			case routingKeyOrderDecided:
 				m.handleOrderDecided(ctx, msg)
 			default:
 				_ = msg.Ack(false)
@@ -462,10 +467,10 @@ func (m *Manager) handleOrderCreated(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
-	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "order.created"))
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOrderCreated))
 	if err != nil {
 		metrics.RecordNotification("order_created", "idempotence_error")
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -508,10 +513,10 @@ func (m *Manager) handleOrderDecided(ctx context.Context, msg amqp.Delivery) {
 		return
 	}
 
-	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "order.decided"))
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOrderDecided))
 	if err != nil {
 		metrics.RecordNotification("order_decided", "idempotence_error")
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}

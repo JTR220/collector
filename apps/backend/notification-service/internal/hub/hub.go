@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"io"
 	"sync"
 	"time"
 
@@ -56,54 +57,64 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			h.mu.Lock()
-			h.clients[client.UserID] = append(h.clients[client.UserID], client)
-			metrics.SetWebSocketActiveConnections(h.connectionCountLocked())
-			h.mu.Unlock()
-			log.Info().Str("user_id", client.UserID.String()).Msg("WebSocket client connected")
-
+			h.handleRegister(client)
 		case client := <-h.unregister:
-			h.mu.Lock()
-			clients := h.clients[client.UserID]
-			for i, c := range clients {
-				if c == client {
-					h.clients[client.UserID] = append(clients[:i], clients[i+1:]...)
-					close(client.send)
-					break
-				}
-			}
-			if len(h.clients[client.UserID]) == 0 {
-				delete(h.clients, client.UserID)
-			}
-			metrics.SetWebSocketActiveConnections(h.connectionCountLocked())
-			h.mu.Unlock()
-			log.Info().Str("user_id", client.UserID.String()).Msg("WebSocket client disconnected")
-
+			h.handleUnregister(client)
 		case msg := <-h.broadcast:
-			h.mu.RLock()
-			if msg.UserID == nil {
-				// Broadcast to ALL connected clients
-				for _, clients := range h.clients {
-					for _, c := range clients {
-						select {
-						case c.send <- msg.Payload:
-						default:
-							// Buffer full — drop message for this client
-							log.Warn().Str("user_id", c.UserID.String()).Msg("client send buffer full, dropping message")
-						}
-					}
-				}
-			} else {
-				// Send to a specific user (all their devices/tabs)
-				for _, c := range h.clients[*msg.UserID] {
-					select {
-					case c.send <- msg.Payload:
-					default:
-						log.Warn().Str("user_id", msg.UserID.String()).Msg("client send buffer full, dropping message")
-					}
-				}
-			}
-			h.mu.RUnlock()
+			h.handleBroadcast(msg)
+		}
+	}
+}
+
+func (h *Hub) handleRegister(client *Client) {
+	h.mu.Lock()
+	h.clients[client.UserID] = append(h.clients[client.UserID], client)
+	metrics.SetWebSocketActiveConnections(h.connectionCountLocked())
+	h.mu.Unlock()
+	log.Info().Str("user_id", client.UserID.String()).Msg("WebSocket client connected")
+}
+
+func (h *Hub) handleUnregister(client *Client) {
+	h.mu.Lock()
+	clients := h.clients[client.UserID]
+	for i, c := range clients {
+		if c == client {
+			h.clients[client.UserID] = append(clients[:i], clients[i+1:]...)
+			close(client.send)
+			break
+		}
+	}
+	if len(h.clients[client.UserID]) == 0 {
+		delete(h.clients, client.UserID)
+	}
+	metrics.SetWebSocketActiveConnections(h.connectionCountLocked())
+	h.mu.Unlock()
+	log.Info().Str("user_id", client.UserID.String()).Msg("WebSocket client disconnected")
+}
+
+func (h *Hub) handleBroadcast(msg *BroadcastMsg) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if msg.UserID == nil {
+		// Broadcast to ALL connected clients
+		for _, clients := range h.clients {
+			dispatchToClients(clients, msg.Payload)
+		}
+		return
+	}
+	// Send to a specific user (all their devices/tabs)
+	dispatchToClients(h.clients[*msg.UserID], msg.Payload)
+}
+
+// dispatchToClients pousse payload sur le canal d'emission de chaque client ;
+// si le buffer d'un client est plein, le message est abandonne pour lui sans
+// bloquer ni impacter les autres clients.
+func dispatchToClients(clients []*Client, payload []byte) {
+	for _, c := range clients {
+		select {
+		case c.send <- payload:
+		default:
+			log.Warn().Str("user_id", c.UserID.String()).Msg("client send buffer full, dropping message")
 		}
 	}
 }
@@ -157,39 +168,57 @@ func (c *Client) WritePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+			if !c.writeMessage(message, ok) {
 				return
 			}
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			if _, err := w.Write(message); err != nil {
-				return
-			}
-			// Flush all pending messages in a single write
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				if _, err := w.Write([]byte("\n")); err != nil {
-					return
-				}
-				if _, err := w.Write(<-c.send); err != nil {
-					return
-				}
-			}
-			if err := w.Close(); err != nil {
-				return
-			}
-
 		case <-ticker.C:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if !c.writePing() {
 				return
 			}
 		}
 	}
+}
+
+// writeMessage ecrit message sur la connexion (et vide le buffer restant en
+// une seule frame WebSocket). Renvoie false si la connexion doit se fermer :
+// canal ferme cote hub (ok == false) ou erreur d'ecriture.
+func (c *Client) writeMessage(message []byte, ok bool) bool {
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	if !ok {
+		_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+		return false
+	}
+	w, err := c.conn.NextWriter(websocket.TextMessage)
+	if err != nil {
+		return false
+	}
+	if _, err := w.Write(message); err != nil {
+		return false
+	}
+	if !c.flushPending(w) {
+		return false
+	}
+	return w.Close() == nil
+}
+
+// flushPending vide le reste du buffer d'emission dans le writer courant,
+// pour eviter une frame WebSocket par message quand plusieurs sont en attente.
+func (c *Client) flushPending(w io.Writer) bool {
+	n := len(c.send)
+	for i := 0; i < n; i++ {
+		if _, err := w.Write([]byte("\n")); err != nil {
+			return false
+		}
+		if _, err := w.Write(<-c.send); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Client) writePing() bool {
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	return c.conn.WriteMessage(websocket.PingMessage, nil) == nil
 }
 
 // ReadPump pumps messages from the WebSocket to discard them (keeps conn alive)

@@ -10,6 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const errStatsUnavailable = "Impossible de calculer les statistiques"
+
 // GetAdminStats renvoie un instantane back-office concret de la plateforme
 // (reserve aux administrateurs via le middleware AdminRequired) : volume
 // d'affaires, entonnoir des commandes, sante du catalogue et activite recente.
@@ -48,7 +50,7 @@ func GetAdminStats(c *gin.Context) {
 		// Vendeurs actifs distincts (annonces rattachees a un compte).
 		fail(repository.DB.Model(&models.Article{}).Where("seller_id > 0").
 			Distinct("seller_id").Count(&activeSellers)) {
-		response.Error(c, http.StatusInternalServerError, "Impossible de calculer les statistiques")
+		response.Error(c, http.StatusInternalServerError, errStatsUnavailable)
 		return
 	}
 
@@ -60,7 +62,7 @@ func GetAdminStats(c *gin.Context) {
 	var statusRows []statusRow
 	if fail(repository.DB.Model(&models.Order{}).
 		Select("status, COUNT(*) as count").Group("status").Scan(&statusRows)) {
-		response.Error(c, http.StatusInternalServerError, "Impossible de calculer les statistiques")
+		response.Error(c, http.StatusInternalServerError, errStatsUnavailable)
 		return
 	}
 	ordersByStatus := map[string]int64{
@@ -85,14 +87,14 @@ func GetAdminStats(c *gin.Context) {
 		Group("categories.name").
 		Order("count DESC").
 		Scan(&byCategory)) {
-		response.Error(c, http.StatusInternalServerError, "Impossible de calculer les statistiques")
+		response.Error(c, http.StatusInternalServerError, errStatsUnavailable)
 		return
 	}
 
 	// Dernieres commandes (activite recente).
 	var recent []models.Order
 	if fail(repository.DB.Preload("Article").Order("id DESC").Limit(6).Find(&recent)) {
-		response.Error(c, http.StatusInternalServerError, "Impossible de calculer les statistiques")
+		response.Error(c, http.StatusInternalServerError, errStatsUnavailable)
 		return
 	}
 	type recentOrder struct {

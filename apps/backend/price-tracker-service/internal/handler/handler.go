@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const errInternalServer = "internal server error"
+
 type Handler struct {
 	repo *repository.PriceRepository
 }
@@ -64,7 +66,7 @@ func (h *Handler) GetPriceHistory(c *gin.Context) {
 	history, err := h.repo.GetPriceHistory(c.Request.Context(), itemID)
 	if err != nil {
 		log.Error().Err(err).Str("item_id", itemID.String()).Msg("GetPriceHistory failed")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 
@@ -87,7 +89,7 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 	alerts, err := h.repo.GetAlerts(c.Request.Context(), onlyUnresolved)
 	if err != nil {
 		log.Error().Err(err).Msg("GetAlerts failed")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 
@@ -113,7 +115,7 @@ func (h *Handler) ResolveAlert(c *gin.Context) {
 
 	if err := h.repo.ResolveAlert(c.Request.Context(), alertID); err != nil {
 		log.Error().Err(err).Str("alert_id", alertID.String()).Msg("ResolveAlert failed")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 

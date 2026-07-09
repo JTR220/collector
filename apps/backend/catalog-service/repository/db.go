@@ -14,6 +14,23 @@ import (
 
 var DB *gorm.DB
 
+// Identifiants et libelles du seed de demo, reutilises a plusieurs endroits
+// (definition des pieces vedettes, affectation aux comptes demo, commandes
+// de demo) : extraits en constantes pour eviter la duplication de litteraux.
+const (
+	slugPKM001 = "PKM-001"
+	slugGBC014 = "GBC-014"
+	slugCMX007 = "CMX-007"
+	slugVNL022 = "VNL-022"
+	slugFIG101 = "FIG-101"
+	slugWAT045 = "WAT-045"
+
+	categoryDesignerToy = "Designer Toy"
+
+	rarityNearMint = "Near Mint"
+	gradeCGC96     = "CGC 9.6"
+)
+
 func InitDB() {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
@@ -59,7 +76,7 @@ func SeedData() {
 		{Name: "Console", Description: "Consoles de jeu vintage et éditions scellées"},
 		{Name: "Comics", Description: "Bandes dessinées et comics gradés CGC / CBCS"},
 		{Name: "Vinyle", Description: "Disques vinyles 1ère presse et éditions rares"},
-		{Name: "Designer Toy", Description: "Art toys et figurines en édition limitée"},
+		{Name: categoryDesignerToy, Description: "Art toys et figurines en édition limitée"},
 		{Name: "Horlogerie", Description: "Montres vintage et customisées"},
 	}
 
@@ -83,7 +100,7 @@ func SeedData() {
 	// Les 6 pieces vedettes ne sont inserees qu'une fois (au premier boot).
 	var baseCount int64
 	DB.Model(&models.Article{}).Where("slug IN ?",
-		[]string{"PKM-001", "GBC-014", "CMX-007", "VNL-022", "FIG-101", "WAT-045"}).Count(&baseCount)
+		[]string{slugPKM001, slugGBC014, slugCMX007, slugVNL022, slugFIG101, slugWAT045}).Count(&baseCount)
 	if baseCount > 0 {
 		topUpCatalog(catID)
 		log.Println("Pieces vedettes deja presentes : top-up catalogue etendu applique")
@@ -92,7 +109,7 @@ func SeedData() {
 
 	articles := []models.Article{
 		{
-			Slug:         "PKM-001",
+			Slug:         slugPKM001,
 			Name:         "Charizard",
 			Description:  "Carte Pokémon Charizard holographique en excellent état, conservée sous sleeve premium depuis l'achat.",
 			Series:       "Base Set, 1ère édition",
@@ -116,7 +133,7 @@ func SeedData() {
 			CategoryID:   catID("TCG"),
 		},
 		{
-			Slug:         "GBC-014",
+			Slug:         slugGBC014,
 			Name:         "Game Boy Color",
 			Description:  "Game Boy Color édition Pikachu NTSC, boîte d'origine scellée en usine. Jamais ouverte.",
 			Series:       "Édition Pikachu, scellé",
@@ -140,14 +157,14 @@ func SeedData() {
 			CategoryID:   catID("Console"),
 		},
 		{
-			Slug:         "CMX-007",
+			Slug:         slugCMX007,
 			Name:         "Action Comics #1",
 			Description:  "Reprint commémoratif 1988 en très bon état, gradé par CGC. Couverture nette, dos sans plis.",
 			Series:       "DC, reprint 1988",
 			Year:         1988,
-			Rarity:       "Near Mint",
+			Rarity:       rarityNearMint,
 			RarityScore:  4,
-			Grade:        "CGC 9.6",
+			Grade:        gradeCGC96,
 			Prix:         640,
 			FraisPort:    14,
 			Seller:       "panel_press",
@@ -164,7 +181,7 @@ func SeedData() {
 			CategoryID:   catID("Comics"),
 		},
 		{
-			Slug:         "VNL-022",
+			Slug:         slugVNL022,
 			Name:         "Daft Punk — Discovery",
 			Description:  "Vinyle 33t double album 1ère presse 2001, pochette sans déchirure, disques sans rayures visibles.",
 			Series:       "Vinyle, 1ère presse 2001",
@@ -188,7 +205,7 @@ func SeedData() {
 			CategoryID:   catID("Vinyle"),
 		},
 		{
-			Slug:         "FIG-101",
+			Slug:         slugFIG101,
 			Name:         "Bearbrick 1000%",
 			Description:  "Bearbrick 1000% Andy Warhol edition 2022, boîte intacte avec certificat d'authenticité original.",
 			Series:       "Andy Warhol, 2022",
@@ -209,10 +226,10 @@ func SeedData() {
 			SeatsLeft:    0,
 			SeatsTotal:   5,
 			ResellPrice:  1800,
-			CategoryID:   catID("Designer Toy"),
+			CategoryID:   catID(categoryDesignerToy),
 		},
 		{
-			Slug:         "WAT-045",
+			Slug:         slugWAT045,
 			Name:         "Casio F-91W",
 			Description:  "Casio F-91W customisé bracelet NATO bleu nuit, boîtier poncé mat. Mouvement original garanti.",
 			Series:       "Mod custom NATO bleu",
@@ -282,7 +299,7 @@ var unsplashPool = map[string][]string{
 	"Console":      {"1606663889134-b1dedb5ed8b7", "1531525645387-7f14be1bdbbd", "1486401899868-0e435ed85128", "1550745165-9bc0b252726f"},
 	"Comics":       {"1608889175123-8ee362201f81", "1612036782180-6f0b6cd846fe", "1601645191163-3fc0d5d64e35"},
 	"Vinyle":       {"1493225457124-a3eb161ffa5f", "1458560871784-56d23406c091", "1571330735066-03aaa9429d89"},
-	"Designer Toy": {"1566576912321-d58ddd7a6088", "1533105079780-92b9be482077", "1608889175123-8ee362201f81"},
+	categoryDesignerToy: {"1566576912321-d58ddd7a6088", "1533105079780-92b9be482077", "1608889175123-8ee362201f81"},
 	"Horlogerie":   {"1524592094714-0f0654e20314", "1587836374828-4dbafa94cf0e", "1548169874-53e85f753f1e"},
 	"_default":     {"1493711662062-fa541adb3fc8", "1585504198199-20277593b94f", "1518709268805-4e9042af9f23", "1550009158-9ebf69173e03"},
 }
@@ -363,11 +380,11 @@ func generateCatalog(catID func(string) uint) []models.Article {
 		},
 		"Comics": {
 			{"Amazing Fantasy #15", "Marvel, reprint gradé", "Key Issue", "CGC 9.4", 2002, 720, 14},
-			{"Batman #1 — Facsimile", "DC, édition anniversaire", "Near Mint", "CGC 9.8", 2019, 180, 12},
-			{"X-Men #1 (1991)", "Marvel, Jim Lee cover", "Near Mint", "CGC 9.6", 1991, 260, 12},
-			{"Spawn #1", "Image Comics, 1992", "Near Mint", "CGC 9.8", 1992, 210, 12},
+			{"Batman #1 — Facsimile", "DC, édition anniversaire", rarityNearMint, "CGC 9.8", 2019, 180, 12},
+			{"X-Men #1 (1991)", "Marvel, Jim Lee cover", rarityNearMint, gradeCGC96, 1991, 260, 12},
+			{"Spawn #1", "Image Comics, 1992", rarityNearMint, "CGC 9.8", 1992, 210, 12},
 			{"Watchmen #1", "DC, 1re impression", "Very Fine", "CGC 9.0", 1986, 340, 13},
-			{"Saga #1 signé", "Image, signé B.K. Vaughan", "Signature", "CGC 9.6", 2012, 290, 12},
+			{"Saga #1 signé", "Image, signé B.K. Vaughan", "Signature", gradeCGC96, 2012, 290, 12},
 		},
 		"Vinyle": {
 			{"Pink Floyd — Dark Side", "Harvest, 1re presse UK", "Rare", "VG+", 1973, 420, 14},
@@ -377,7 +394,7 @@ func generateCatalog(catID func(string) uint) []models.Article {
 			{"Radiohead — OK Computer", "Parlophone, 2xLP", "Collector", "NM", 1997, 160, 12},
 			{"Kendrick Lamar — DAMN.", "TDE, presse rouge", "Limited", "M", 2017, 85, 10},
 		},
-		"Designer Toy": {
+		categoryDesignerToy: {
 			{"KAWS Companion — Grey", "OriginalFake, 2016", "Limited", "MIB", 2016, 980, 30},
 			{"Bearbrick 400% Basquiat", "Medicom, série #1", "Limited", "MIB", 2019, 320, 22},
 			{"Funko Pop Gold Batman", "18\" édition dorée", "Chase", "Mint", 2021, 140, 18},
@@ -396,12 +413,12 @@ func generateCatalog(catID func(string) uint) []models.Article {
 	}
 
 	glyphs := map[string]string{
-		"TCG": "卡", "Console": "電", "Comics": "S", "Vinyle": "♪", "Designer Toy": "★", "Horlogerie": "◷",
+		"TCG": "卡", "Console": "電", "Comics": "S", "Vinyle": "♪", categoryDesignerToy: "★", "Horlogerie": "◷",
 	}
 
 	var out []models.Article
 	seq := 200
-	for _, cat := range []string{"TCG", "Console", "Comics", "Vinyle", "Designer Toy", "Horlogerie"} {
+	for _, cat := range []string{"TCG", "Console", "Comics", "Vinyle", categoryDesignerToy, "Horlogerie"} {
 		for i, it := range catalog[cat] {
 			seq++
 			gallery := unsplashURLs(cat, i)
@@ -445,8 +462,8 @@ func backfillSellerAssignments() {
 		ownerID uint
 		slugs   []string
 	}{
-		{vendeurDemoID, []string{"PKM-001", "GBC-014", "CMX-007"}},
-		{testDemoID, []string{"VNL-022", "FIG-101", "WAT-045"}},
+		{vendeurDemoID, []string{slugPKM001, slugGBC014, slugCMX007}},
+		{testDemoID, []string{slugVNL022, slugFIG101, slugWAT045}},
 	}
 
 	for _, a := range assignments {
@@ -507,8 +524,8 @@ func backfillDemoOrders() {
 		slug   string
 		status string
 	}{
-		{"VNL-022", models.OrderStatusPaid},
-		{"FIG-101", models.OrderStatusPending},
+		{slugVNL022, models.OrderStatusPaid},
+		{slugFIG101, models.OrderStatusPending},
 	}
 
 	for _, d := range demoOrders {

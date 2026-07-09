@@ -15,6 +15,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	whereIDEquals      = "id = ?"
+	errArticleNotFound = "Article introuvable"
+)
+
 // sanitizeImageURL ne garde une URL de photo fournie par le vendeur que si
 // elle est http(s), raisonnablement courte et pointe vers un hôte explicite.
 // Elle protege contre les schemas dangereux (data:, javascript:, file:...),
@@ -95,14 +100,14 @@ func GetArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.Preload("Category").First(&article, "id = ?", id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "Article introuvable")
+	if err := repository.DB.Preload("Category").First(&article, whereIDEquals, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
 		return
 	}
 
 	// Compteur de vues informatif (fiche consultee) : incrementation atomique
 	// en base puis reflet immediat dans la reponse, sans re-frapper la DB.
-	repository.DB.Model(&models.Article{}).Where("id = ?", article.ID).UpdateColumn("views", gorm.Expr("views + 1"))
+	repository.DB.Model(&models.Article{}).Where(whereIDEquals, article.ID).UpdateColumn("views", gorm.Expr("views + 1"))
 	article.Views++
 
 	c.JSON(http.StatusOK, article)
@@ -162,8 +167,8 @@ func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "Article introuvable")
+	if err := repository.DB.First(&article, whereIDEquals, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
 		return
 	}
 
@@ -185,8 +190,8 @@ func UpdateArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "Article introuvable")
+	if err := repository.DB.First(&article, whereIDEquals, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
 		return
 	}
 

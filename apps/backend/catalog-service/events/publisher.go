@@ -34,12 +34,18 @@ var Current Publisher = NoopPublisher{}
 // le service fonctionne normalement, sans publication.
 type NoopPublisher struct{}
 
-func (NoopPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {}
+func (NoopPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
 func (NoopPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
 }
 func (NoopPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
 }
-func (NoopPublisher) Close() {}
+func (NoopPublisher) Close() {
+	// no-op : aucune connexion a fermer.
+}
 
 // AMQPPublisher publie sur RabbitMQ. La connexion s'etablit en arriere-plan
 // avec retry : le demarrage du service ne depend jamais du broker.
@@ -59,52 +65,75 @@ func NewAMQPPublisher(url string) *AMQPPublisher {
 
 func (p *AMQPPublisher) connectLoop() {
 	backoff := time.Second
-	for {
-		p.mu.Lock()
-		if p.closed {
-			p.mu.Unlock()
+	for !p.isClosed() {
+		conn, ch, err := p.dialAndDeclare()
+		if err != nil {
+			log.Printf("RabbitMQ indisponible (%v), nouvel essai dans %s", err, backoff)
+			time.Sleep(backoff)
+			backoff = nextPublisherBackoff(backoff)
+			continue
+		}
+
+		p.setActive(conn, ch)
+		log.Printf("RabbitMQ connecte, exchange %q pret", exchangeEvents)
+		<-conn.NotifyClose(make(chan *amqp.Error, 1))
+
+		if p.clearActive() {
 			return
 		}
-		p.mu.Unlock()
-
-		conn, err := amqp.Dial(p.url)
-		if err == nil {
-			ch, chErr := conn.Channel()
-			if chErr == nil {
-				chErr = ch.ExchangeDeclare(exchangeEvents, "topic", true, false, false, false, nil)
-			}
-			if chErr == nil {
-				p.mu.Lock()
-				p.conn = conn
-				p.ch = ch
-				p.mu.Unlock()
-				log.Printf("RabbitMQ connecte, exchange %q pret", exchangeEvents)
-
-				closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
-				<-closeCh
-
-				p.mu.Lock()
-				p.conn = nil
-				p.ch = nil
-				closed := p.closed
-				p.mu.Unlock()
-				if closed {
-					return
-				}
-				log.Printf("Connexion RabbitMQ perdue, reconnexion...")
-				backoff = time.Second
-				continue
-			}
-			_ = conn.Close()
-			err = chErr
-		}
-
-		log.Printf("RabbitMQ indisponible (%v), nouvel essai dans %s", err, backoff)
-		time.Sleep(backoff)
-		if backoff < 30*time.Second {
-			backoff *= 2
-		}
+		log.Printf("Connexion RabbitMQ perdue, reconnexion...")
+		backoff = time.Second
 	}
+}
+
+func (p *AMQPPublisher) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
+}
+
+// dialAndDeclare ouvre une connexion et un canal AMQP, puis declare
+// l'exchange collector.events. En cas d'erreur a n'importe quelle etape,
+// la connexion ouverte est refermee et l'erreur remontee telle quelle.
+func (p *AMQPPublisher) dialAndDeclare() (*amqp.Connection, *amqp.Channel, error) {
+	conn, err := amqp.Dial(p.url)
+	if err != nil {
+		return nil, nil, err
+	}
+	ch, err := conn.Channel()
+	if err == nil {
+		err = ch.ExchangeDeclare(exchangeEvents, "topic", true, false, false, false, nil)
+	}
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	return conn, ch, nil
+}
+
+func (p *AMQPPublisher) setActive(conn *amqp.Connection, ch *amqp.Channel) {
+	p.mu.Lock()
+	p.conn = conn
+	p.ch = ch
+	p.mu.Unlock()
+}
+
+// clearActive efface la connexion/canal courants et renvoie true si le
+// publisher a ete ferme entre-temps (Close), auquel cas connectLoop doit
+// s'arreter plutot que de tenter une reconnexion.
+func (p *AMQPPublisher) clearActive() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.conn = nil
+	p.ch = nil
+	return p.closed
+}
+
+func nextPublisherBackoff(d time.Duration) time.Duration {
+	if d >= 30*time.Second {
+		return 30 * time.Second
+	}
+	return d * 2
 }
 
 // PublishPriceUpdated publie l'evenement price.updated. Si le broker est

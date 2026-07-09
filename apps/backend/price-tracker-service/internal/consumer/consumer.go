@@ -19,11 +19,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// MessageStore tracks which message IDs have already been processed, to make
+// ProcessedMarker tracks which message IDs have already been processed, to make
 // consumption idempotent across redeliveries (e.g. after a nack/requeue or a
 // consumer restart before the ack reached the broker). Satisfied by
 // *repository.PriceRepository; a fake is used in tests.
-type MessageStore interface {
+type ProcessedMarker interface {
 	MarkProcessed(ctx context.Context, messageID string) (bool, error)
 }
 
@@ -83,7 +83,7 @@ func (p *Publisher) PublishAlert(alert model.FraudAlertEvent) error {
 // PriceConsumer listens to price.updated events from catalog-service
 type PriceConsumer struct {
 	repo      *repository.PriceRepository
-	store     MessageStore
+	store     ProcessedMarker
 	detector  *detector.Detector
 	publisher *Publisher
 	cfg       *config.Config

@@ -11,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const routeArticleByID = "/article/:id"
+
 func InitRouter() *gin.Engine {
 	router := gin.Default()
 	router.Use(metrics.Middleware())
@@ -57,7 +59,7 @@ func InitRouter() *gin.Engine {
 
 	// Routes publiques (lecture catalogue sans authentification)
 	router.GET("/article", controllers.GetAllArticles)
-	router.GET("/article/:id", controllers.GetArticle)
+	router.GET(routeArticleByID, controllers.GetArticle)
 	router.GET("/category", controllers.GetAllCategories)
 	router.GET("/sellers/:id/rating", controllers.GetSellerRating)
 	router.GET("/sellers/:id/reviews", controllers.GetSellerReviews)
@@ -67,8 +69,8 @@ func InitRouter() *gin.Engine {
 	protected.Use(middlewares.AuthRequired())
 	{
 		protected.POST("/article", controllers.CreateArticle)
-		protected.PUT("/article/:id", controllers.UpdateArticle)
-		protected.DELETE("/article/:id", controllers.DeleteArticle)
+		protected.PUT(routeArticleByID, controllers.UpdateArticle)
+		protected.DELETE(routeArticleByID, controllers.DeleteArticle)
 		protected.POST("/article/:id/image", controllers.UploadArticleImage)
 		protected.GET("/me/articles", controllers.GetMyArticles)
 
