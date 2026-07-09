@@ -17,40 +17,40 @@ resources:
 - ingress.yaml
 - sealed-collector-secrets.yaml
 
-configMapGenerator:
-  - name: collector-config
-    literals:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=collector
-      - DB_USER=postgres
-      - FRONTEND_ORIGIN=https://chaker.pro
   # Hosts d'API PROD lus au runtime par le front (remplace les defaults base).
-  - name: collector-front-config
-    behavior: replace
-    literals:
-      - PUBLIC_AUTH_API_BASE_URL=https://auth.chaker.pro
-      - PUBLIC_CATALOG_API_BASE_URL=https://api.chaker.pro
-      - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.chaker.pro
-      - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.chaker.pro
+configMapGenerator:
+- literals:
+  - DB_HOST=postgres
+  - DB_PORT=5432
+  - DB_NAME=collector
+  - DB_USER=postgres
+  - FRONTEND_ORIGIN=https://chaker.pro
+  name: collector-config
+- behavior: replace
+  literals:
+  - PUBLIC_AUTH_API_BASE_URL=https://auth.chaker.pro
+  - PUBLIC_CATALOG_API_BASE_URL=https://api.chaker.pro
+  - PUBLIC_PRICE_TRACKER_API_BASE_URL=https://price.chaker.pro
+  - PUBLIC_NOTIFICATION_API_BASE_URL=https://notifications.chaker.pro
+  name: collector-front-config
 
 # Promotion manuelle : remplacer newTag par le digest validé en staging, ex :
 #   - name: ghcr.io/jtr220/collector/auth-service
 #     digest: sha256:abc123...
 images:
-- digest: sha256:49a716c752555fb013369cef6bfc15438925abeff8de9e94d7dca4944df26bea
+- digest: sha256:932988832c511a95bbec2b66fc8fe78a4cf7ca5e312eaa97d15e7012694b5f42
   name: ghcr.io/jtr220/collector/auth-service
   newName: ghcr.io/jtr220/collector/auth-service
-- digest: sha256:deda429fc44246fd08e71b08676367ce2c9cd22be9a74453f08eb7c698ad8ea9
+- digest: sha256:44d9991816923daba1a180d480c130ae89d6b68987cfc16e260d6d1c8593fa59
   name: ghcr.io/jtr220/collector/catalog-service
   newName: ghcr.io/jtr220/collector/catalog-service
 - digest: sha256:294fc75ef0488a0dd71908eb817ea62e33ef94d0561f599f975ad1a9fccca19c
   name: ghcr.io/jtr220/collector/collector-front
   newName: ghcr.io/jtr220/collector/collector-front
-- digest: sha256:fd544264653e45a55b806009f4ab639960ec350ba45a37137be32d6f1e889840
+- digest: sha256:3d17cb9ac42aeec948c1cd4163adb9d7c24e7ce27344ed9806149d56ae0d112d
   name: ghcr.io/jtr220/collector/notification-service
   newName: ghcr.io/jtr220/collector/notification-service
-- digest: sha256:5d48e604b2f6cec0016f17e4c90191577b9cd380723c43345cae2ba1ed5b1a94
+- digest: sha256:0285fb6e0da67b09bbf352931439b0c849d5022718e71c1af7ca971b68865c40
   name: ghcr.io/jtr220/collector/price-tracker-service
   newName: ghcr.io/jtr220/collector/price-tracker-service
 
