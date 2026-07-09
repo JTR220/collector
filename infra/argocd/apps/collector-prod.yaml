@@ -1,8 +1,8 @@
 # Étape 11 — prod : branche dediee "master" (distincte de "main" utilisee par
-# staging). La promotion se fait via une Pull Request main -> master (voir
-# le job "promote-prod" dans .github/workflows/*.yml, qui ouvre la PR sans la
-# merger) : la revue + le merge humain sur GitHub est le premier garde-fou,
-# le clic "Sync" dans l'UI Argo CD (pas de bloc automated) est le second.
+# staging). La promotion se fait via une Pull Request main -> master, ouverte
+# et mergee manuellement : la revue + le merge humain sur GitHub est le
+# premier garde-fou, le clic "Sync" dans l'UI Argo CD (pas de bloc automated)
+# est le second.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
