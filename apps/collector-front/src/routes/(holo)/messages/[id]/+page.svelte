@@ -25,7 +25,7 @@
 	// aussi son propre filtre cote serveur (internal/pii) — rejet 400 meme si ce filtre
 	// local laissait passer un cas.
 	const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
-	const PHONE_RE = /(?:\+?\d[\s.\-]?){7,}\d/;
+	const PHONE_RE = /(?:\+?\d[\s.-]?){7,}\d/;
 	const containsContactInfo = (text: string) => EMAIL_RE.test(text) || PHONE_RE.test(text);
 
 	let thread = $state<MessageAPI[]>([]);
