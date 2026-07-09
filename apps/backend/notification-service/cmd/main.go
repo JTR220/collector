@@ -107,8 +107,9 @@ func main() {
 	metricsMux := http.NewServeMux()
 	metricsMux.Handle("/metrics", promhttp.Handler())
 	metricsSrv := &http.Server{
-		Addr:    ":9100",
-		Handler: metricsMux,
+		Addr:              ":9100",
+		Handler:           metricsMux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -93,7 +93,12 @@ func RecordImageUpload(result string) {
 func Serve(addr string) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Le serveur de metriques n'a pas pu demarrer : %v", err)
 	}
 }
