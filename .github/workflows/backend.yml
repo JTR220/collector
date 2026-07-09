@@ -50,9 +50,10 @@ jobs:
         working-directory: apps/backend/${{ matrix.service }}
 
     # Postgres ephemere pour les tests d'integration de notification-service
-    # (requetes Postgres-specifiques : gen_random_uuid(), UUID, DISTINCT ON —
-    # non simulables en sqlite). Inoffensif pour les autres services de la
-    # matrice, qui ne lisent pas TEST_DATABASE_DSN.
+    # et price-tracker-service (requetes Postgres-specifiques : gen_random_uuid(),
+    # UUID, DISTINCT ON — non simulables en sqlite). Isole par job de matrice
+    # (chaque service a son propre conteneur postgres) : inoffensif pour
+    # auth-service/catalog-service, qui ne lisent pas TEST_DATABASE_DSN.
     services:
       postgres:
         image: postgres:17-alpine
@@ -98,7 +99,11 @@ jobs:
       - name: Run Tests (avec détecteur de data races)
         # TEST_DATABASE_DSN n'est consomme que par les tests d'integration de
         # notification-service (repository_integration_test.go,
-        # handler_integration_test.go) ; les autres services l'ignorent.
+        # handler_integration_test.go) et price-tracker-service
+        # (repository_integration_test.go) ; les autres services l'ignorent.
+        # Le nom "notification_test" est un heritage historique : chaque job
+        # de la matrice a son propre conteneur postgres isole, donc la base
+        # est vide et propre quel que soit le service qui la peuple ensuite.
         env:
           TEST_DATABASE_DSN: postgres://postgres:postgres@localhost:5432/notification_test?sslmode=disable
         run: |
