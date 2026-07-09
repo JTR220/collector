@@ -24,22 +24,22 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 	cancelled: 'Annulée'
 };
 
-const request = <T>(path: string, token: string, init?: RequestInit) =>
-	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: 'catalog-service' });
+const request = <T>(path: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { init, errorPrefix: 'catalog-service' });
 
-export const buyArticle = (token: string, articleId: number) =>
-	request<{ order: Order }>(`/article/${articleId}/buy`, token, { method: 'POST' });
+export const buyArticle = (articleId: number) =>
+	request<{ order: Order }>(`/article/${articleId}/buy`, { method: 'POST' });
 
-export const fetchMyOrders = (token: string) => request<Order[]>('/me/orders', token);
+export const fetchMyOrders = () => request<Order[]>('/me/orders');
 
 /** Ventes reçues (en tant que vendeur), y compris celles en attente de validation. */
-export const fetchMySales = (token: string) => request<Order[]>('/me/sales', token);
+export const fetchMySales = () => request<Order[]>('/me/sales');
 
-export const acceptOrder = (token: string, orderId: number) =>
-	request<{ order: Order }>(`/order/${orderId}/accept`, token, { method: 'PATCH' });
+export const acceptOrder = (orderId: number) =>
+	request<{ order: Order }>(`/order/${orderId}/accept`, { method: 'PATCH' });
 
-export const rejectOrder = (token: string, orderId: number) =>
-	request<{ order: Order }>(`/order/${orderId}/reject`, token, { method: 'PATCH' });
+export const rejectOrder = (orderId: number) =>
+	request<{ order: Order }>(`/order/${orderId}/reject`, { method: 'PATCH' });
 
 // ── Avis vendeur ─────────────────────────────────────────────────────────────
 
@@ -56,8 +56,8 @@ export type Review = {
 
 export type SellerRating = { average: number; count: number };
 
-export const leaveReview = (token: string, orderId: number, rating: number, comment: string) =>
-	request<{ review: Review }>(`/order/${orderId}/review`, token, {
+export const leaveReview = (orderId: number, rating: number, comment: string) =>
+	request<{ review: Review }>(`/order/${orderId}/review`, {
 		method: 'POST',
 		body: JSON.stringify({ rating, comment })
 	});

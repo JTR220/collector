@@ -43,14 +43,14 @@ describe('catalog API', () => {
 		expect(fetchMock.mock.calls[0][0]).toMatch(/\/category$/);
 	});
 
-	it('createArticle envoie le token Bearer et extrait .article de la reponse', async () => {
+	it('createArticle envoie credentials:include et extrait .article de la reponse', async () => {
 		const article = { ID: 2, name: 'Nouvelle carte' };
 		fetchMock.mockResolvedValue({
 			ok: true,
 			json: async () => ({ status: 'created', article, message: 'ok' })
 		});
 
-		const result = await createArticle('tok-abc', {
+		const result = await createArticle({
 			name: 'Nouvelle carte',
 			description: '',
 			prix: 10,
@@ -60,7 +60,7 @@ describe('catalog API', () => {
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/article');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 		expect(result).toEqual(article);
 	});
 
@@ -72,7 +72,7 @@ describe('catalog API', () => {
 		});
 
 		await expect(
-			createArticle('tok', { name: '', description: '', prix: 0, fraisPort: 0, categoryId: 1 })
+			createArticle({ name: '', description: '', prix: 0, fraisPort: 0, categoryId: 1 })
 		).rejects.toThrow('Donnees invalides');
 	});
 

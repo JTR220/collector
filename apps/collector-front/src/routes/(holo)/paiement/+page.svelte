@@ -39,7 +39,7 @@
 	}
 
 	async function payer() {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
@@ -48,14 +48,13 @@
 			return;
 		}
 		formError = null;
-		const token = $auth.token;
 		submitting = true;
 		results = {};
 		// Sequentiel : chaque achat est une commande distincte soumise a la
 		// validation de son vendeur, on garde des messages d'erreur lisibles un par un.
 		for (const item of $cart) {
 			try {
-				await buyArticle(token, item.ID);
+				await buyArticle(item.ID);
 				results = { ...results, [item.ID]: 'ok' };
 				cart.remove(item.ID);
 			} catch (e) {

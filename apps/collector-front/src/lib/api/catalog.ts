@@ -90,10 +90,9 @@ export type NewArticleInput = {
 	imageUrl?: string;
 };
 
-/** Met une pièce en vente. Le vendeur (sellerId) est déduit du token côté serveur. */
-export async function createArticle(token: string, input: NewArticleInput): Promise<ArticleAPI> {
+/** Met une pièce en vente. Le vendeur (sellerId) est déduit de la session côté serveur. */
+export async function createArticle(input: NewArticleInput): Promise<ArticleAPI> {
 	const data = await apiRequest<{ article: ArticleAPI }>(BASE_URL, '/article', {
-		token,
 		init: { method: 'POST', body: JSON.stringify(input) },
 		errorPrefix: 'catalog-service'
 	});
@@ -110,13 +109,8 @@ export type EditArticleInput = {
 };
 
 /** Modifie une annonce existante (nom, description, prix, port, catégorie, photo). */
-export async function updateArticle(
-	token: string,
-	id: number,
-	input: EditArticleInput
-): Promise<ArticleAPI> {
+export async function updateArticle(id: number, input: EditArticleInput): Promise<ArticleAPI> {
 	const data = await apiRequest<{ article: ArticleAPI }>(BASE_URL, `/article/${id}`, {
-		token,
 		init: { method: 'PUT', body: JSON.stringify(input) },
 		errorPrefix: 'catalog-service'
 	});
@@ -124,28 +118,21 @@ export async function updateArticle(
 }
 
 /** Retire définitivement une annonce du catalogue. */
-export async function deleteArticle(token: string, id: number): Promise<void> {
+export async function deleteArticle(id: number): Promise<void> {
 	await apiRequest(BASE_URL, `/article/${id}`, {
-		token,
 		init: { method: 'DELETE' },
 		errorPrefix: 'catalog-service'
 	});
 }
 
 /** Annonces de l'utilisateur courant (vendues incluses), pour la gestion depuis son profil. */
-export async function fetchMyArticles(token: string): Promise<ArticleAPI[]> {
-	return apiRequest<ArticleAPI[]>(BASE_URL, '/me/articles', {
-		token,
-		errorPrefix: 'catalog-service'
-	});
+export async function fetchMyArticles(): Promise<ArticleAPI[]> {
+	return apiRequest<ArticleAPI[]>(BASE_URL, '/me/articles', { errorPrefix: 'catalog-service' });
 }
 
 /** Tout le catalogue (vendues incluses, tous vendeurs), pour la modération back-office. */
-export async function fetchAllArticlesAdmin(token: string): Promise<ArticleAPI[]> {
-	return apiRequest<ArticleAPI[]>(BASE_URL, '/admin/articles', {
-		token,
-		errorPrefix: 'catalog-service'
-	});
+export async function fetchAllArticlesAdmin(): Promise<ArticleAPI[]> {
+	return apiRequest<ArticleAPI[]>(BASE_URL, '/admin/articles', { errorPrefix: 'catalog-service' });
 }
 
 /**
@@ -154,16 +141,12 @@ export async function fetchAllArticlesAdmin(token: string): Promise<ArticleAPI[]
  * est présent, ce qui casserait le multipart (le navigateur doit fixer
  * lui-même le boundary).
  */
-export async function uploadArticleImage(
-	token: string,
-	id: number,
-	file: File
-): Promise<ArticleAPI> {
+export async function uploadArticleImage(id: number, file: File): Promise<ArticleAPI> {
 	const form = new FormData();
 	form.append('image', file);
 	const res = await fetch(`${BASE_URL}/article/${id}/image`, {
 		method: 'POST',
-		headers: { Authorization: `Bearer ${token}` },
+		credentials: 'include',
 		body: form
 	});
 	const data = await res.json().catch(() => ({}) as { article?: ArticleAPI; error?: string });

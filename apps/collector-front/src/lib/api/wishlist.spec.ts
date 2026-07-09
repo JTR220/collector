@@ -10,14 +10,14 @@ describe('wishlist API', () => {
 		vi.stubGlobal('fetch', fetchMock);
 	});
 
-	it('fetchMyWishlist envoie le token Bearer', async () => {
+	it('fetchMyWishlist envoie credentials:include', async () => {
 		fetchMock.mockResolvedValue({ ok: true, json: async () => [] });
 
-		await fetchMyWishlist('tok-abc');
+		await fetchMyWishlist();
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/me/wishlist');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 	});
 
 	it('addToWishlist poste articleId et renvoie item/already', async () => {
@@ -26,7 +26,7 @@ describe('wishlist API', () => {
 			json: async () => ({ item: { ID: 1, articleId: 5 }, already: false })
 		});
 
-		const result = await addToWishlist('tok', 5);
+		const result = await addToWishlist(5);
 
 		const [, init] = fetchMock.mock.calls[0];
 		expect(init.method).toBe('POST');
@@ -37,7 +37,7 @@ describe('wishlist API', () => {
 	it('removeFromWishlist envoie DELETE sur /me/wishlist/:articleId', async () => {
 		fetchMock.mockResolvedValue({ ok: true, json: async () => ({ message: 'ok' }) });
 
-		await removeFromWishlist('tok', 5);
+		await removeFromWishlist(5);
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/me/wishlist/5');
@@ -51,6 +51,6 @@ describe('wishlist API', () => {
 			json: async () => ({ error: 'Article introuvable' })
 		});
 
-		await expect(addToWishlist('tok', 999)).rejects.toThrow('Article introuvable');
+		await expect(addToWishlist(999)).rejects.toThrow('Article introuvable');
 	});
 });

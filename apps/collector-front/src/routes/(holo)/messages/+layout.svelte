@@ -27,11 +27,11 @@
 	);
 
 	onMount(async () => {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
-		await messages.refresh($auth.token);
+		await messages.refresh();
 		loading = false;
 	});
 

@@ -10,14 +10,16 @@
 	let { children } = $props();
 
 	// Connexion WebSocket notifications liee a la session : ouverte au login,
-	// fermee au logout ou en quittant le layout.
-	let currentToken: string | null = null;
+	// fermee au logout ou en quittant le layout. L'authentification passe par
+	// le cookie httpOnly (envoye automatiquement) : plus besoin de token cote JS.
+	let wasAuthenticated = false;
 	const unsubAuth = auth.subscribe(($auth) => {
-		if ($auth.token === currentToken) return;
-		currentToken = $auth.token;
-		if ($auth.token) {
-			notifications.start($auth.token);
-			messages.start($auth.token);
+		const isAuth = !!$auth.user;
+		if (isAuth === wasAuthenticated) return;
+		wasAuthenticated = isAuth;
+		if (isAuth) {
+			notifications.start();
+			messages.start();
 		} else {
 			notifications.reset();
 			messages.reset();

@@ -8,16 +8,16 @@ export type WishlistItem = {
 	CreatedAt: string;
 };
 
-const request = <T>(path: string, token: string, init?: RequestInit) =>
-	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: 'catalog-service' });
+const request = <T>(path: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { init, errorPrefix: 'catalog-service' });
 
-export const fetchMyWishlist = (token: string) => request<WishlistItem[]>('/me/wishlist', token);
+export const fetchMyWishlist = () => request<WishlistItem[]>('/me/wishlist');
 
-export const addToWishlist = (token: string, articleId: number) =>
-	request<{ item: WishlistItem; already?: boolean }>('/me/wishlist', token, {
+export const addToWishlist = (articleId: number) =>
+	request<{ item: WishlistItem; already?: boolean }>('/me/wishlist', {
 		method: 'POST',
 		body: JSON.stringify({ articleId })
 	});
 
-export const removeFromWishlist = (token: string, articleId: number) =>
-	request<{ message: string }>(`/me/wishlist/${articleId}`, token, { method: 'DELETE' });
+export const removeFromWishlist = (articleId: number) =>
+	request<{ message: string }>(`/me/wishlist/${articleId}`, { method: 'DELETE' });

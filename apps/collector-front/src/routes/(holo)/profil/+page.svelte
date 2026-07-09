@@ -62,15 +62,15 @@
 	const handle = $derived(me?.name ? me.name.toLowerCase().replace(/\s+/g, '_') : '…');
 
 	onMount(async () => {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
 		// Seul un echec d'authentification (/me) deconnecte l'utilisateur.
 		try {
-			me = await fetchMe($auth.token);
+			me = await fetchMe();
 			// On rafraichit le role dans le store pour garder l'onglet Admin fiable.
-			auth.login($auth.token, {
+			auth.login({
 				id: me.id,
 				name: me.name,
 				email: me.email,
@@ -84,10 +84,10 @@
 		// Wishlist et commandes viennent du catalog-service : une panne de ce
 		// service ne doit PAS deconnecter — on charge ce qui repond.
 		const [w, o, s, a] = await Promise.allSettled([
-			fetchMyWishlist($auth.token),
-			fetchMyOrders($auth.token),
-			fetchMySales($auth.token),
-			fetchMyArticles($auth.token)
+			fetchMyWishlist(),
+			fetchMyOrders(),
+			fetchMySales(),
+			fetchMyArticles()
 		]);
 		if (w.status === 'fulfilled') wishlist = w.value;
 		if (o.status === 'fulfilled') orders = o.value;
@@ -97,12 +97,12 @@
 	});
 
 	async function removeArticle(article: ArticleAPI) {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		if (!confirm(`Retirer « ${article.name} » du catalogue ?`)) return;
 		articleBusyId = article.ID;
 		articlesMsg = null;
 		try {
-			await deleteArticle($auth.token, article.ID);
+			await deleteArticle(article.ID);
 			myArticles = myArticles.filter((a) => a.ID !== article.ID);
 		} catch (e) {
 			articlesMsg = e instanceof Error ? e.message : "Impossible de retirer l'annonce.";
@@ -123,11 +123,11 @@
 	}
 
 	async function submitReview(order: Order) {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		reviewBusy = true;
 		reviewMsg = null;
 		try {
-			await leaveReview($auth.token, order.ID, reviewRating, reviewComment.trim());
+			await leaveReview(order.ID, reviewRating, reviewComment.trim());
 			orders = orders.map((o) => (o.ID === order.ID ? { ...o, reviewed: true } : o));
 			reviewFormOrderId = null;
 		} catch (e) {
@@ -138,13 +138,13 @@
 	}
 
 	async function decide(order: Order, accept: boolean) {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		salesBusyId = order.ID;
 		salesMsg = null;
 		try {
 			const { order: updated } = accept
-				? await acceptOrder($auth.token, order.ID)
-				: await rejectOrder($auth.token, order.ID);
+				? await acceptOrder(order.ID)
+				: await rejectOrder(order.ID);
 			sales = sales.map((s) => (s.ID === updated.ID ? { ...s, status: updated.status } : s));
 			salesMsg = accept
 				? 'Commande acceptée.'

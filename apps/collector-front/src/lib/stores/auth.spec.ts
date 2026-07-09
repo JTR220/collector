@@ -10,6 +10,11 @@ vi.stubGlobal('localStorage', {
 	clear: () => store.clear()
 });
 
+// logout() appelle POST /logout (best-effort) : $app/environment.browser vaut
+// false par defaut hors navigateur, donc cet appel ne se declenche pas dans
+// ce test, mais on stub fetch quand meme pour ne pas dependre de ce detail.
+vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+
 import { auth, isAuthenticated } from './auth';
 
 describe('auth store', () => {
@@ -18,20 +23,23 @@ describe('auth store', () => {
 		auth.logout();
 	});
 
-	it('login persiste le token et l’utilisateur', () => {
-		auth.login('tok-123', { id: 1, name: 'Alice', email: 'a@b.c' });
+	it('login persiste le profil utilisateur (jamais de token, cookie httpOnly)', () => {
+		auth.login({ id: 1, name: 'Alice', email: 'a@b.c' });
 		const state = get(auth);
-		expect(state.token).toBe('tok-123');
 		expect(state.user?.name).toBe('Alice');
-		expect(localStorage.getItem('collector_token')).toBe('tok-123');
+		expect(JSON.parse(localStorage.getItem('collector_user') ?? 'null')).toEqual({
+			id: 1,
+			name: 'Alice',
+			email: 'a@b.c'
+		});
 		expect(get(isAuthenticated)).toBe(true);
 	});
 
-	it('logout efface le token', () => {
-		auth.login('tok-123', { id: 1, name: 'Alice', email: 'a@b.c' });
+	it('logout efface le profil utilisateur en cache', () => {
+		auth.login({ id: 1, name: 'Alice', email: 'a@b.c' });
 		auth.logout();
-		expect(get(auth).token).toBeNull();
-		expect(localStorage.getItem('collector_token')).toBeNull();
+		expect(get(auth).user).toBeNull();
+		expect(localStorage.getItem('collector_user')).toBeNull();
 		expect(get(isAuthenticated)).toBe(false);
 	});
 });

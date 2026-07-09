@@ -10,18 +10,18 @@ describe('market API', () => {
 		vi.stubGlobal('fetch', fetchMock);
 	});
 
-	it('buyArticle poste sur /article/:id/buy avec le token Bearer', async () => {
+	it('buyArticle poste sur /article/:id/buy avec credentials:include', async () => {
 		fetchMock.mockResolvedValue({
 			ok: true,
 			json: async () => ({ order: { ID: 1, articleId: 5 } })
 		});
 
-		const result = await buyArticle('tok-abc', 5);
+		const result = await buyArticle(5);
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/article/5/buy');
 		expect(init.method).toBe('POST');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 		expect(result.order.ID).toBe(1);
 	});
 
@@ -32,16 +32,16 @@ describe('market API', () => {
 			json: async () => ({ error: 'Cette piece est deja vendue' })
 		});
 
-		await expect(buyArticle('tok', 5)).rejects.toThrow('Cette piece est deja vendue');
+		await expect(buyArticle(5)).rejects.toThrow('Cette piece est deja vendue');
 	});
 
-	it('fetchMyOrders appelle /me/orders avec le token', async () => {
+	it('fetchMyOrders appelle /me/orders avec credentials:include', async () => {
 		fetchMock.mockResolvedValue({ ok: true, json: async () => [] });
 
-		await fetchMyOrders('tok-abc');
+		await fetchMyOrders();
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/me/orders');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 	});
 });

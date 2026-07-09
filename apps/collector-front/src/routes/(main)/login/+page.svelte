@@ -37,18 +37,22 @@
 
 		try {
 			if (mode === 'login') {
+				// credentials:'include' : indispensable pour que le navigateur accepte
+				// le cookie httpOnly de session renvoye par /login (Set-Cookie).
 				const res = await fetch(`${authApiUrl}/login`, {
 					method: 'POST',
+					credentials: 'include',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ email, password })
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? 'Erreur connexion');
-				auth.login(data.token, data.user);
+				auth.login(data.user);
 				goto(data.user?.role === 'admin' ? '/admin' : '/');
 			} else {
 				const res = await fetch(`${authApiUrl}/utilisateur`, {
 					method: 'POST',
+					credentials: 'include',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ name, email, password })
 				});

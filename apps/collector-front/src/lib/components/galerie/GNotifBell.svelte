@@ -23,7 +23,7 @@
 	}
 
 	function onRead(id: string) {
-		if ($auth.token) notifications.markRead($auth.token, id);
+		if ($auth.user) notifications.markRead(id);
 	}
 
 	// Clic sur une notification liée à un article (achat, négociation…) :
@@ -35,7 +35,7 @@
 	}
 
 	function onReadAll() {
-		if ($auth.token) notifications.markAllRead($auth.token);
+		if ($auth.user) notifications.markAllRead();
 	}
 
 	function timeAgo(iso: string): string {

@@ -21,8 +21,9 @@
 	type BlockedAttempt = { id: string; body: string; created_at: string };
 
 	// Détection cote client de partage de coordonnées personnelles (téléphone / email) :
-	// aucune moderation cote serveur pour l'instant, donc le blocage n'est que visuel/local,
-	// rien n'est envoye ni persiste quand une tentative est detectee.
+	// evite un aller-retour reseau pour les cas evidents. notification-service applique
+	// aussi son propre filtre cote serveur (internal/pii) — rejet 400 meme si ce filtre
+	// local laissait passer un cas.
 	const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
 	const PHONE_RE = /(?:\+?\d[\s.\-]?){7,}\d/;
 	const containsContactInfo = (text: string) => EMAIL_RE.test(text) || PHONE_RE.test(text);
@@ -77,14 +78,14 @@
 	}
 
 	onMount(async () => {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
 		try {
-			thread = await fetchConversationMessages($auth.token, conversationId);
-			await markConversationRead($auth.token, conversationId);
-			messagesStore.refresh($auth.token);
+			thread = await fetchConversationMessages(conversationId);
+			await markConversationRead(conversationId);
+			messagesStore.refresh();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Impossible de charger la conversation.';
 		} finally {
@@ -92,13 +93,13 @@
 			scrollToBottom();
 		}
 
-		socket = connectMessages($auth.token, (msg) => {
+		socket = connectMessages((msg) => {
 			if (msg.conversation_id !== conversationId) return;
 			thread = [...thread, msg];
 			scrollToBottom();
-			if (msg.recipient_id === myUUID && $auth.token) {
-				markConversationRead($auth.token, conversationId);
-				messagesStore.refresh($auth.token);
+			if (msg.recipient_id === myUUID) {
+				markConversationRead(conversationId);
+				messagesStore.refresh();
 			}
 		});
 	});
@@ -106,9 +107,8 @@
 	onDestroy(() => socket?.close());
 
 	async function send() {
-		const token = $auth.token;
 		const body = draft.trim();
-		if (!token || !body || thread.length === 0) return;
+		if (!$auth.user || !body || thread.length === 0) return;
 
 		if (containsContactInfo(body)) {
 			blockedAttempts = [...blockedAttempts, { id: `blocked-${Date.now()}`, body, created_at: new Date().toISOString() }];
@@ -122,7 +122,7 @@
 
 		sending = true;
 		try {
-			const sent = await sendMessage(token, {
+			const sent = await sendMessage({
 				recipientId,
 				body,
 				articleId: first.article_id,
@@ -131,7 +131,7 @@
 			thread = [...thread, sent];
 			draft = '';
 			scrollToBottom();
-			messagesStore.refresh(token);
+			messagesStore.refresh();
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Erreur lors de l'envoi.";
 		} finally {

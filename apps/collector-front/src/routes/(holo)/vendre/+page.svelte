@@ -60,7 +60,7 @@
 	}
 
 	onMount(async () => {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
@@ -89,7 +89,7 @@
 	});
 
 	async function submit() {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		if (!categoryId) {
 			error = 'Choisissez une catégorie.';
 			return;
@@ -98,7 +98,7 @@
 		error = '';
 		try {
 			if (editId) {
-				await updateArticle($auth.token, Number(editId), {
+				await updateArticle(Number(editId), {
 					name: name.trim(),
 					description: description.trim(),
 					prix: Number(prix),
@@ -107,7 +107,7 @@
 					imageUrl: imageUrl.trim() || undefined
 				});
 				for (const file of photoFiles) {
-					await uploadArticleImage($auth.token, Number(editId), file);
+					await uploadArticleImage(Number(editId), file);
 				}
 				goto(`/lot/${editId}`);
 				return;
@@ -124,9 +124,9 @@
 				grade: grade.trim() || undefined,
 				imageUrl: imageUrl.trim() || undefined
 			};
-			const created = await createArticle($auth.token, input);
+			const created = await createArticle(input);
 			for (const file of photoFiles) {
-				await uploadArticleImage($auth.token, created.ID, file);
+				await uploadArticleImage(created.ID, file);
 			}
 			goto(`/lot/${created.ID}`);
 		} catch (e) {

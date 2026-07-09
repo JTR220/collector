@@ -50,10 +50,6 @@
 	let statsErreur = '';
 	let lastRefresh = new Date();
 
-	function authHeaders(): Record<string, string> {
-		return $auth.token ? { Authorization: `Bearer ${$auth.token}` } : {};
-	}
-
 	async function checkHealth(url: string): Promise<ServiceStatus> {
 		try {
 			const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
@@ -65,7 +61,7 @@
 
 	async function chargerStats() {
 		try {
-			const response = await fetch(`${catalogApiUrl}/admin/stats`, { headers: authHeaders() });
+			const response = await fetch(`${catalogApiUrl}/admin/stats`, { credentials: 'include' });
 			if (!response.ok) throw new Error();
 			stats = (await response.json()) as AdminStats;
 			statsErreur = '';
@@ -106,9 +102,9 @@
 	let fraudTrackerDown = false;
 
 	async function fetchFraudAlerts() {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		try {
-			fraudAlerts = await fetchAlerts($auth.token, true);
+			fraudAlerts = await fetchAlerts(true);
 			fraudTrackerDown = false;
 		} catch {
 			fraudAlerts = [];
@@ -117,9 +113,9 @@
 	}
 
 	async function onResolveAlert(id: string) {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		try {
-			await resolveAlert($auth.token, id);
+			await resolveAlert(id);
 			fraudAlerts = fraudAlerts.filter((a) => a.id !== id);
 		} catch {
 			/* ignore */
@@ -139,9 +135,9 @@
 	let moderationMsg = '';
 
 	async function fetchUsersList() {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		try {
-			users = await fetchUsers($auth.token);
+			users = await fetchUsers();
 			usersDown = false;
 		} catch {
 			users = [];
@@ -150,13 +146,13 @@
 	}
 
 	async function onToggleSuspend(u: AdminUser) {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		userBusyId = u.ID;
 		moderationMsg = '';
 		try {
 			const { suspended } = u.suspended
-				? await unsuspendUser($auth.token, u.ID)
-				: await suspendUser($auth.token, u.ID);
+				? await unsuspendUser(u.ID)
+				: await suspendUser(u.ID);
 			users = users.map((x) => (x.ID === u.ID ? { ...x, suspended } : x));
 		} catch (e) {
 			moderationMsg = e instanceof Error ? e.message : 'Action impossible.';

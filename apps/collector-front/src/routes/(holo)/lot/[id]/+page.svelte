@@ -48,8 +48,8 @@
 	onMount(async () => {
 		try {
 			article = await fetchArticle($page.params.id ?? '');
-			if ($auth.token) {
-				const wishlist = await fetchMyWishlist($auth.token);
+			if ($auth.user) {
+				const wishlist = await fetchMyWishlist();
 				inWishlist = wishlist.some((w) => w.articleId === article?.ID);
 			}
 			if (article) recentlyViewed.push(article);
@@ -89,25 +89,24 @@
 		}
 	});
 
-	function requireAuth(): string | null {
-		if (!$isAuthenticated || !$auth.token) {
+	function requireAuth(): boolean {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
-			return null;
+			return false;
 		}
-		return $auth.token;
+		return true;
 	}
 
 	async function toggleWishlist() {
-		const token = requireAuth();
-		if (!token || !article) return;
+		if (!requireAuth() || !article) return;
 		actionBusy = true;
 		try {
 			if (inWishlist) {
-				await removeFromWishlist(token, article.ID);
+				await removeFromWishlist(article.ID);
 				inWishlist = false;
 				actionMsg = 'Retiré de la wishlist.';
 			} else {
-				const res = await addToWishlist(token, article.ID);
+				const res = await addToWishlist(article.ID);
 				inWishlist = true;
 				actionMsg = res.already ? 'Déjà dans la wishlist.' : 'Ajouté à la wishlist.';
 			}
@@ -126,12 +125,11 @@
 	}
 
 	async function buyNow() {
-		const token = requireAuth();
-		if (!token || !article || isOwnArticle) return;
+		if (!requireAuth() || !article || isOwnArticle) return;
 		actionBusy = true;
 		actionMsg = null;
 		try {
-			await buyArticle(token, article.ID);
+			await buyArticle(article.ID);
 			article.sold = true;
 			actionMsg =
 				'Demande d’achat envoyée — le vendeur doit la valider. Vous recevrez une notification.';
@@ -143,12 +141,11 @@
 	}
 
 	async function sendContactMessage() {
-		const token = requireAuth();
 		const body = contactDraft.trim();
-		if (!token || !article || !body || isOwnArticle) return;
+		if (!requireAuth() || !article || !body || isOwnArticle) return;
 		contactBusy = true;
 		try {
-			const sent = await sendMessage(token, {
+			const sent = await sendMessage({
 				recipientId: toUserUUID(article.sellerId),
 				body,
 				articleId: article.ID,
@@ -169,8 +166,7 @@
 	}
 
 	async function sendNegotiation() {
-		const token = requireAuth();
-		if (!token || !article || isOwnArticle) return;
+		if (!requireAuth() || !article || isOwnArticle) return;
 		const offer = Number(negotiatePrice);
 		if (!offer || offer <= 0) {
 			actionMsg = 'Indiquez un prix proposé valide.';
@@ -180,7 +176,7 @@
 		try {
 			let body = `Bonjour, seriez-vous prêt à accepter ${eur(offer)} pour "${article.name}" (prix affiché : ${eur(article.prix)}) ?`;
 			if (negotiateComment.trim()) body += `\n${negotiateComment.trim()}`;
-			const sent = await sendMessage(token, {
+			const sent = await sendMessage({
 				recipientId: toUserUUID(article.sellerId),
 				body,
 				articleId: article.ID,

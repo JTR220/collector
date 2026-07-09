@@ -134,7 +134,8 @@
 			for (const id of ids) {
 				const response = await fetch(`${catalogApiBaseUrl}/article/${id}`, {
 					method: 'DELETE',
-					headers: authHeaders(false)
+					credentials: 'include',
+					headers: jsonHeaders(false)
 				});
 				if (!response.ok) {
 					const payload = await response.json().catch(() => null);
@@ -158,12 +159,10 @@
 	let erreur = '';
 	let succes = '';
 
-	// En-tetes authentifies : les ecritures et le back-office exigent un token admin.
-	function authHeaders(json = true): Record<string, string> {
-		const h: Record<string, string> = {};
-		if (json) h['Content-Type'] = 'application/json';
-		if ($auth.token) h.Authorization = `Bearer ${$auth.token}`;
-		return h;
+	// Le cookie httpOnly de session (credentials:'include' sur chaque fetch,
+	// voir plus bas) porte l'authentification admin — plus de token en JS.
+	function jsonHeaders(json = true): Record<string, string> {
+		return json ? { 'Content-Type': 'application/json' } : {};
 	}
 
 	function normalizeCategory(category: Record<string, unknown>): Category {
@@ -208,7 +207,8 @@
 	// pieces deja vendues, exclues du catalogue public depuis GetAllArticles.
 	async function chargerArticles() {
 		const response = await fetch(`${catalogApiBaseUrl}/admin/articles`, {
-			headers: authHeaders(false)
+			credentials: 'include',
+			headers: jsonHeaders(false)
 		});
 		if (!response.ok) {
 			throw new Error('Impossible de charger les articles.');
@@ -219,7 +219,8 @@
 
 	async function chargerStats() {
 		const response = await fetch(`${catalogApiBaseUrl}/admin/stats`, {
-			headers: authHeaders(false)
+			credentials: 'include',
+			headers: jsonHeaders(false)
 		});
 		if (!response.ok) {
 			throw new Error('Impossible de charger les statistiques.');
@@ -246,7 +247,8 @@
 		try {
 			const response = await fetch(`${catalogApiBaseUrl}/article/${id}`, {
 				method: 'DELETE',
-				headers: authHeaders(false)
+				credentials: 'include',
+				headers: jsonHeaders(false)
 			});
 			if (!response.ok) {
 				const payload = await response.json().catch(() => null);
@@ -267,7 +269,8 @@
 		try {
 			const response = await fetch(`${catalogApiBaseUrl}/category`, {
 				method: 'POST',
-				headers: authHeaders(),
+				credentials: 'include',
+				headers: jsonHeaders(),
 				body: JSON.stringify(categoryForm)
 			});
 
@@ -298,7 +301,8 @@
 		try {
 			const response = await fetch(`${catalogApiBaseUrl}/article`, {
 				method: 'POST',
-				headers: authHeaders(),
+				credentials: 'include',
+				headers: jsonHeaders(),
 				body: JSON.stringify({
 					name: articleForm.name,
 					description: articleForm.description,

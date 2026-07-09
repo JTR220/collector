@@ -15,9 +15,9 @@ function createMessages() {
 	const store = writable<MessagesState>({ conversations: [], unreadCount: 0 });
 	let socket: MessageSocket | null = null;
 
-	async function refresh(token: string) {
+	async function refresh() {
 		try {
-			const conversations = await fetchConversations(token);
+			const conversations = await fetchConversations();
 			const unreadCount = conversations.reduce((sum, c) => sum + c.unread_count, 0);
 			store.set({ conversations, unreadCount });
 		} catch {
@@ -28,14 +28,14 @@ function createMessages() {
 	return {
 		subscribe: store.subscribe,
 
-		async start(token: string) {
+		async start() {
 			this.stop();
-			await refresh(token);
-			socket = connectMessages(token, () => {
+			await refresh();
+			socket = connectMessages(() => {
 				// Nouveau message (envoye ou recu) : on rafraichit la liste des fils
 				// pour recalculer apercu + compteur, plus simple et fiable que du
 				// merge manuel cote client.
-				refresh(token);
+				refresh();
 			});
 		},
 
