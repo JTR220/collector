@@ -16,6 +16,9 @@ import (
 // (ou un attaquant) sature le volume monte avec des fichiers enormes.
 const maxUploadSize = 5 << 20 // 5 Mo
 
+// maxArticleImages borne la taille de la galerie par annonce.
+const maxArticleImages = 8
+
 // allowedImageTypes mappe le type MIME reellement detecte (jamais celui
 // declare par le client) vers l'extension de stockage.
 var allowedImageTypes = map[string]string{
@@ -53,6 +56,10 @@ func UploadArticleImage(c *gin.Context) {
 	}
 	if !isAdmin(c) && article.SellerID != currentUserID(c) {
 		response.Error(c, http.StatusForbidden, "Vous ne pouvez modifier que vos propres annonces")
+		return
+	}
+	if len(article.Images) >= maxArticleImages {
+		response.Error(c, http.StatusBadRequest, "Nombre maximum de photos atteint (8)")
 		return
 	}
 
@@ -111,8 +118,17 @@ func UploadArticleImage(c *gin.Context) {
 		return
 	}
 
-	article.ImageURL = "/uploads/" + filename
-	if err := repository.DB.Model(&article).Update("image_url", article.ImageURL).Error; err != nil {
+	imagePath := "/uploads/" + filename
+	// Premiere photo envoyee : couverture (compat cartes catalogue). Les
+	// suivantes s'ajoutent a la galerie sans toucher a la couverture.
+	if article.ImageURL == "" {
+		article.ImageURL = imagePath
+	}
+	article.Images = append(article.Images, imagePath)
+	if err := repository.DB.Model(&article).Updates(map[string]interface{}{
+		"image_url": article.ImageURL,
+		"images":    article.Images,
+	}).Error; err != nil {
 		response.Error(c, http.StatusInternalServerError, "Impossible de mettre a jour l'annonce")
 		return
 	}

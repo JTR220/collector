@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -236,9 +237,12 @@ func SeedData() {
 		},
 	}
 
-	// Photos Unsplash sur les 6 pieces vedettes (cyclage du pool par defaut).
+	// Photos Unsplash sur les 6 pieces vedettes (cyclage du pool par defaut) :
+	// galerie complete, pas juste la couverture.
 	for i := range articles {
-		articles[i].ImageURL = unsplashURL("", i)
+		gallery := unsplashURLs("_default", i)
+		articles[i].ImageURL = gallery[0]
+		articles[i].Images = gallery
 		if err := DB.Create(&articles[i]).Error; err != nil {
 			log.Printf("Erreur creation article %s: %v", articles[i].Slug, err)
 			return
@@ -293,6 +297,18 @@ func DefaultImageFor(categoryID uint) string {
 	return unsplashURL(cat.Name, int(categoryID))
 }
 
+// DefaultImagesFor renvoie une petite galerie de photos Unsplash themees
+// (jusqu'a tout le pool de la categorie), pour donner une vraie galerie
+// multi-photos aux annonces qui n'en ont pas encore uploade.
+func DefaultImagesFor(categoryID uint) []string {
+	var cat models.Categorie
+	name := ""
+	if err := DB.First(&cat, categoryID).Error; err == nil {
+		name = cat.Name
+	}
+	return unsplashURLs(name, int(categoryID))
+}
+
 // unsplashURL renvoie une URL de photo Unsplash themee pour la categorie donnee,
 // choisie de facon deterministe (cyclage sur l'index) pour varier les visuels.
 func unsplashURL(category string, i int) string {
@@ -302,6 +318,22 @@ func unsplashURL(category string, i int) string {
 	}
 	id := pool[i%len(pool)]
 	return fmt.Sprintf("https://images.unsplash.com/photo-%s?auto=format&fit=crop&w=600&q=70", id)
+}
+
+// unsplashURLs renvoie toutes les photos du pool d'une categorie (dans
+// l'ordre, a partir de l'index i), pour constituer une galerie de demo
+// realiste plutot qu'une seule photo repetee.
+func unsplashURLs(category string, i int) []string {
+	pool := unsplashPool[category]
+	if len(pool) == 0 {
+		pool = unsplashPool["_default"]
+	}
+	urls := make([]string, len(pool))
+	for k := range pool {
+		id := pool[(i+k)%len(pool)]
+		urls[k] = fmt.Sprintf("https://images.unsplash.com/photo-%s?auto=format&fit=crop&w=900&q=70", id)
+	}
+	return urls
 }
 
 // generateCatalog produit un catalogue etoffe : plusieurs pieces par categorie,
@@ -372,6 +404,7 @@ func generateCatalog(catID func(string) uint) []models.Article {
 	for _, cat := range []string{"TCG", "Console", "Comics", "Vinyle", "Designer Toy", "Horlogerie"} {
 		for i, it := range catalog[cat] {
 			seq++
+			gallery := unsplashURLs(cat, i)
 			out = append(out, models.Article{
 				Slug:        fmt.Sprintf("CAT-%03d", seq),
 				Name:        it.name,
@@ -384,7 +417,8 @@ func generateCatalog(catID func(string) uint) []models.Article {
 				FraisPort:   it.port,
 				Seller:      "collector_vault",
 				SellerScore: 4.8,
-				ImageURL:    unsplashURL(cat, i),
+				ImageURL:    gallery[0],
+				Images:      gallery,
 				SaleType:    "drop",
 				Glyph:       glyphs[cat],
 				CategoryID:  catID(cat),
@@ -529,5 +563,23 @@ func backfillArticleImages() {
 	}
 	if len(articles) > 0 {
 		log.Printf("Backfill images : %d articles avec photo Unsplash", len(articles))
+	}
+
+	// Galerie manquante (articles crees avant l'ajout du champ Images, ou dont
+	// la seule photo est une URL externe sans vraie galerie) : on complete avec
+	// une galerie themee par categorie, sans toucher a la couverture existante.
+	var noGallery []models.Article
+	DB.Preload("Category").
+		Where("images IS NULL OR images = '' OR images = '[]' OR images = 'null'").
+		Find(&noGallery)
+	for i := range noGallery {
+		gallery := unsplashURLs(noGallery[i].Category.Name, int(noGallery[i].ID))
+		if noGallery[i].ImageURL != "" && !strings.HasPrefix(noGallery[i].ImageURL, "/uploads") {
+			gallery[0] = noGallery[i].ImageURL
+		}
+		DB.Model(&noGallery[i]).Update("images", models.StringSlice(gallery))
+	}
+	if len(noGallery) > 0 {
+		log.Printf("Backfill galerie : %d articles avec galerie Unsplash", len(noGallery))
 	}
 }

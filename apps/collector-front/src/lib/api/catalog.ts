@@ -25,6 +25,7 @@ export type ArticleAPI = {
 	sellerId: number;
 	sellerScore: number;
 	imageUrl: string;
+	images: string[];
 	saleType: 'drop' | 'direct';
 	sold: boolean;
 	views: number;
@@ -41,10 +42,21 @@ export type ArticleAPI = {
 	category: CategoryAPI;
 };
 
+function resolveImageURL(url: string): string {
+	return url.startsWith('http') ? url : `${BASE_URL}${url}`;
+}
+
 /** Résout l'URL d'affichage de la photo d'un article (URL absolue, ou chemin relatif hérité résolu sur le catalog-service). */
 export function articleImage(article: Pick<ArticleAPI, 'imageUrl'>): string | null {
 	if (!article.imageUrl) return null;
-	return article.imageUrl.startsWith('http') ? article.imageUrl : `${BASE_URL}${article.imageUrl}`;
+	return resolveImageURL(article.imageUrl);
+}
+
+/** Résout la galerie complète d'un article (retombe sur la seule couverture si aucune galerie n'a été renseignée). */
+export function articleImages(article: Pick<ArticleAPI, 'imageUrl' | 'images'>): string[] {
+	const gallery = (article.images ?? []).filter(Boolean);
+	if (gallery.length > 0) return gallery.map(resolveImageURL);
+	return article.imageUrl ? [resolveImageURL(article.imageUrl)] : [];
 }
 
 export async function fetchArticle(id: number | string): Promise<ArticleAPI> {

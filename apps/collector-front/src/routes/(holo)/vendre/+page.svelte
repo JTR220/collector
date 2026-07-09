@@ -34,22 +34,29 @@
 	let rarity = $state('');
 	let grade = $state('');
 	let imageUrl = $state('');
-	let photoFile = $state<File | null>(null);
+	let photoFiles = $state<File[]>([]);
 	let photoError = $state('');
 
 	const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+	const MAX_PHOTOS = 8;
 
 	function onPhotoChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
-		const f = input.files?.[0] ?? null;
+		const files = Array.from(input.files ?? []);
 		photoError = '';
-		if (f && f.size > MAX_PHOTO_SIZE) {
-			photoError = 'Fichier trop volumineux (5 Mo max).';
-			photoFile = null;
+		const oversized = files.some((f) => f.size > MAX_PHOTO_SIZE);
+		if (oversized) {
+			photoError = 'Un ou plusieurs fichiers dépassent 5 Mo.';
+			photoFiles = [];
 			input.value = '';
 			return;
 		}
-		photoFile = f;
+		if (files.length > MAX_PHOTOS) {
+			photoError = `${MAX_PHOTOS} photos maximum.`;
+			photoFiles = files.slice(0, MAX_PHOTOS);
+			return;
+		}
+		photoFiles = files;
 	}
 
 	onMount(async () => {
@@ -99,7 +106,9 @@
 					categoryId: Number(categoryId),
 					imageUrl: imageUrl.trim() || undefined
 				});
-				if (photoFile) await uploadArticleImage($auth.token, Number(editId), photoFile);
+				for (const file of photoFiles) {
+					await uploadArticleImage($auth.token, Number(editId), file);
+				}
 				goto(`/lot/${editId}`);
 				return;
 			}
@@ -116,7 +125,9 @@
 				imageUrl: imageUrl.trim() || undefined
 			};
 			const created = await createArticle($auth.token, input);
-			if (photoFile) await uploadArticleImage($auth.token, created.ID, photoFile);
+			for (const file of photoFiles) {
+				await uploadArticleImage($auth.token, created.ID, file);
+			}
 			goto(`/lot/${created.ID}`);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Opération impossible.';
@@ -241,23 +252,31 @@
 					<input class="in" bind:value={grade} placeholder="PSA 9" disabled={!!editId} />
 				</label>
 				<label class="field span-2">
-					<span class="lbl">Photo (fichier, 5 Mo max)</span>
+					<span class="lbl">Photos (jusqu'à {MAX_PHOTOS}, 5 Mo max chacune)</span>
 					<input
 						class="in in-file"
 						type="file"
+						multiple
 						accept="image/jpeg,image/png,image/webp,image/gif"
 						onchange={onPhotoChange}
 					/>
-					{#if photoFile}<span class="photo-picked">{photoFile.name} sélectionné</span>{/if}
+					{#if photoFiles.length > 0}
+						<span class="photo-picked"
+							>{photoFiles.length} photo{photoFiles.length > 1 ? 's' : ''} sélectionnée{photoFiles.length >
+							1
+								? 's'
+								: ''} : {photoFiles.map((f) => f.name).join(', ')}</span
+						>
+					{/if}
 					{#if photoError}<span class="photo-err">{photoError}</span>{/if}
 				</label>
 				<label class="field span-2">
-					<span class="lbl">…ou URL de la photo (https uniquement)</span>
+					<span class="lbl">…ou URL de la photo de couverture (https uniquement)</span>
 					<input
 						class="in"
 						type="url"
 						bind:value={imageUrl}
-						disabled={!!photoFile}
+						disabled={photoFiles.length > 0}
 						placeholder={editId
 							? 'https://…  (laissez vide pour garder la photo actuelle)'
 							: 'https://…  (laissez vide pour une photo par défaut)'}

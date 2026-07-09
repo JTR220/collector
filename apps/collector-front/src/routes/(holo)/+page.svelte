@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
+	import { fetchArticles, fetchCategories, articleImage, type ArticleAPI, type CategoryAPI } from '$lib/api/catalog';
 	import { eur, pct } from '$lib/utils/format';
 	import GSelect from '$lib/components/galerie/GSelect.svelte';
 
 	let articles = $state<ArticleAPI[]>([]);
+	let categories = $state<CategoryAPI[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
 	onMount(async () => {
 		try {
-			articles = await fetchArticles();
+			[articles, categories] = await Promise.all([fetchArticles(), fetchCategories()]);
 		} catch (e) {
 			error = 'Impossible de charger le catalogue. Vérifiez que le catalog-service est démarré.';
 			console.error(e);
@@ -28,7 +29,7 @@
 	let availableOnly = $state(false);
 	let sort = $state<'recent' | 'price-asc' | 'price-desc' | 'name'>('recent');
 
-	const categories = $derived([...new Set(articles.map((a) => a.category.name))].sort());
+	const categoryNames = $derived([...categories].map((c) => c.name).sort());
 	const rarities = $derived([...new Set(articles.map((a) => a.rarity).filter(Boolean))].sort());
 	const grades = $derived([...new Set(articles.map((a) => a.grade).filter(Boolean))].sort());
 
@@ -108,7 +109,7 @@
 <!-- Filtres catégorie (pills) -->
 <div class="pill-row">
 	<button class="pill" class:pill-active={!filterCat} onclick={() => (filterCat = '')}>Tout</button>
-	{#each categories as cat}
+	{#each categoryNames as cat}
 		<button class="pill" class:pill-active={filterCat === cat} onclick={() => (filterCat = cat)}>
 			{cat}
 		</button>

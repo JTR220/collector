@@ -33,6 +33,33 @@ func (h *PriceHistory) Scan(src interface{}) error {
 	}
 }
 
+// StringSlice stores a []string as a JSON text column (meme mecanisme que
+// PriceHistory ci-dessus), utilise pour la galerie photo d'un article.
+type StringSlice []string
+
+func (s StringSlice) Value() (driver.Value, error) {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
+}
+
+func (s *StringSlice) Scan(src interface{}) error {
+	if src == nil {
+		*s = StringSlice{}
+		return nil
+	}
+	switch v := src.(type) {
+	case string:
+		return json.Unmarshal([]byte(v), s)
+	case []byte:
+		return json.Unmarshal(v, s)
+	default:
+		return fmt.Errorf("unsupported scan type for StringSlice: %T", src)
+	}
+}
+
 type Categorie struct {
 	gorm.Model
 	Name        string `json:"name" binding:"required"`
@@ -55,6 +82,10 @@ type Article struct {
 	SellerID     uint         `json:"sellerId" gorm:"index"`
 	SellerScore  float64      `json:"sellerScore"`
 	ImageURL     string       `json:"imageUrl"`
+	// Images est la galerie complete (l'ImageURL ci-dessus reste la photo de
+	// couverture, utilisee par les cartes catalogue et rester compatible avec
+	// l'existant). Stockee en JSON texte, comme PriceHistory.
+	Images       StringSlice  `json:"images" gorm:"type:text"`
 	SaleType     string       `json:"saleType"` // drop | direct
 	Sold         bool         `json:"sold"`
 	Views        uint         `json:"views"`

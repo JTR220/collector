@@ -3,7 +3,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
-	import { fetchArticle, fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
+	import { fetchArticle, fetchArticles, articleImage, articleImages, type ArticleAPI } from '$lib/api/catalog';
+	import { recentlyViewed } from '$lib/stores/recentlyViewed';
 	import { addToWishlist, removeFromWishlist, fetchMyWishlist } from '$lib/api/wishlist';
 	import {
 		buyArticle,
@@ -37,6 +38,12 @@
 	let sellerRating = $state<SellerRating | null>(null);
 	let sellerReviews = $state<Review[]>([]);
 	let related = $state<ArticleAPI[]>([]);
+	let mainImageIndex = $state(0);
+
+	// Suggestions "déjà vus", excluant l'article courant.
+	const recentSuggestions = $derived(
+		$recentlyViewed.filter((a) => a.ID !== article?.ID).slice(0, 4)
+	);
 
 	onMount(async () => {
 		try {
@@ -45,6 +52,7 @@
 				const wishlist = await fetchMyWishlist($auth.token);
 				inWishlist = wishlist.some((w) => w.articleId === article?.ID);
 			}
+			if (article) recentlyViewed.push(article);
 		} catch (e) {
 			error = 'Lot introuvable ou catalog-service indisponible.';
 			console.error(e);
@@ -210,17 +218,18 @@
 	<p class="state-msg error">{error}</p>
 	<a class="back-link" href="/">← Retour à la vitrine</a>
 {:else}
-	{@const img = articleImage(article)}
+	{@const gallery = articleImages(article)}
+	{@const mainImg = gallery[mainImageIndex] ?? gallery[0]}
 	<a class="back-link" href="/">Accueil / {article.category.name} / <span>{article.name}</span></a>
 
 	<section class="lot-grid">
 		<!-- Galerie photo -->
 		<div class="gallery">
 			<div class="gallery-main">
-				{#if img}
+				{#if mainImg}
 					<img
 						class="gallery-img"
-						src={img}
+						src={mainImg}
 						alt={article.name}
 						onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 					/>
@@ -231,13 +240,20 @@
 					<span class="lot-sold">vendu</span>
 				{/if}
 			</div>
-			<div class="gallery-thumbs">
-				{#each Array(4) as _, i}
-					<div class="gallery-thumb">
-						{#if img}<img src={img} alt="" />{/if}
-					</div>
-				{/each}
-			</div>
+			{#if gallery.length > 1}
+				<div class="gallery-thumbs">
+					{#each gallery as thumb, i}
+						<button
+							class="gallery-thumb"
+							class:gallery-thumb-active={i === mainImageIndex}
+							onclick={() => (mainImageIndex = i)}
+							aria-label={`Photo ${i + 1}`}
+						>
+							<img src={thumb} alt="" />
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<!-- Infos -->
@@ -299,7 +315,9 @@
 			</div>
 
 			{#if !isOwnArticle && !article.sold}
-				<button class="link-negotiate" onclick={openNegotiate}>💬 Négocier le prix</button>
+				<button class="btn-outline btn-negotiate" onclick={openNegotiate}>
+					💬 Négocier le prix
+				</button>
 			{/if}
 
 			{#if contactOpen && !isOwnArticle}
@@ -310,7 +328,7 @@
 						disabled={contactBusy}
 						rows="2"></textarea>
 					<button
-						class="btn-primary-alt"
+						class="btn-send"
 						disabled={contactBusy || !contactDraft.trim()}
 						onclick={sendContactMessage}
 					>
@@ -338,7 +356,7 @@
 						bind:value={negotiateComment}
 						disabled={negotiateBusy}
 						rows="2"></textarea>
-					<button class="btn-primary-alt" disabled={negotiateBusy || !negotiatePrice} onclick={sendNegotiation}>
+					<button class="btn-send" disabled={negotiateBusy || !negotiatePrice} onclick={sendNegotiation}>
 						Envoyer l'offre
 					</button>
 				</div>
@@ -401,27 +419,41 @@
 		</div>
 	</GPanel>
 
+	<!-- Déjà consultés -->
+	{#if recentSuggestions.length > 0}
+		<section class="related">
+			<h2 class="related-title">Récemment consultés</h2>
+			<div class="related-grid">
+				{@render productCards(recentSuggestions)}
+			</div>
+		</section>
+	{/if}
+
 	<!-- Vous aimerez aussi -->
 	{#if related.length > 0}
 		<section class="related">
 			<h2 class="related-title">Vous aimerez aussi</h2>
 			<div class="related-grid">
-				{#each related as r (r.ID)}
-					{@const rImg = articleImage(r)}
-					<a class="related-card" href={`/lot/${r.ID}`}>
-						<div class="related-art">
-							{#if rImg}<img src={rImg} alt={r.name} />{/if}
-						</div>
-						<div class="related-body">
-							<p class="related-name">{r.name}</p>
-							<p class="related-price">{eur(r.prix)}</p>
-						</div>
-					</a>
-				{/each}
+				{@render productCards(related)}
 			</div>
 		</section>
 	{/if}
 {/if}
+
+{#snippet productCards(items: ArticleAPI[])}
+	{#each items as r (r.ID)}
+		{@const rImg = articleImage(r)}
+		<a class="related-card" href={`/lot/${r.ID}`}>
+			<div class="related-art">
+				{#if rImg}<img src={rImg} alt={r.name} />{/if}
+			</div>
+			<div class="related-body">
+				<p class="related-name">{r.name}</p>
+				<p class="related-price">{eur(r.prix)}</p>
+			</div>
+		</a>
+	{/each}
+{/snippet}
 
 <style>
 	.state-msg {
@@ -518,15 +550,25 @@
 	}
 	.gallery-thumb {
 		height: 90px;
+		padding: 0;
 		border-radius: 10px;
 		background: var(--c-bg);
 		border: 1px solid var(--c-border);
 		overflow: hidden;
+		cursor: pointer;
+		transition: border-color 120ms;
+	}
+	.gallery-thumb:hover {
+		border-color: var(--c-ink);
+	}
+	.gallery-thumb-active {
+		border: 2px solid var(--c-ink);
 	}
 	.gallery-thumb img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		display: block;
 	}
 
 	/* Infos */
@@ -703,19 +745,29 @@
 		border-color: var(--c-ink);
 	}
 
-	.link-negotiate {
+	.btn-negotiate {
 		align-self: flex-start;
-		background: none;
+	}
+
+	.btn-send {
+		align-self: flex-start;
+		padding: 10px 22px;
 		border: none;
-		padding: 0;
+		border-radius: 8px;
+		background: var(--c-accent);
+		color: #fff;
 		font-family: var(--f-body);
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--c-text-tertiary);
 		cursor: pointer;
+		transition: filter 120ms;
 	}
-	.link-negotiate:hover {
-		color: var(--c-ink);
+	.btn-send:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
+	.btn-send:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.contact-box {
@@ -785,11 +837,6 @@
 	.negotiate-comment:focus {
 		outline: none;
 		border-color: var(--c-ink);
-	}
-	.negotiate-box .btn-primary-alt {
-		align-self: flex-start;
-		flex: none;
-		padding: 10px 20px;
 	}
 
 	.action-msg {

@@ -65,10 +65,14 @@ func CreateArticle(c *gin.Context) {
 	article.SaleType = "direct"
 	article.Sold = false
 	// Visuel par defaut (Unsplash themee) si le vendeur n'a pas fourni de photo
-	// valide (schema https obligatoire — voir sanitizeImageURL).
+	// valide (schema https obligatoire — voir sanitizeImageURL). Galerie de
+	// depart alignee sur la couverture ; complete ensuite via l'upload.
 	article.ImageURL = sanitizeImageURL(article.ImageURL)
 	if article.ImageURL == "" {
-		article.ImageURL = repository.DefaultImageFor(article.CategoryID)
+		article.Images = repository.DefaultImagesFor(article.CategoryID)
+		article.ImageURL = article.Images[0]
+	} else {
+		article.Images = models.StringSlice{article.ImageURL}
 	}
 
 	if err := repository.DB.Create(&article).Error; err != nil {
