@@ -137,9 +137,9 @@ func UploadArticleImage(c *gin.Context) {
 		article.ImageURL = imagePath
 	}
 	article.Images = append(article.Images, imagePath)
-	if err := repository.DB.Model(&article).Updates(map[string]interface{}{
-		"image_url": article.ImageURL,
-		"images":    article.Images,
+	if err := repository.DB.Model(&article).Select("image_url", "images").Updates(models.Article{
+		ImageURL: article.ImageURL,
+		Images:   article.Images,
 	}).Error; err != nil {
 		metrics.RecordImageUpload("error")
 		response.Error(c, http.StatusInternalServerError, "Impossible de mettre a jour l'annonce")

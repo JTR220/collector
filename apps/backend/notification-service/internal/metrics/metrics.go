@@ -71,22 +71,21 @@ func Middleware() gin.HandlerFunc {
 	}
 }
 
+// inc factorise l'increment des compteurs metier a une ou plusieurs
+// dimensions (type/result/operation...), evitant une fonction Record*
+// quasi identique par compteur.
+func inc(counter *prometheus.CounterVec, labelValues ...string) {
+	counter.WithLabelValues(labelValues...).Inc()
+}
+
 func RecordNotification(notificationType, result string) {
-	NotificationsCreatedTotal.WithLabelValues(notificationType, result).Inc()
+	inc(NotificationsCreatedTotal, notificationType, result)
 }
-
-func RecordMessage(result string) {
-	MessagesSentTotal.WithLabelValues(result).Inc()
-}
-
-func RecordEmail(result string) {
-	EmailsSentTotal.WithLabelValues(result).Inc()
-}
+func RecordMessage(result string) { inc(MessagesSentTotal, result) }
+func RecordEmail(result string)   { inc(EmailsSentTotal, result) }
 
 func SetWebSocketActiveConnections(count int) {
 	WebSocketActiveConnections.Set(float64(count))
 }
 
-func RecordRabbitMQError(operation string) {
-	RabbitMQErrorsTotal.WithLabelValues(operation).Inc()
-}
+func RecordRabbitMQError(operation string) { inc(RabbitMQErrorsTotal, operation) }

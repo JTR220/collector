@@ -66,17 +66,16 @@ func Middleware() gin.HandlerFunc {
 	}
 }
 
-func RecordLogin(result string) {
-	LoginAttemptsTotal.WithLabelValues(result).Inc()
+// inc factorise l'increment des compteurs metier a une seule dimension
+// (result/reason/type...), evitant une fonction Record* quasi identique
+// par compteur.
+func inc(counter *prometheus.CounterVec, labelValues ...string) {
+	counter.WithLabelValues(labelValues...).Inc()
 }
 
-func RecordRegistration(result string) {
-	RegistrationsTotal.WithLabelValues(result).Inc()
-}
-
-func RecordJWTRejection(reason string) {
-	JWTRejectionsTotal.WithLabelValues(reason).Inc()
-}
+func RecordLogin(result string)        { inc(LoginAttemptsTotal, result) }
+func RecordRegistration(result string) { inc(RegistrationsTotal, result) }
+func RecordJWTRejection(reason string) { inc(JWTRejectionsTotal, reason) }
 
 // Serve expose /metrics sur un port interne dedie (jamais route par l'ingress
 // public, qui ne proxy que le port "http" du Service k8s) : le scraping

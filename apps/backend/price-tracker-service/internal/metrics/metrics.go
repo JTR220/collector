@@ -63,14 +63,13 @@ func Middleware() gin.HandlerFunc {
 	}
 }
 
-func RecordPriceEvent(result string) {
-	PriceEventsConsumedTotal.WithLabelValues(result).Inc()
+// inc factorise l'increment des compteurs metier a une seule dimension
+// (result/reason/operation...), evitant une fonction Record* quasi
+// identique par compteur.
+func inc(counter *prometheus.CounterVec, labelValues ...string) {
+	counter.WithLabelValues(labelValues...).Inc()
 }
 
-func RecordFraudAlert(reason string) {
-	FraudAlertsTotal.WithLabelValues(reason).Inc()
-}
-
-func RecordRabbitMQError(operation string) {
-	RabbitMQErrorsTotal.WithLabelValues(operation).Inc()
-}
+func RecordPriceEvent(result string)       { inc(PriceEventsConsumedTotal, result) }
+func RecordFraudAlert(reason string)       { inc(FraudAlertsTotal, reason) }
+func RecordRabbitMQError(operation string) { inc(RabbitMQErrorsTotal, operation) }
