@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"auth-service/cascade"
 	"auth-service/middlewares"
 	"auth-service/models"
 	"auth-service/repository"
@@ -281,6 +282,180 @@ func TestGetMeUnknownIDReturns404(t *testing.T) {
 	w := performGetMe(t, 42)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status attendu 404, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func performUpdateMe(t *testing.T, userID float64, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPatch, "/me", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_id", userID)
+	UpdateMe(c)
+	return w
+}
+
+func TestUpdateMeChangesNameAndEmail(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performUpdateMe(t, 1, `{"name":"Alice Updated","email":"alice2@example.com"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var user models.Utilisateur
+	if err := repository.DB.First(&user, 1).Error; err != nil {
+		t.Fatalf("relecture utilisateur : %v", err)
+	}
+	if user.Name != "Alice Updated" || user.Email != "alice2@example.com" {
+		t.Errorf("profil non mis a jour : %+v", user)
+	}
+}
+
+func TestUpdateMeChangesPasswordWhenProvided(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performUpdateMe(t, 1, `{"name":"Alice","email":"alice@example.com","password":"nouveaumdp"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var user models.Utilisateur
+	if err := repository.DB.First(&user, 1).Error; err != nil {
+		t.Fatalf("relecture utilisateur : %v", err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte("nouveaumdp")); err != nil {
+		t.Errorf("le nouveau mot de passe devrait etre accepte : %v", err)
+	}
+}
+
+func TestUpdateMeRejectsDuplicateEmail(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+	seedUser(t, "bob@example.com", "longpassword")
+
+	w := performUpdateMe(t, 1, `{"name":"Alice","email":"bob@example.com"}`)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("email duplique : status attendu 409, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func performExportMe(t *testing.T, userID float64) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/me/export", nil)
+	c.Set("user_id", userID)
+	ExportMe(c)
+	return w
+}
+
+func TestExportMeReturnsAccountData(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performExportMe(t, 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+	if w.Header().Get("Content-Disposition") == "" {
+		t.Error("Content-Disposition attendu pour un telechargement")
+	}
+
+	var resp struct {
+		Account struct {
+			Email string `json:"email"`
+		} `json:"account"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode reponse : %v", err)
+	}
+	if resp.Account.Email != "alice@example.com" {
+		t.Errorf("email attendu alice@example.com, obtenu %q", resp.Account.Email)
+	}
+}
+
+func performDeleteMe(t *testing.T, userID float64) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodDelete, "/me", nil)
+	c.Set("user_id", userID)
+	DeleteMe(c)
+	return w
+}
+
+func TestDeleteMePermanentlyRemovesUser(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	w := performDeleteMe(t, 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	var count int64
+	repository.DB.Unscoped().Model(&models.Utilisateur{}).Where("id = ?", 1).Count(&count)
+	if count != 0 {
+		t.Errorf("l'utilisateur devrait etre supprime physiquement, count=%d", count)
+	}
+
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].MaxAge >= 0 {
+		t.Error("le cookie de session devrait etre efface")
+	}
+}
+
+func TestDeleteMeUnknownIDReturns404(t *testing.T) {
+	setupTestDB(t)
+
+	w := performDeleteMe(t, 999)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status attendu 404, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteMeNotifiesCascadeTargets(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	var notified []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		notified = append(notified, r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cascade.Init("s3cret", srv.URL)
+	t.Cleanup(func() { cascade.Instance = nil })
+
+	w := performDeleteMe(t, 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+	if len(notified) != 1 || notified[0] != "/internal/users/1/anonymize" {
+		t.Errorf("le service cascade aurait du etre notifie sur /internal/users/1/anonymize, obtenu %v", notified)
+	}
+}
+
+func TestDeleteMeSucceedsEvenIfCascadeTargetIsUnreachable(t *testing.T) {
+	setupTestDB(t)
+	seedUser(t, "alice@example.com", "longpassword")
+
+	// URL invalide : simule un service indisponible. La suppression du
+	// compte, deja effective localement, ne doit jamais en dependre.
+	cascade.Init("s3cret", "http://127.0.0.1:1")
+	t.Cleanup(func() { cascade.Instance = nil })
+
+	w := performDeleteMe(t, 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200 meme si le service cascade est injoignable, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }
 
