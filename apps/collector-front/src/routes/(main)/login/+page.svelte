@@ -188,65 +188,6 @@
 			>
 				{mode === 'login' ? "Pas de compte ? · S'inscrire" : 'Déjà un compte ? · Se connecter'}
 			</button>
-
-			<div class="demo">
-				<span class="demo-label">Comptes de démo</span>
-				<button
-					type="button"
-					class="demo-row"
-					onclick={() => {
-						email = 'admin@collector.shop';
-						password = 'admin123';
-					}}
-				>
-					<span class="demo-role">Admin</span>
-					<span class="demo-creds">admin@collector.shop · admin123</span>
-				</button>
-				<button
-					type="button"
-					class="demo-row"
-					onclick={() => {
-						email = 'test@collector.shop';
-						password = 'test123';
-					}}
-				>
-					<span class="demo-role">Test</span>
-					<span class="demo-creds">test@collector.shop · test123</span>
-				</button>
-				<button
-					type="button"
-					class="demo-row"
-					onclick={() => {
-						email = 'vendeur@collector.shop';
-						password = 'vendeur123';
-					}}
-				>
-					<span class="demo-role">Vendeur</span>
-					<span class="demo-creds">vendeur@collector.shop · vendeur123</span>
-				</button>
-				<button
-					type="button"
-					class="demo-row"
-					onclick={() => {
-						email = 'acheteur@collector.shop';
-						password = 'acheteur123';
-					}}
-				>
-					<span class="demo-role">Acheteur</span>
-					<span class="demo-creds">acheteur@collector.shop · acheteur123</span>
-				</button>
-				<button
-					type="button"
-					class="demo-row"
-					onclick={() => {
-						email = 'vault@collector.shop';
-						password = 'vault123';
-					}}
-				>
-					<span class="demo-role">Collector Vault</span>
-					<span class="demo-creds">vault@collector.shop · vault123</span>
-				</button>
-			</div>
 		</div>
 	</div>
 </div>
@@ -499,51 +440,5 @@
 	}
 	.toggle-btn:hover {
 		color: var(--c-ink);
-	}
-
-	/* Encart comptes de démo */
-	.demo {
-		margin-top: 20px;
-		border: 1px solid var(--c-border);
-		border-radius: 9px;
-		padding: 12px;
-		background: var(--c-bg);
-	}
-	.demo-label {
-		display: block;
-		font-size: 10.5px;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--c-text-muted);
-		margin-bottom: 8px;
-	}
-	.demo-row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		width: 100%;
-		background: none;
-		border: none;
-		border-radius: 6px;
-		padding: 7px 8px;
-		cursor: pointer;
-		text-align: left;
-		transition: background 120ms;
-	}
-	.demo-row:hover {
-		background: var(--c-badge-verified-bg);
-	}
-	.demo-role {
-		flex-shrink: 0;
-		font-size: 10.5px;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		color: var(--c-ink);
-		width: 58px;
-	}
-	.demo-creds {
-		font-family: var(--f-body);
-		font-size: 12px;
-		color: var(--c-text-muted);
 	}
 </style>
