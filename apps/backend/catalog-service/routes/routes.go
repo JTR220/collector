@@ -86,6 +86,14 @@ func InitRouter() *gin.Engine {
 		protected.PATCH("/order/:id/reject", controllers.RejectOrder)
 		protected.POST("/order/:id/review", controllers.CreateReview)
 
+		// Negociation de prix (offres)
+		protected.POST("/article/:id/offer", controllers.CreateOffer)
+		protected.GET("/me/offers/received", controllers.GetReceivedOffers)
+		protected.GET("/me/offers/sent", controllers.GetSentOffers)
+		protected.PATCH("/offer/:id/accept", controllers.AcceptOffer)
+		protected.PATCH("/offer/:id/reject", controllers.RejectOffer)
+		protected.POST("/offer/:id/pay", controllers.PayOffer)
+
 		// Wishlist
 		protected.GET("/me/wishlist", controllers.GetMyWishlist)
 		protected.POST("/me/wishlist", controllers.AddToWishlist)

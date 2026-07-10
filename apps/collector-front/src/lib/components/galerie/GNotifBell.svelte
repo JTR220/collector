@@ -15,7 +15,11 @@
 		ITEM_SOLD: '✓',
 		ORDER_PENDING: '🛒',
 		ORDER_ACCEPTED: '✓',
-		ORDER_REJECTED: '✗'
+		ORDER_REJECTED: '✗',
+		OFFER_RECEIVED: '💬',
+		OFFER_ACCEPTED: '✅',
+		OFFER_REJECTED: '✗',
+		OFFER_PURCHASED: '💰'
 	};
 
 	function toggle() {

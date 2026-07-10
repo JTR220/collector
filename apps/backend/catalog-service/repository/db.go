@@ -57,6 +57,7 @@ func InitDB() {
 	err = DB.AutoMigrate(
 		&models.Categorie{}, &models.Article{},
 		&models.WishlistItem{}, &models.Order{}, &models.Review{},
+		&models.Offer{},
 	)
 	if err != nil {
 		log.Fatal("Echec lors de la creation des tables : ", err)

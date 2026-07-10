@@ -73,6 +73,21 @@ func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
 		return err
 	}
 
+	// Queue: offres (negociation de prix : creation, decision, paiement)
+	qOffers, err := ch.QueueDeclare(queueOfferEvents, true, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOffers.Name, routingKeyOfferCreated, cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOffers.Name, routingKeyOfferDecided, cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOffers.Name, routingKeyOfferPurchased, cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -135,10 +150,11 @@ func (m *Manager) runUntilClosed(ctx context.Context, ch *amqp.Channel, closeCh 
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 	go func() { defer wg.Done(); m.consumePriceUpdates(cycleCtx, ch) }()
 	go func() { defer wg.Done(); m.consumeFraudAlerts(cycleCtx, ch) }()
 	go func() { defer wg.Done(); m.consumeOrderEvents(cycleCtx, ch) }()
+	go func() { defer wg.Done(); m.consumeOfferEvents(cycleCtx, ch) }()
 	wg.Wait()
 
 	return ctx.Err() == nil
@@ -390,6 +406,10 @@ const (
 	queueOrderEvents          = "notification-service.order.events"
 	routingKeyOrderCreated    = "order.created"
 	routingKeyOrderDecided    = "order.decided"
+	queueOfferEvents          = "notification-service.offer.events"
+	routingKeyOfferCreated    = "offer.created"
+	routingKeyOfferDecided    = "offer.decided"
+	routingKeyOfferPurchased  = "offer.purchased"
 	msgIdempotenceCheckFailed = "failed to check message idempotence — requeuing"
 )
 
@@ -550,5 +570,179 @@ func (m *Manager) handleOrderDecided(ctx context.Context, msg amqp.Delivery) {
 	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.BuyerID), title, emailBody)
 
 	log.Info().Str("item_id", event.ItemID.String()).Bool("accepted", event.Accepted).Msg("order.decided notification dispatched")
+	_ = msg.Ack(false)
+}
+
+// ── Offer Events Consumer ────────────────────────────────────────────────────
+
+func (m *Manager) consumeOfferEvents(ctx context.Context, ch *amqp.Channel) {
+	msgs, err := ch.Consume(queueOfferEvents, "notif-offer-consumer", false, false, false, false, nil)
+	if err != nil {
+		metrics.RecordRabbitMQError("consume_offer")
+		log.Error().Err(err).Msg("failed to start offer consumer")
+		return
+	}
+	log.Info().Msg("offer consumer started")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+			switch msg.RoutingKey {
+			case routingKeyOfferCreated:
+				m.handleOfferCreated(ctx, msg)
+			case routingKeyOfferDecided:
+				m.handleOfferDecided(ctx, msg)
+			case routingKeyOfferPurchased:
+				m.handleOfferPurchased(ctx, msg)
+			default:
+				_ = msg.Ack(false)
+			}
+		}
+	}
+}
+
+func (m *Manager) handleOfferCreated(ctx context.Context, msg amqp.Delivery) {
+	var event model.OfferCreatedEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("offer_created", "invalid_payload")
+		log.Error().Err(err).Msg("invalid offer.created payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOfferCreated))
+	if err != nil {
+		metrics.RecordNotification("offer_created", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate offer.created ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	title := "💬 Nouvelle offre reçue"
+	body := fmt.Sprintf("Un acheteur propose %.2f€ pour \"%s\" (prix affiché : %.2f€). Acceptez ou refusez depuis votre profil.", event.Price, event.ItemName, event.ListPrice)
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.SellerID,
+		Type:      model.TypeOfferReceived,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	emailBody := fmt.Sprintf(
+		"Bonjour,\n\nUn acheteur propose %.2f€ pour votre annonce \"%s\" (prix affiché : %.2f€).\n\nConnectez-vous à votre profil Collector.shop pour accepter ou refuser cette offre.\n\n— Collector.shop",
+		event.Price, event.ItemName, event.ListPrice,
+	)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.SellerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Msg("offer.created notification dispatched")
+	_ = msg.Ack(false)
+}
+
+func (m *Manager) handleOfferDecided(ctx context.Context, msg amqp.Delivery) {
+	var event model.OfferDecisionEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("offer_decided", "invalid_payload")
+		log.Error().Err(err).Msg("invalid offer.decided payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOfferDecided))
+	if err != nil {
+		metrics.RecordNotification("offer_decided", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate offer.decided ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	notifType := model.TypeOfferRejected
+	title := "❌ Offre refusée"
+	emailBody := fmt.Sprintf("Bonjour,\n\nLe vendeur a refusé votre offre à %.2f€ sur \"%s\".\n\n— Collector.shop", event.Price, event.ItemName)
+	if event.Accepted {
+		notifType = model.TypeOfferAccepted
+		title = "✅ Offre acceptée — vous pouvez payer"
+		emailBody = fmt.Sprintf("Bonjour,\n\nLe vendeur a accepté votre offre à %.2f€ sur \"%s\". Connectez-vous à votre profil Collector.shop pour finaliser le paiement à ce prix.\n\n— Collector.shop", event.Price, event.ItemName)
+	}
+	body := fmt.Sprintf("Votre offre à %.2f€ sur \"%s\" a été %s par le vendeur.", event.Price, event.ItemName, map[bool]string{true: "acceptée", false: "refusée"}[event.Accepted])
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.BuyerID,
+		Type:      notifType,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.BuyerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Bool("accepted", event.Accepted).Msg("offer.decided notification dispatched")
+	_ = msg.Ack(false)
+}
+
+func (m *Manager) handleOfferPurchased(ctx context.Context, msg amqp.Delivery) {
+	var event model.OfferPurchasedEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("offer_purchased", "invalid_payload")
+		log.Error().Err(err).Msg("invalid offer.purchased payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOfferPurchased))
+	if err != nil {
+		metrics.RecordNotification("offer_purchased", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate offer.purchased ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	title := "💰 Vente finalisée"
+	body := fmt.Sprintf("\"%s\" a été vendu au prix négocié de %.2f€.", event.ItemName, event.Price)
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.SellerID,
+		Type:      model.TypeOfferPurchased,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	emailBody := fmt.Sprintf(
+		"Bonjour,\n\nVotre annonce \"%s\" a été vendue au prix négocié de %.2f€. Retrouvez le détail dans votre profil Collector.shop.\n\n— Collector.shop",
+		event.ItemName, event.Price,
+	)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.SellerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Msg("offer.purchased notification dispatched")
 	_ = msg.Ack(false)
 }

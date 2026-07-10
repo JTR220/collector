@@ -21,6 +21,7 @@
 	} from '$lib/api/market';
 	import { fetchPriceHistory } from '$lib/api/priceTracker';
 	import { sendMessage, toUserUUID } from '$lib/api/messages';
+	import { createOffer } from '$lib/api/offers';
 	import { cart } from '$lib/stores/cart';
 	import { eur, eurC, pct, sparkPath } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
@@ -180,15 +181,11 @@
 		}
 		negotiateBusy = true;
 		try {
-			let body = `Bonjour, seriez-vous prêt à accepter ${eur(offer)} pour "${article.name}" (prix affiché : ${eur(article.prix)}) ?`;
-			if (negotiateComment.trim()) body += `\n${negotiateComment.trim()}`;
-			const sent = await sendMessage({
-				recipientId: toUserUUID(article.sellerId),
-				body,
-				articleId: article.ID,
-				articleName: article.name
-			});
-			goto(`/messages/${sent.conversation_id}`);
+			await createOffer(article.ID, offer, negotiateComment.trim());
+			negotiateOpen = false;
+			negotiatePrice = '';
+			negotiateComment = '';
+			actionMsg = 'Offre envoyée — vous serez notifié dès que le vendeur aura répondu.';
 		} catch (e) {
 			actionMsg = e instanceof Error ? e.message : "Erreur lors de l'envoi de l'offre.";
 		} finally {
