@@ -21,3 +21,28 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  # selfHeal réaligne tout drift Git -> cluster, mais les Deployments pilotés
+  # par un HPA (voir infra/k8s/base/*/hpa.yaml) changent de replicas en dehors
+  # de Git : sans ça, chaque resync ramènerait le pod count au replicas:1 du
+  # manifest et annulerait le scaling en plein test de charge.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: auth-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: notification-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: price-tracker-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: collector-front
+      jsonPointers:
+        - /spec/replicas
