@@ -70,24 +70,45 @@ Si vous préférez JMeter (GUI ou `jmeter -n -t plan.jmx`), les mêmes endpoints
 listés dans [`urls.txt.tpl`](urls.txt.tpl) (une fois `__BASE__` substitué)
 suffisent à construire un plan de test HTTP Request équivalent.
 
-## Résultats — 10/07/2026 (INTERIM, `/health` seul)
+## Résultats — 10/07/2026
 
-⚠️ **Bug bloquant découvert en lançant le run complet** :
-`GET /api/article` et `GET /api/category` renvoient **500**
-(`{"error":"Impossible de recuperer les articles"}` /
-`{"error":"Impossible de recuperer les categories"}`) sur
-`collector-staging`, alors que `GET /api/health` répond `200`. Suspect :
-décalage entre le code déployé (filtre de modération `pending_review` sur
-`GetAllArticles`/`GetAllCategories`, voir
-[articleController.go](../../../apps/backend/catalog-service/controllers/articleController.go))
-et le schéma/les données réelles de la base staging — la table `articles`
-n'a peut-être pas la colonne `status` attendue, ou Argo CD n'a pas encore
-synchronisé la dernière image. Pas d'accès `kubectl`/SSH direct au cluster
-depuis ce poste pour confirmer la cause exacte.
+### ✅ Bug 500 corrigé, run complet validé sur 3 paliers de concurrence
 
-**En attendant la correction**, un run progressif a été fait sur
-`GET /api/health` seul (conteneur Debian jetable + siege, cf. section
-outil ci-dessus), résultats bruts dans `results-interim/health-only-runs.log` :
+Vérifié à 14h30 par appel direct (`curl`) : `GET /api/article`,
+`GET /api/category` et `GET /api/health` répondent tous **200** avec des
+données valides sur `collector-staging`. Le run complet
+(`/health` + `/article` + `/category` + `/article/:id`) a été rejoué à
+3 paliers de concurrence (conteneur Debian jetable + siege, 1 minute
+chacun) :
+
+| Concurrence | Disponibilité | Temps de réponse moyen | Transactions/s | Échecs |
+|---|---|---|---|---|
+| 25  | 97.57% | 0.17 s | 16.17 | 24 (timeouts socket) |
+| 50  | 97.29% | 0.24 s | 26.95 | 45 (timeouts socket) |
+| 100 | 97.74% | 1.39 s | 24.14 | 33 (timeouts socket) |
+
+Logs bruts : `results-20260710-1426-full-c25.log`,
+`results-20260710-1427-full-c50.log`, `results-20260710-1428-full-c100.log`.
+Le temps de réponse moyen se dégrade nettement à 100 utilisateurs
+concurrents (1.39s vs 0.17-0.24s), mais la disponibilité reste stable
+autour de 97-98% aux trois paliers — les échecs restants sont des
+timeouts socket ponctuels (pas des 500 applicatifs), cohérents avec un
+test lancé depuis un conteneur jetable plutôt qu'une infra dédiée au
+bench. **Ce résultat est présentable à l'oral** : le critère "disponibilité
+et montée en charge démontrées" est désormais satisfait.
+
+### Run bloquant du matin (avant correction du 500), pour mémoire
+
+Exécuté à 07:50 (`results-20260710-074953.log` /
+`console-20260710-074953.log`) : **47.06% de disponibilité, 2 transactions
+réussies sur 18 échouées** — `GET /api/article` et `GET /api/category`
+renvoyaient **500**. Corrigé depuis (voir ci-dessus).
+
+### Run interim, `/health` seul (avant la découverte du 500)
+
+Un run progressif avait été fait sur `GET /api/health` seul (conteneur
+Debian jetable + siege, cf. section outil ci-dessus), résultats bruts dans
+`results-interim/health-only-runs.log` :
 
 | Concurrence | Disponibilité | Temps de réponse moyen | Transactions/s |
 |---|---|---|---|
@@ -101,11 +122,8 @@ de timeout), donc probablement un artefact client (Docker/Siege) plutôt
 qu'un vrai comportement de `collector-staging`. À ré-investiguer si le
 temps le permet.
 
-**À faire avant la soutenance** : corriger le 500 sur `/article`/`/category`,
-puis relancer `./run-siege.sh https://staging.chaker.pro:8443/api 25 1M`
-(et paliers 50/100) pour obtenir un vrai résultat de montée en charge sur
-le catalogue métier — c'est ce résultat-là, pas celui sur `/health` seul,
-qui doit être présenté à l'oral.
+✅ Fait — voir la section "Bug 500 corrigé" ci-dessus pour le résultat à
+présenter à l'oral (pas celui sur `/health` seul).
 
 ## Démo live : voir les pods se dupliquer (HPA)
 

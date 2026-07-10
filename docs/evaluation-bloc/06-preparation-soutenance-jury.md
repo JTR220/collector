@@ -1,8 +1,9 @@
 # Preparation soutenance - Projet Collector
 
-Document de revision aligne sur l'etat du depot au 09/07/2026. Il sert a
-repondre aux questions de jury sur l'architecture, les choix techniques, les
-fonctionnalites livrees, la securite, les tests et le deploiement GitOps.
+Document de revision aligne sur l'etat du depot au 10/07/2026 (apres-midi).
+Il sert a repondre aux questions de jury sur l'architecture, les choix
+techniques, les fonctionnalites livrees, la securite, les tests et le
+deploiement GitOps.
 
 ---
 
@@ -251,14 +252,23 @@ Mesures deja en place :
 - images distroless non-root, scan Trivy, SBOM Syft, signature cosign ;
 - policies Kyverno de gouvernance cluster.
 
-Risques suivis :
+Risques du plan de remediation, etat au 10/07/2026 :
 
-- P0 : filtre anti-coordonnees personnelles dans la messagerie ;
-- P1 : remplacer l'usage front du JWT en `localStorage` par le cookie httpOnly
-  pour tous les services ;
-- P1 : moderation avant publication d'annonce ;
-- P2 : passer Kyverno de `Audit` a `Enforce` ;
-- P2 : ajouter des metriques applicatives Prometheus.
+- ✅ P0 filtre anti-coordonnees personnelles dans la messagerie : resolu
+  (`notification-service/internal/pii/filter.go`, fonction `Detect`, teste) ;
+- ✅ P1 cookie httpOnly pour le JWT : resolu, le token ne transite plus en
+  `localStorage` ;
+- ✅ P1 moderation avant publication d'annonce : resolu (statut
+  `pending_review` par defaut, admin approuve/rejette) ;
+- ✅ P2 Kyverno `Audit` -> `Enforce` : resolu sur les 4 policies (a
+  revalider sur le cluster reel via `kubectl get policyreport -A`, pas
+  fait depuis ce poste faute d'acces kubectl/SSH) ;
+- ⚠️ P2 metriques applicatives Prometheus : fait uniquement sur
+  `catalog-service` (`/metrics`), pas encore sur auth/notification/
+  price-tracker-service ;
+- axes ouverts assumes (hors P0-P2, voir
+  `04-cartographie-competences-formation.md`) : preferences de
+  notification par type, internationalisation/accessibilite.
 
 ---
 
@@ -336,15 +346,23 @@ kubectl get sealedsecrets -n <namespace>
 ### Montee en charge (Siege)
 
 Voir [`loadtest/README.md`](loadtest/README.md) pour le protocole complet et
-les resultats. **Etat au 10/07/2026** : `/api/health` tient 100% de
-disponibilite jusqu'a 100 utilisateurs concurrents sur staging, mais
-`/api/article` et `/api/category` renvoient **500** ("Impossible de
-recuperer les articles/categories") sur `collector-staging` actuellement —
-probablement un decalage entre le code deploye (filtre de moderation
-`pending_review`) et le schema/donnees reels de la base staging. **A
-corriger avant la soutenance** : rejouer le test complet (`urls.txt.tpl`,
-tous les endpoints) une fois le 500 resolu, pour avoir un vrai chiffre de
-montee en charge sur le catalogue metier et pas seulement sur `/health`.
+les resultats. **Etat au 10/07/2026 (apres-midi)** : le bug 500 sur
+`/api/article`/`/api/category` est corrige (verifie par appel direct,
+`GET` renvoie `200` avec donnees valides). Run complet rejoue a 3 paliers
+de concurrence :
+
+| Concurrence | Disponibilite | Temps de reponse moyen |
+|---|---|---|
+| 25  | 97.57% | 0.17 s |
+| 50  | 97.29% | 0.24 s |
+| 100 | 97.74% | 1.39 s (degradation nette du temps de reponse) |
+
+Disponibilite stable ~97-98% aux trois paliers, les echecs residuels sont
+des timeouts socket ponctuels (pas des 500 applicatifs). **Ce resultat est
+presentable a l'oral** — le critere "disponibilite et montee en charge
+demontrees" de la grille est satisfait. Le run bloquant du matin (47% de
+disponibilite, 500 sur le catalogue) reste documente dans
+`loadtest/README.md` a titre d'historique.
 
 ---
 
@@ -372,9 +390,12 @@ revue, un commit et une synchronisation tracable.
 
 **Limite la plus importante du POC ?**
 
-La messagerie ne bloque pas encore les coordonnees personnelles. C'est le point
-de remediation prioritaire car il touche directement le modele economique et
-l'exigence metier.
+L'instrumentation Prometheus ne couvre que `catalog-service` pour le
+moment (auth/notification/price-tracker n'exposent pas encore de
+`/metrics`), et l'avis vendeur (`sellerScore`) reste fige a 5.0 pour les
+nouvelles annonces faute d'avis reels agreges. Ce sont les deux axes
+d'amelioration les plus visibles actuellement (le bug de disponibilite
+catalogue rencontre plus tot dans la journee est corrige et re-verifie).
 
 ---
 
