@@ -49,7 +49,7 @@ func setupCatalogDB(t *testing.T) {
 	}
 	if err := db.AutoMigrate(
 		&models.Categorie{}, &models.Article{},
-		&models.WishlistItem{}, &models.Order{}, &models.Review{},
+		&models.WishlistItem{}, &models.Order{},
 	); err != nil {
 		t.Fatalf("migration : %v", err)
 	}

@@ -2,13 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
-	import {
-		fetchMe,
-		updateProfile,
-		exportMyData,
-		deleteMyAccount,
-		type MeResponse
-	} from '$lib/api/auth';
+	import { fetchMe, type MeResponse } from '$lib/api/auth';
 	import { fetchMyWishlist, type WishlistItem } from '$lib/api/wishlist';
 	import {
 		fetchMyOrders,
@@ -56,16 +50,6 @@
 	let reviewComment = $state('');
 	let reviewBusy = $state(false);
 	let reviewMsg = $state<string | null>(null);
-
-	// ── RGPD : modification / export / suppression du compte ──────────────────
-	let editingProfile = $state(false);
-	let editName = $state('');
-	let editEmail = $state('');
-	let editPassword = $state('');
-	let profileBusy = $state(false);
-	let profileMsg = $state<string | null>(null);
-	let exportBusy = $state(false);
-	let deleteBusy = $state(false);
 
 	const pendingSales = $derived(sales.filter((s) => s.status === 'pending'));
 	const reviewableStatuses: OrderStatus[] = ['paid', 'shipped', 'delivered'];
@@ -276,75 +260,6 @@
 		goto('/login');
 	}
 
-	function toggleEditProfile() {
-		profileMsg = null;
-		editingProfile = !editingProfile;
-		if (editingProfile && me) {
-			editName = me.name;
-			editEmail = me.email;
-			editPassword = '';
-		}
-	}
-
-	async function saveProfile() {
-		if (!me) return;
-		profileBusy = true;
-		profileMsg = null;
-		try {
-			const updated = await updateProfile({
-				name: editName.trim(),
-				email: editEmail.trim(),
-				...(editPassword ? { password: editPassword } : {})
-			});
-			me = { ...me, name: updated.name, email: updated.email };
-			auth.login({ id: me.id, name: me.name, email: me.email, role: me.role });
-			editingProfile = false;
-			profileMsg = 'Profil mis à jour.';
-		} catch (e) {
-			profileMsg = e instanceof Error ? e.message : 'Impossible de mettre à jour le profil.';
-		} finally {
-			profileBusy = false;
-		}
-	}
-
-	async function downloadMyData() {
-		exportBusy = true;
-		profileMsg = null;
-		try {
-			const data = await exportMyData();
-			const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = 'mes-donnees-collector.json';
-			a.click();
-			URL.revokeObjectURL(url);
-		} catch (e) {
-			profileMsg = e instanceof Error ? e.message : "Impossible d'exporter vos données.";
-		} finally {
-			exportBusy = false;
-		}
-	}
-
-	async function deleteAccount() {
-		if (
-			!confirm(
-				'Supprimer définitivement votre compte et toutes vos données personnelles ? Cette action est irréversible.'
-			)
-		)
-			return;
-		deleteBusy = true;
-		profileMsg = null;
-		try {
-			await deleteMyAccount();
-			auth.logout();
-			goto('/login');
-		} catch (e) {
-			profileMsg = e instanceof Error ? e.message : 'Impossible de supprimer le compte.';
-			deleteBusy = false;
-		}
-	}
-
 	const fmtDate = (iso: string) =>
 		new Date(iso).toLocaleDateString('fr-FR', {
 			day: '2-digit',
@@ -476,51 +391,6 @@
 			</div>
 		</div>
 	{/if}
-
-	<!-- Confidentialité & compte -->
-	<GPanel style="margin-bottom:14px">
-		<div class="privacy-head">
-			<Kicker>Confidentialité &amp; compte</Kicker>
-			<button class="btn-ghost-sm" onclick={toggleEditProfile}>
-				{editingProfile ? 'Annuler' : 'Modifier mon profil'}
-			</button>
-		</div>
-
-		{#if editingProfile}
-			<div class="edit-form">
-				<label class="field">
-					<span>Nom</span>
-					<input type="text" bind:value={editName} disabled={profileBusy} />
-				</label>
-				<label class="field">
-					<span>Email</span>
-					<input type="email" bind:value={editEmail} disabled={profileBusy} />
-				</label>
-				<label class="field">
-					<span>Nouveau mot de passe (facultatif)</span>
-					<input
-						type="password"
-						bind:value={editPassword}
-						placeholder="Laisser vide pour ne pas changer"
-						disabled={profileBusy}
-					/>
-				</label>
-				<button class="btn-accept" disabled={profileBusy} onclick={saveProfile}>
-					Enregistrer
-				</button>
-			</div>
-		{/if}
-
-		<div class="privacy-actions">
-			<button class="btn-ghost-sm" disabled={exportBusy} onclick={downloadMyData}>
-				Exporter mes données (JSON)
-			</button>
-			<button class="btn-reject-sm" disabled={deleteBusy} onclick={deleteAccount}>
-				Supprimer mon compte
-			</button>
-		</div>
-		{#if profileMsg}<p class="action-msg">{profileMsg}</p>{/if}
-	</GPanel>
 
 	<!-- Statistiques -->
 	<GPanel style="margin-bottom:14px">
@@ -809,55 +679,6 @@
 		color: var(--c-ink);
 		font-weight: 600;
 		margin-top: 10px;
-	}
-
-	/* Confidentialité & compte */
-	.privacy-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		flex-wrap: wrap;
-	}
-	.edit-form {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-top: 14px;
-		padding-top: 14px;
-		border-top: 1px solid var(--c-border);
-	}
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-	}
-	.field span {
-		font-family: var(--f-body);
-		font-size: 11.5px;
-		color: var(--c-text-muted);
-	}
-	.field input {
-		background: var(--c-bg);
-		border: 1px solid var(--c-border);
-		border-radius: 8px;
-		padding: 9px 12px;
-		color: var(--c-text);
-		font-family: var(--f-body);
-		font-size: 13px;
-	}
-	.field input:focus {
-		outline: none;
-		border-color: var(--c-ink);
-	}
-	.edit-form .btn-accept {
-		align-self: flex-start;
-	}
-	.privacy-actions {
-		display: flex;
-		gap: 10px;
-		margin-top: 14px;
-		flex-wrap: wrap;
 	}
 
 	/* Statistiques */
