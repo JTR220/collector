@@ -51,6 +51,14 @@ spec:
                 secretKeyRef:
                   name: collector-secrets
                   key: DB_PASSWORD
+            # partage avec auth-service : authentifie l'appel interne
+            # PATCH /internal/users/:id/anonymize (cascade RGPD, droit a
+            # l'effacement) declenche a la suppression d'un compte.
+            - name: INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-secrets
+                  key: INTERNAL_SECRET
           readinessProbe:
             httpGet:
               path: /health

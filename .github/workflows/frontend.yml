@@ -8,11 +8,13 @@ on:
     paths:
       - "apps/collector-front/**"
       - ".github/workflows/frontend.yml"
+  # Pas de filtre paths ici : ce sont les required status checks de la
+  # protection de branche main. Avec un filtre, une PR qui ne touche pas
+  # apps/collector-front/** ne declenche jamais ce workflow -> GitHub attend
+  # un rapport de statut qui n'arrive jamais ("Waiting for status to be
+  # reported" indefiniment, merge bloque).
   pull_request:
     branches: [main]
-    paths:
-      - "apps/collector-front/**"
-      - ".github/workflows/frontend.yml"
 
 permissions:
   contents: read

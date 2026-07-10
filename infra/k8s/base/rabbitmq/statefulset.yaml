@@ -48,6 +48,9 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]
+              # chown/chmod exigent ces capabilities meme en root (UID 0) :
+              # drop:[ALL] les retire sinon, d'ou "Operation not permitted".
+              add: [CHOWN, FOWNER]
           volumeMounts:
             - name: data
               mountPath: /var/lib/rabbitmq

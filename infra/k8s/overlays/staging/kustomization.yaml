@@ -27,6 +27,11 @@ configMapGenerator:
   - DB_USER=postgres
   - FRONTEND_ORIGIN=https://staging.chaker.pro:8443
   - AUTH_SERVICE_URL=http://auth-service
+  # DNS interne au cluster : cascade d'anonymisation (auth-service ->
+  # catalog-service/notification-service) a la suppression d'un compte
+  # (droit a l'effacement, art. 17 RGPD).
+  - CATALOG_SERVICE_URL=http://catalog-service
+  - NOTIFICATION_SERVICE_URL=http://notification-service
   - COOKIE_SECURE=true
   name: collector-config
 - behavior: replace
