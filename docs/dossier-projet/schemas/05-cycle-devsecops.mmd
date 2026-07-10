@@ -1,0 +1,27 @@
+flowchart TD
+    subgraph Code["1 . Code"]
+        C1[Dev local] --> C2[gitleaks: secrets scanning]
+    end
+    subgraph Build["2 . Build"]
+        B1[go vet / eslint / prettier] --> B2[go test -race, vitest]
+        B2 --> B3[SAST: gosec, Semgrep, SonarCloud]
+        B3 --> B4[SCA: govulncheck, npm audit, Dependabot]
+    end
+    subgraph Package["3 . Package"]
+        P1[hadolint] --> P2[Build image distroless nonroot]
+        P2 --> P3[Trivy scan bloquant]
+        P3 --> P4[Push GHCR sha-digest]
+        P4 --> P5[SBOM Syft + signature cosign keyless]
+    end
+    subgraph Release["4 . Release"]
+        R1[Commit digest overlay staging] --> R2[Argo CD sync auto]
+        R2 --> R3[Promotion prod: PR + sync manuel]
+    end
+    subgraph Deploy["5 . Deploy / Admission"]
+        D1[Kyverno: verifyImages, non-root, no-latest, resources - Enforce]
+    end
+    subgraph Operate["6 . Operate"]
+        O1[HTTPS cert-manager] --> O2[Prometheus /metrics]
+        O2 --> O3[Kube-prometheus-stack + Grafana]
+    end
+    Code --> Build --> Package --> Release --> Deploy --> Operate

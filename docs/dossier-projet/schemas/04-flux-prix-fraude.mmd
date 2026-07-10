@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant F as Frontend
+    participant C as catalog-service
+    participant R as RabbitMQ
+    participant P as price-tracker-service
+    participant N as notification-service
+    participant W as WebSocket
+    F->>C: PUT /article/:id
+    C->>R: publish price.updated
+    R->>P: consume price.updated
+    P->>P: persist history + detect fraud
+    P->>R: publish fraud.alert si necessaire
+    R->>N: consume price.updated / fraud.alert
+    N->>W: push notification temps reel

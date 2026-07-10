@@ -6,7 +6,6 @@ kind: Kustomization
 
 namespace: collector-staging
 
-  # Décommenter après génération du SealedSecret (voir infra/secrets/README.md) :
 resources:
 - ../../base
 - ingress.yaml

@@ -1,0 +1,15 @@
+flowchart LR
+    U[Utilisateur] --> F[collector-front]
+    F --> A[auth-service]
+    F --> C[catalog-service]
+    F --> P[price-tracker-service]
+    F --> N[notification-service]
+    C --> DB1[(PostgreSQL collector)]
+    A --> DB1
+    P --> DB2[(PostgreSQL collector_price)]
+    N --> DB3[(PostgreSQL collector_notifications)]
+    C -- price.updated / order.* --> R[(RabbitMQ)]
+    R --> P
+    R --> N
+    P -- fraud.alert --> R
+    N -- WebSocket --> F

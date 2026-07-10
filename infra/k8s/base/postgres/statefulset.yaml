@@ -19,6 +19,7 @@ spec:
       securityContext:
         # uid/gid de l'utilisateur postgres dans postgres:17-alpine
         fsGroup: 70
+        runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:

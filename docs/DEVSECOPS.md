@@ -21,10 +21,10 @@ rien ne contourne le tout, et l'observabilité qu'on le voit.
 | 9 | Registre | GHCR, tags par SHA, digest dans les manifests | `docker/metadata-action` (`sha-…`), jamais `latest` | ✅ |
 | 10 | Manifests + Kustomize | base + overlays staging/prod | [infra/k8s/](../infra/k8s/) — voir [infra/README.md](../infra/README.md) | ✅ |
 | 11 | Argo CD | App of Apps, sync auto staging / manuel prod, selfHeal+prune | [infra/argocd/](../infra/argocd/) | 🔶 cluster bootstrappé (VPS), staging en cours de convergence |
-| 12 | Secrets cluster | Sealed Secrets (kubeseal) | [infra/secrets/](../infra/secrets/) + app `sealed-secrets` | ❌ SealedSecrets pas encore générés |
+| 12 | Secrets cluster | Sealed Secrets (kubeseal) | [infra/secrets/](../infra/secrets/) + app `sealed-secrets` | ✅ générés pour staging et prod |
 | 13 | Rollout progressif | Argo Rollouts, canary 25 %/pause/100 % | [infra/k8s/addons/rollouts/](../infra/k8s/addons/rollouts/) | 🔶 optionnel, prêt à brancher |
-| 14 | Policies runtime | Kyverno : verifyImages (cosign), no-latest, non-root, resources | [infra/policies/](../infra/policies/) | ✅ en **Audit** → passer en Enforce |
-| 15 | Observabilité | kube-prometheus-stack | app `monitoring` | ✅ stack (instrumentation Go à faire) |
+| 14 | Policies runtime | Kyverno : verifyImages (cosign), no-latest, non-root, resources | [infra/policies/](../infra/policies/) | ✅ **Enforce** (basculé le 10/07/2026, à revalider sur `kubectl get policyreport -A`) |
+| 15 | Observabilité | kube-prometheus-stack + métriques applicatives | app `monitoring` + [catalog-service/metrics](../apps/backend/catalog-service/metrics/metrics.go) | ✅ stack + `catalog-service` instrumenté (autres services à faire) |
 
 ## Flux d'un push sur main
 
@@ -69,13 +69,18 @@ n'est poussé ni signé ni déployé.
    L'image est buildée avec les hosts *staging* ; une vraie prod front demande
    soit un build dédié, soit (mieux) un refactor vers `$env/dynamic/public`
    pour lire les URLs au runtime → restaure le « build once, deploy many ».
-2. **Pas de tests unitaires backend** : `go test` passe mais ne teste presque
-   rien — la barrière de qualité fonctionnelle (étape 1) est en partie creuse.
-3. **Instrumentation Prometheus des services Go** (latence, erreurs, métriques
-   métier) : pré-requis pour les ServiceMonitors et l'analyse canary
-   automatique (étape 13).
-4. **Kyverno en Audit** : passer `validationFailureAction: Enforce` une fois
-   les PolicyReports purgés (`kubectl get policyreport -A`).
+2. **Couverture de tests backend inégale** : de nombreux `*_test.go` couvrent
+   désormais controllers/middlewares/repository/PII/modération sur les 4
+   services, mais la couverture n'est pas homogène partout — à surveiller via
+   l'indicateur de couverture CI plutôt qu'à considérer comme un trou uniforme.
+3. **Instrumentation Prometheus des services Go** : `catalog-service` expose
+   `/metrics` (requêtes HTTP, articles, commandes, modération, uploads) ;
+   `auth-service`, `notification-service` et `price-tracker-service` restent
+   à instrumenter pour une observabilité homogène et pour les ServiceMonitors/
+   analyse canary (étape 13).
+4. **Kyverno passé en Enforce** (10/07/2026) : à revalider contre
+   `kubectl get policyreport -A` sur le cluster réel avant le prochain sync
+   Argo CD, pour s'assurer qu'aucun pod existant n'est bloqué à tort.
 5. **notification-service / price-tracker-service** : Dockerfiles durcis mais
    pas encore dans la CI ni les manifests (services non intégrés).
 6. **Dette eslint front** : 3 règles svelte désactivées et `no-unused-vars` en
@@ -113,9 +118,9 @@ Progression :
 - `collector-prod` reste `OutOfSync`/`Missing` : **attendu**, sync manuel volontaire (pas une erreur)
 
 Le flux complet (push → CI → digest → Argo CD sync auto) est validé de bout en
-bout sur staging. Reste à faire : SealedSecrets pour `collector-prod`,
-sauvegarde de la clé privée du controller sealed-secrets, et passage de
-Kyverno en mode Enforce.
+bout sur staging. SealedSecrets générés pour staging et prod, Kyverno passé en
+Enforce (10/07/2026). Reste à faire : sauvegarde de la clé privée du
+controller sealed-secrets hors cluster (voir `infra/secrets/README.md`).
 
 ## Actions manuelles côté GitHub (une fois)
 

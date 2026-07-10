@@ -9,7 +9,7 @@ metadata:
     policies.kyverno.io/title: Requests et limits obligatoires
     policies.kyverno.io/severity: medium
 spec:
-  validationFailureAction: Audit # → Enforce une fois validé
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: require-requests-limits
