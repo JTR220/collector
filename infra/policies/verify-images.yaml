@@ -3,9 +3,10 @@
 # repo est refusée à l'admission. "Ce qui n'est pas né dans ta CI ne tourne
 # pas" (référentiel SLSA).
 #
-# Démarrer en Audit (alertes dans les PolicyReports), passer en Enforce une
-# fois les faux positifs purgés :
-#   kubectl get policyreport -A
+# Passé en Enforce : toute image non signée est refusée à l'admission (plus
+# une simple alerte dans les PolicyReports). Si un déploiement est bloqué à
+# tort, vérifier d'abord `kubectl get policyreport -A` avant de revenir en
+# Audit.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -18,7 +19,7 @@ metadata:
       keyless par un workflow GitHub Actions du repo JTR220/collector.
       Ferme l'attaque par substitution d'image dans le registre.
 spec:
-  validationFailureAction: Audit # → Enforce une fois validé
+  validationFailureAction: Enforce
   webhookTimeoutSeconds: 30
   failurePolicy: Fail
   rules:

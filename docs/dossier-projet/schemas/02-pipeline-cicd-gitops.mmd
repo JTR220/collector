@@ -1,0 +1,8 @@
+flowchart LR
+    Dev[Commit Git] --> CI[GitHub Actions]
+    CI --> Scan[Tests + SAST + SCA + Build + Scan image]
+    Scan --> Sign[SBOM + signature cosign]
+    Sign --> StagingCommit[Commit du digest dans overlay staging]
+    StagingCommit --> Argo[Argo CD]
+    Argo --> Cluster[Cluster Kubernetes]
+    Cluster --> Prod[Promotion prod via PR puis sync manuel]
