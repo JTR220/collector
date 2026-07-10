@@ -333,6 +333,19 @@ kubectl get certificate -n <namespace>
 kubectl get sealedsecrets -n <namespace>
 ```
 
+### Montee en charge (Siege)
+
+Voir [`loadtest/README.md`](loadtest/README.md) pour le protocole complet et
+les resultats. **Etat au 10/07/2026** : `/api/health` tient 100% de
+disponibilite jusqu'a 100 utilisateurs concurrents sur staging, mais
+`/api/article` et `/api/category` renvoient **500** ("Impossible de
+recuperer les articles/categories") sur `collector-staging` actuellement —
+probablement un decalage entre le code deploye (filtre de moderation
+`pending_review`) et le schema/donnees reels de la base staging. **A
+corriger avant la soutenance** : rejouer le test complet (`urls.txt.tpl`,
+tous les endpoints) une fois le 500 resolu, pour avoir un vrai chiffre de
+montee en charge sur le catalogue metier et pas seulement sur `/health`.
+
 ---
 
 ## 9. Reponses courtes a preparer

@@ -1,6 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
+import { cart } from './cart';
 
 const AUTH_BASE_URL = env.PUBLIC_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -29,6 +30,10 @@ function createAuth() {
 		logout() {
 			localStorage.removeItem('collector_user');
 			set({ user: null });
+			// Le panier est un etat par utilisateur : sans ce clear, il survit a
+			// la deconnexion et le prochain compte connecte sur ce navigateur
+			// heriterait des articles du precedent.
+			cart.clear();
 			// Efface le cookie de session cote serveur. Best-effort (fire-and-
 			// forget) : meme si l'appel echoue, l'etat local est deja nettoye.
 			if (browser) {

@@ -69,3 +69,100 @@ Résultat à coller dans le support de soutenance et/ou dans
 Si vous préférez JMeter (GUI ou `jmeter -n -t plan.jmx`), les mêmes endpoints
 listés dans [`urls.txt.tpl`](urls.txt.tpl) (une fois `__BASE__` substitué)
 suffisent à construire un plan de test HTTP Request équivalent.
+
+## Résultats — 10/07/2026 (INTERIM, `/health` seul)
+
+⚠️ **Bug bloquant découvert en lançant le run complet** :
+`GET /api/article` et `GET /api/category` renvoient **500**
+(`{"error":"Impossible de recuperer les articles"}` /
+`{"error":"Impossible de recuperer les categories"}`) sur
+`collector-staging`, alors que `GET /api/health` répond `200`. Suspect :
+décalage entre le code déployé (filtre de modération `pending_review` sur
+`GetAllArticles`/`GetAllCategories`, voir
+[articleController.go](../../../apps/backend/catalog-service/controllers/articleController.go))
+et le schéma/les données réelles de la base staging — la table `articles`
+n'a peut-être pas la colonne `status` attendue, ou Argo CD n'a pas encore
+synchronisé la dernière image. Pas d'accès `kubectl`/SSH direct au cluster
+depuis ce poste pour confirmer la cause exacte.
+
+**En attendant la correction**, un run progressif a été fait sur
+`GET /api/health` seul (conteneur Debian jetable + siege, cf. section
+outil ci-dessus), résultats bruts dans `results-interim/health-only-runs.log` :
+
+| Concurrence | Disponibilité | Temps de réponse moyen | Transactions/s |
+|---|---|---|---|
+| 25  | 100.00% | 0.10 s | 109.18 |
+| 50  | 100.00% | 0.60–0.75 s (reproductible sur 2 runs) | 6.6–7.3 (chute anormale, cause non identifiée) |
+| 100 | 100.00% | 0.21 s | 111.48 |
+
+Le creux au palier 50 est reproductible (2 runs cohérents) mais sa cause
+n'est pas expliquée — pas de dégradation serveur visible (dispo 100%, pas
+de timeout), donc probablement un artefact client (Docker/Siege) plutôt
+qu'un vrai comportement de `collector-staging`. À ré-investiguer si le
+temps le permet.
+
+**À faire avant la soutenance** : corriger le 500 sur `/article`/`/category`,
+puis relancer `./run-siege.sh https://staging.chaker.pro:8443/api 25 1M`
+(et paliers 50/100) pour obtenir un vrai résultat de montée en charge sur
+le catalogue métier — c'est ce résultat-là, pas celui sur `/health` seul,
+qui doit être présenté à l'oral.
+
+## Démo live : voir les pods se dupliquer (HPA)
+
+Avant le 10/07/2026, **aucun HorizontalPodAutoscaler n'existait** dans le
+repo — tous les services étaient figés à `replicas: 1` en dur, donc rien ne
+se serait dupliqué pendant une démo, même sous forte charge. Ajouté depuis :
+`infra/k8s/base/{auth-service,notification-service,price-tracker-service,
+collector-front}/hpa.yaml` (CPU, 50% d'utilisation moyenne, 1→4 replicas).
+`catalog-service` reste hors HPA : son volume `catalog-uploads` est
+`ReadWriteOnce`, donc figé à `replicas: 1` (voir `pvc.yaml`).
+
+**Prod n'est pas concernée** (`collector-prod` reste `OutOfSync`/`Missing`,
+jamais synchronisé — voir `docs/DEVSECOPS.md`) : impossible de lui envoyer
+plus de charge, il n'y a rien qui tourne dessus. La démo live ne peut se
+faire que sur **staging**.
+
+Piège GitOps évité : `collector-staging` a `selfHeal: true` (Argo CD), qui
+aurait ramené le nombre de pods à 1 à chaque resync et annulé le scaling en
+plein test — `infra/argocd/apps/collector-staging.yaml` ignore désormais
+`spec/replicas` pour ces 4 Deployments (`ignoreDifferences`).
+
+### Prérequis à vérifier sur le cluster (pas testé depuis ce poste, pas d'accès kubectl/SSH)
+
+```bash
+kubectl top nodes                       # doit répondre : confirme que metrics-server tourne
+                                         # (k3s l'active par défaut, mais à revérifier)
+kubectl get hpa -n collector-staging    # les 4 HPA doivent apparaître avec une valeur TARGETS
+```
+
+Si `kubectl top` échoue ou si `TARGETS` reste `<unknown>` : metrics-server
+n'est pas up, l'HPA ne peut pas scaler (pas d'erreur bloquante côté Argo CD,
+juste aucune décision de scaling prise).
+
+### Déroulé pour la soutenance
+
+Deux terminaux côte à côte pendant le run Siege :
+
+```bash
+# Terminal 1 : regarder les pods apparaître
+kubectl get pods -n collector-staging -l app=auth-service -w
+
+# Terminal 2 : regarder la métrique CPU qui déclenche le scale-up
+kubectl get hpa -n collector-staging -w
+```
+
+Puis lancer une charge plus soutenue que les runs de smoke-test ci-dessus
+(l'HPA a une fenêtre de stabilisation ~15-60s avant de réagir, donc un run
+de 30s ne laisse pas le temps de voir grand-chose) :
+
+```bash
+./run-siege.sh https://staging.chaker.pro:8443/auth 100 3M
+```
+
+`/auth` cible directement `auth-service` (health check inclus) — un run de
+3 minutes à 100 utilisateurs concurrents doit laisser le temps à l'HPA de
+détecter le dépassement de 50% CPU (seuil bas : 25m sur une requête de
+50m) et de scaler avant la fin du run.
+
+**Non testé en conditions réelles** (pas d'accès cluster depuis ce poste) :
+à valider une fois avant la soutenance, pas le jour J.
