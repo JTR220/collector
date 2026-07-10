@@ -15,6 +15,15 @@
 		type OrderStatus
 	} from '$lib/api/market';
 	import { fetchMyArticles, deleteArticle, type ArticleAPI } from '$lib/api/catalog';
+	import {
+		fetchReceivedOffers,
+		fetchSentOffers,
+		acceptOffer,
+		rejectOffer,
+		payOffer,
+		OFFER_STATUS_LABELS,
+		type Offer
+	} from '$lib/api/offers';
 	import { eur } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GAvatar from '$lib/components/galerie/GAvatar.svelte';
@@ -28,6 +37,11 @@
 	let sales = $state<Order[]>([]);
 	let salesBusyId = $state<number | null>(null);
 	let salesMsg = $state<string | null>(null);
+	let receivedOffers = $state<Offer[]>([]);
+	let sentOffers = $state<Offer[]>([]);
+	let offersBusyId = $state<number | null>(null);
+	let offersMsg = $state<string | null>(null);
+	let confirmOffer = $state<Offer | null>(null);
 	let myArticles = $state<ArticleAPI[]>([]);
 	let articleBusyId = $state<number | null>(null);
 	let articlesMsg = $state<string | null>(null);
@@ -83,16 +97,20 @@
 		}
 		// Wishlist et commandes viennent du catalog-service : une panne de ce
 		// service ne doit PAS deconnecter — on charge ce qui repond.
-		const [w, o, s, a] = await Promise.allSettled([
+		const [w, o, s, a, ro, so] = await Promise.allSettled([
 			fetchMyWishlist(),
 			fetchMyOrders(),
 			fetchMySales(),
-			fetchMyArticles()
+			fetchMyArticles(),
+			fetchReceivedOffers(),
+			fetchSentOffers()
 		]);
 		if (w.status === 'fulfilled') wishlist = w.value;
 		if (o.status === 'fulfilled') orders = o.value;
 		if (s.status === 'fulfilled') sales = s.value;
 		if (a.status === 'fulfilled') myArticles = a.value;
+		if (ro.status === 'fulfilled') receivedOffers = ro.value;
+		if (so.status === 'fulfilled') sentOffers = so.value;
 		loading = false;
 	});
 
@@ -151,6 +169,61 @@
 			salesMsg = e instanceof Error ? e.message : 'Erreur lors du traitement de la commande.';
 		} finally {
 			salesBusyId = null;
+		}
+	}
+
+	function openAcceptConfirm(offer: Offer) {
+		offersMsg = null;
+		confirmOffer = offer;
+	}
+
+	function closeAcceptConfirm() {
+		confirmOffer = null;
+	}
+
+	async function confirmAcceptOffer() {
+		if (!confirmOffer) return;
+		const offer = confirmOffer;
+		offersBusyId = offer.ID;
+		offersMsg = null;
+		try {
+			await acceptOffer(offer.ID);
+			receivedOffers = receivedOffers.filter((o) => o.ID !== offer.ID);
+			offersMsg = 'Offre acceptée — l’acheteur peut désormais payer au prix négocié.';
+		} catch (e) {
+			offersMsg = e instanceof Error ? e.message : "Impossible d'accepter l'offre.";
+		} finally {
+			offersBusyId = null;
+			confirmOffer = null;
+		}
+	}
+
+	async function declineOffer(offer: Offer) {
+		offersBusyId = offer.ID;
+		offersMsg = null;
+		try {
+			await rejectOffer(offer.ID);
+			receivedOffers = receivedOffers.filter((o) => o.ID !== offer.ID);
+			offersMsg = 'Offre refusée.';
+		} catch (e) {
+			offersMsg = e instanceof Error ? e.message : "Impossible de refuser l'offre.";
+		} finally {
+			offersBusyId = null;
+		}
+	}
+
+	async function payAcceptedOffer(offer: Offer) {
+		offersBusyId = offer.ID;
+		offersMsg = null;
+		try {
+			const { order } = await payOffer(offer.ID);
+			sentOffers = sentOffers.map((o) => (o.ID === offer.ID ? { ...o, status: 'purchased' } : o));
+			orders = [order, ...orders];
+			offersMsg = 'Paiement effectué — retrouvez la commande dans « Mes achats ».';
+		} catch (e) {
+			offersMsg = e instanceof Error ? e.message : 'Impossible de payer cette offre.';
+		} finally {
+			offersBusyId = null;
 		}
 	}
 
@@ -248,6 +321,77 @@
 		</GPanel>
 	{/if}
 
+	{#if receivedOffers.length > 0}
+		<GPanel style="margin-bottom:14px">
+			<Kicker>Offres reçues · {receivedOffers.length}</Kicker>
+			<div class="item-list">
+				{#each receivedOffers as o (o.ID)}
+					<div class="sale-row">
+						<a class="item-name" href={`/lot/${o.articleId}`}
+							>{o.article?.name ?? `Lot #${o.articleId}`}</a
+						>
+						{#if o.article}
+							<span class="offer-vs-price">{eur(o.article.prix)}</span>
+						{/if}
+						<span class="item-price">{eur(o.price)}</span>
+						<div class="sale-actions">
+							<button
+								class="btn-accept"
+								disabled={offersBusyId === o.ID}
+								onclick={() => openAcceptConfirm(o)}>Accepter</button
+							>
+							<button
+								class="btn-reject"
+								disabled={offersBusyId === o.ID}
+								onclick={() => declineOffer(o)}>Refuser</button
+							>
+						</div>
+					</div>
+					{#if o.message}<p class="offer-message">« {o.message} »</p>{/if}
+				{/each}
+			</div>
+			{#if offersMsg}
+				<p class="action-msg">{offersMsg}</p>
+			{/if}
+		</GPanel>
+	{/if}
+
+	{#if confirmOffer}
+		<div
+			class="modal-overlay"
+			role="button"
+			tabindex="0"
+			onclick={closeAcceptConfirm}
+			onkeydown={(e) => e.key === 'Escape' && closeAcceptConfirm()}
+		>
+			<div
+				class="modal-box"
+				role="dialog"
+				aria-modal="true"
+				tabindex="-1"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<h3 class="modal-title">Accepter cette offre ?</h3>
+				<p class="modal-text">
+					Accepter l'offre à <strong>{eur(confirmOffer.price)}</strong> pour «
+					{confirmOffer.article?.name ?? `Lot #${confirmOffer.articleId}`} »
+					{#if confirmOffer.article}
+						(au lieu de {eur(confirmOffer.article.prix)})
+					{/if}
+					? L'acheteur pourra payer à ce prix réduit.
+				</p>
+				<div class="modal-actions">
+					<button class="btn-ghost-sm" onclick={closeAcceptConfirm}>Annuler</button>
+					<button
+						class="btn-accept"
+						disabled={offersBusyId === confirmOffer.ID}
+						onclick={confirmAcceptOffer}>Confirmer l'acceptation</button
+					>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Statistiques -->
 	<GPanel style="margin-bottom:14px">
 		<Kicker>Statistiques</Kicker>
@@ -335,6 +479,34 @@
 			{#if reviewMsg}<p class="action-msg">{reviewMsg}</p>{/if}
 		</GPanel>
 	</div>
+
+	{#if sentOffers.length > 0}
+		<GPanel style="margin-top:14px">
+			<Kicker>Mes offres envoyées · {sentOffers.length}</Kicker>
+			<div class="item-list">
+				{#each sentOffers as o (o.ID)}
+					<div class="item-row">
+						<span class="item-date">{fmtDate(o.CreatedAt)}</span>
+						<a class="item-name" href={`/lot/${o.articleId}`}
+							>{o.article?.name ?? `Lot #${o.articleId}`}</a
+						>
+						<GChip>{OFFER_STATUS_LABELS[o.status] ?? o.status}</GChip>
+						<span class="item-price">{eur(o.price)}</span>
+						{#if o.status === 'accepted'}
+							<button
+								class="btn-accept"
+								disabled={offersBusyId === o.ID}
+								onclick={() => payAcceptedOffer(o)}>Payer {eur(o.price)}</button
+							>
+						{/if}
+					</div>
+				{:else}
+					<p class="item-empty">Aucune offre envoyée pour l'instant.</p>
+				{/each}
+			</div>
+			{#if offersMsg}<p class="action-msg">{offersMsg}</p>{/if}
+		</GPanel>
+	{/if}
 
 	<!-- Mes annonces -->
 	<GPanel style="margin-top:14px">
@@ -618,6 +790,63 @@
 	}
 	.star-btn.star-on {
 		color: var(--c-accent);
+	}
+
+	/* Offres */
+	.offer-vs-price {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-text-muted);
+		text-decoration: line-through;
+		flex-shrink: 0;
+	}
+	.offer-message {
+		font-family: var(--f-body);
+		font-size: 12px;
+		font-style: italic;
+		color: var(--c-text-muted);
+		margin: -4px 0 8px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid var(--c-border);
+	}
+
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(43, 38, 32, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 20000;
+		padding: 20px;
+	}
+	.modal-box {
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: 14px;
+		max-width: 420px;
+		width: 100%;
+		padding: 24px;
+		box-shadow: 0 20px 48px -12px rgba(43, 38, 32, 0.35);
+	}
+	.modal-title {
+		font-family: var(--f-serif);
+		font-size: 19px;
+		font-weight: 600;
+		color: var(--c-text);
+		margin: 0 0 12px;
+	}
+	.modal-text {
+		font-family: var(--f-body);
+		font-size: 13.5px;
+		line-height: 1.6;
+		color: var(--c-text-tertiary);
+		margin: 0 0 20px;
+	}
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
 	}
 	.review-form textarea {
 		resize: vertical;

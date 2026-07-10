@@ -166,12 +166,34 @@ type publishedOrderDecision struct {
 	accepted                           bool
 }
 
+type publishedOfferCreated struct {
+	offerID, itemID, buyerID, sellerID uint
+	itemName                           string
+	price, listPrice                   float64
+}
+
+type publishedOfferDecision struct {
+	offerID, itemID, buyerID, sellerID uint
+	itemName                           string
+	price                              float64
+	accepted                           bool
+}
+
+type publishedOfferPurchased struct {
+	offerID, orderID, itemID, buyerID, sellerID uint
+	itemName                                    string
+	price                                       float64
+}
+
 // fakePublisher implemente events.Publisher et se contente d'enregistrer les
 // appels, pour verifier depuis un test HTTP qu'un event a (ou n'a pas) ete
 // publie, sans dependre d'un broker RabbitMQ.
 type fakePublisher struct {
-	orderCreated []publishedOrderCreated
-	orderDecided []publishedOrderDecision
+	orderCreated   []publishedOrderCreated
+	orderDecided   []publishedOrderDecision
+	offerCreated   []publishedOfferCreated
+	offerDecided   []publishedOfferDecision
+	offerPurchased []publishedOfferPurchased
 }
 
 func (f *fakePublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {}
@@ -182,6 +204,18 @@ func (f *fakePublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID u
 
 func (f *fakePublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
 	f.orderDecided = append(f.orderDecided, publishedOrderDecision{orderID, itemID, buyerID, sellerID, itemName, price, accepted})
+}
+
+func (f *fakePublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+	f.offerCreated = append(f.offerCreated, publishedOfferCreated{offerID, itemID, buyerID, sellerID, itemName, price, listPrice})
+}
+
+func (f *fakePublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	f.offerDecided = append(f.offerDecided, publishedOfferDecision{offerID, itemID, buyerID, sellerID, itemName, price, accepted})
+}
+
+func (f *fakePublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	f.offerPurchased = append(f.offerPurchased, publishedOfferPurchased{offerID, orderID, itemID, buyerID, sellerID, itemName, price})
 }
 
 func (f *fakePublisher) Close() {}

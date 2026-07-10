@@ -17,6 +17,9 @@ const (
 	routingKeyPrice        = "price.updated"
 	routingKeyOrderCreated = "order.created"
 	routingKeyOrderDecided = "order.decided"
+	routingKeyOfferCreated = "offer.created"
+	routingKeyOfferDecided = "offer.decided"
+	routingKeyOfferBought  = "offer.purchased"
 )
 
 // Publisher publie les evenements metier du catalogue.
@@ -24,6 +27,9 @@ type Publisher interface {
 	PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64)
 	PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64)
 	PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool)
+	PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64)
+	PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool)
+	PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64)
 	Close()
 }
 
@@ -41,6 +47,15 @@ func (NoopPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint
 	// no-op : RABBITMQ_URL absent, aucune publication attendue.
 }
 func (NoopPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
+func (NoopPublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
+func (NoopPublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
+func (NoopPublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
 	// no-op : RABBITMQ_URL absent, aucune publication attendue.
 }
 func (NoopPublisher) Close() {
@@ -218,6 +233,55 @@ func (p *AMQPPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID 
 		DecidedAt: time.Now().UTC(),
 	}
 	p.publishJSON(routingKeyOrderDecided, event, fmt.Sprintf("order.decided:%d:%v", orderID, accepted))
+}
+
+// PublishOfferCreated publie offer.created quand un acheteur propose un prix
+// negocie : le vendeur doit accepter ou refuser (notification-service s'en
+// charge, avec notification + email au vendeur).
+func (p *AMQPPublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+	event := OfferCreatedEvent{
+		OfferID:   ToEventUUID(offerID),
+		ItemID:    ToEventUUID(itemID),
+		ItemName:  itemName,
+		BuyerID:   ToEventUUID(buyerID),
+		SellerID:  ToEventUUID(sellerID),
+		Price:     price,
+		ListPrice: listPrice,
+		CreatedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOfferCreated, event, fmt.Sprintf("offer.created:%d", offerID))
+}
+
+// PublishOfferDecision publie offer.decided quand le vendeur accepte ou
+// refuse une offre : l'acheteur est notifie du resultat.
+func (p *AMQPPublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	event := OfferDecisionEvent{
+		OfferID:   ToEventUUID(offerID),
+		ItemID:    ToEventUUID(itemID),
+		ItemName:  itemName,
+		BuyerID:   ToEventUUID(buyerID),
+		SellerID:  ToEventUUID(sellerID),
+		Price:     price,
+		Accepted:  accepted,
+		DecidedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOfferDecided, event, fmt.Sprintf("offer.decided:%d:%v", offerID, accepted))
+}
+
+// PublishOfferPurchased publie offer.purchased quand l'acheteur a paye une
+// offre acceptee : le vendeur est informe que la vente est finalisee.
+func (p *AMQPPublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	event := OfferPurchasedEvent{
+		OfferID:     ToEventUUID(offerID),
+		OrderID:     ToEventUUID(orderID),
+		ItemID:      ToEventUUID(itemID),
+		ItemName:    itemName,
+		BuyerID:     ToEventUUID(buyerID),
+		SellerID:    ToEventUUID(sellerID),
+		Price:       price,
+		PurchasedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOfferBought, event, fmt.Sprintf("offer.purchased:%d", offerID))
 }
 
 // publishJSON serialise et publie un evenement sur l'exchange collector.events.

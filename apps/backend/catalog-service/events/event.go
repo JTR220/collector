@@ -45,3 +45,41 @@ type OrderDecisionEvent struct {
 	Accepted  bool      `json:"accepted"`
 	DecidedAt time.Time `json:"decided_at"`
 }
+
+// OfferCreatedEvent est publie quand un acheteur propose un prix negocie sur
+// une annonce : le vendeur doit accepter ou refuser cette offre.
+type OfferCreatedEvent struct {
+	OfferID   string    `json:"offer_id"`
+	ItemID    string    `json:"item_id"`
+	ItemName  string    `json:"item_name"`
+	BuyerID   string    `json:"buyer_id"`
+	SellerID  string    `json:"seller_id"`
+	Price     float64   `json:"price"`
+	ListPrice float64   `json:"list_price"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// OfferDecisionEvent est publie quand le vendeur accepte ou refuse une offre.
+type OfferDecisionEvent struct {
+	OfferID   string    `json:"offer_id"`
+	ItemID    string    `json:"item_id"`
+	ItemName  string    `json:"item_name"`
+	BuyerID   string    `json:"buyer_id"`
+	SellerID  string    `json:"seller_id"`
+	Price     float64   `json:"price"`
+	Accepted  bool      `json:"accepted"`
+	DecidedAt time.Time `json:"decided_at"`
+}
+
+// OfferPurchasedEvent est publie quand l'acheteur a paye une offre acceptee :
+// la vente est finalisee au prix negocie.
+type OfferPurchasedEvent struct {
+	OfferID     string    `json:"offer_id"`
+	OrderID     string    `json:"order_id"`
+	ItemID      string    `json:"item_id"`
+	ItemName    string    `json:"item_name"`
+	BuyerID     string    `json:"buyer_id"`
+	SellerID    string    `json:"seller_id"`
+	Price       float64   `json:"price"`
+	PurchasedAt time.Time `json:"purchased_at"`
+}

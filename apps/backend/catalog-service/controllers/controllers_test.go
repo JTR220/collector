@@ -33,6 +33,12 @@ func (m *mockPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID u
 }
 func (m *mockPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
 }
+func (m *mockPublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+}
+func (m *mockPublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+}
+func (m *mockPublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+}
 func (m *mockPublisher) Close() {}
 
 func setupCatalogDB(t *testing.T) {
