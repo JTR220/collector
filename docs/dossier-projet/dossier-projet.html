@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dossier Projet - collector.shop</title>
+  <style>
+    :root {
+      --bg: #f5f1e8;
+      --paper: #fffdf8;
+      --ink: #1e1f1c;
+      --muted: #5b5d56;
+      --line: #d7d0c2;
+      --accent: #8d4f2a;
+      --accent-soft: #efe1d3;
+      --strong: #203a2e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top right, #f2dfc6 0, transparent 28%),
+        linear-gradient(180deg, #f8f4ec 0%, var(--bg) 100%);
+      color: var(--ink);
+      font: 15px/1.55 Georgia, "Times New Roman", serif;
+    }
+    .page {
+      width: min(1080px, calc(100vw - 48px));
+      margin: 24px auto 48px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.08);
+      padding: 42px 48px 56px;
+    }
+    h1, h2, h3 {
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0.02em;
+      margin: 0 0 12px;
+    }
+    h1 {
+      font-size: 34px;
+      line-height: 1.1;
+    }
+    h2 {
+      margin-top: 30px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 22px;
+    }
+    h3 {
+      margin-top: 20px;
+      font-size: 17px;
+      color: var(--strong);
+    }
+    p, li { color: var(--ink); }
+    .lead {
+      color: var(--muted);
+      font-size: 17px;
+      max-width: 72ch;
+    }
+    .meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 18px 0 8px;
+    }
+    .pill {
+      border: 1px solid var(--line);
+      background: var(--accent-soft);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font: 600 12px/1.2 "Segoe UI", Arial, sans-serif;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      background: #fffaf2;
+      padding: 16px;
+      border-radius: 12px;
+    }
+    .card h3 { margin-top: 0; }
+    .diagram {
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      background: #fbf7ef;
+      padding: 16px;
+      border-radius: 12px;
+      font: 13px/1.45 Consolas, "Courier New", monospace;
+      overflow-x: auto;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .table th, .table td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .table th {
+      background: #f3eadc;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    code {
+      background: #f3eadc;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+    }
+    ul { padding-left: 20px; }
+    .footer {
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+    }
+    @media (max-width: 820px) {
+      .page {
+        width: calc(100vw - 20px);
+        padding: 24px 20px 32px;
+      }
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 28px; }
+    }
+    @page {
+      size: A4;
+      margin: 14mm;
+    }
+    @media print {
+      body { background: #fff; }
+      .page {
+        width: auto;
+        margin: 0;
+        box-shadow: none;
+        border: 0;
+        padding: 0;
+      }
+      h2, h3, .card, .diagram, table {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>Dossier Projet - collector.shop</h1>
+    <p class="lead">
+      Documentation de reference du monorepo : finalite produit, architecture microservices,
+      flux evenementiels, execution locale, infrastructure GitOps et chaine DevSecOps.
+    </p>
+
+    <div class="meta">
+      <span class="pill">Monorepo</span>
+      <span class="pill">SvelteKit</span>
+      <span class="pill">Go Microservices</span>
+      <span class="pill">RabbitMQ</span>
+      <span class="pill">Kubernetes GitOps</span>
+    </div>
+
+    <h2>1. Resume executif</h2>
+    <p>
+      <code>collector.shop</code> est une plateforme orientee collection qui reunit catalogue,
+      marketplace, gamification, historique de prix, detection de fraude, notifications temps reel
+      et messagerie utilisateur. Le projet repose sur un frontend SvelteKit et quatre services Go
+      specialises par domaine.
+    </p>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Composants metier</h3>
+        <ul>
+          <li>auth-service : identite et JWT</li>
+          <li>catalog-service : articles, ventes, wishlist, avis, moderation</li>
+          <li>price-tracker-service : historique et anti-fraude</li>
+          <li>notification-service : notifications, WebSocket, messages</li>
+          <li>collector-front : experience web unifiee</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h3>Capacites techniques</h3>
+        <ul>
+          <li>communication REST + WebSocket</li>
+          <li>evenements RabbitMQ pour le decouplage</li>
+          <li>Docker Compose en local</li>
+          <li>Kubernetes + Argo CD pour la cible</li>
+          <li>pipelines CI avec scans de securite, SBOM et signatures</li>
+        </ul>
+      </section>
+    </div>
+
+    <h2>2. Structure du depot</h2>
+    <div class="diagram">collector/
+|-- apps/
+|   |-- backend/
+|   |   |-- auth-service/
+|   |   |-- catalog-service/
+|   |   |-- price-tracker-service/
+|   |   `-- notification-service/
+|   |-- collector-front/
+|   |-- monitoring/
+|   |-- postgres-init/
+|   `-- docker-compose.yml
+|-- docs/
+|-- infra/
+|   |-- argocd/
+|   |-- k8s/
+|   |-- policies/
+|   `-- secrets/
+`-- .github/workflows/</div>
+
+    <h2>3. Vue d'architecture</h2>
+    <div class="diagram">Utilisateur
+    |
+    v
+collector-front
+    |---- REST ----> auth-service --------> PostgreSQL collector
+    |---- REST ----> catalog-service -----> PostgreSQL collector
+    |---- REST ----> price-tracker-service -> PostgreSQL collector_price
+    |---- REST ----> notification-service -> PostgreSQL collector_notifications
+    `---- WS ------> notification-service
+
+catalog-service ---- publish price.updated / order.* ----> RabbitMQ
+RabbitMQ ----------> price-tracker-service
+RabbitMQ ----------> notification-service
+price-tracker-service ---- publish fraud.alert ---------> RabbitMQ</div>
+
+    <h2>4. Composants</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Composant</th>
+          <th>Role</th>
+          <th>Ports / Interfaces</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>collector-front</td>
+          <td>UI, parcours utilisateur, dashboard, notifications, messages</td>
+          <td>5173, REST, WebSocket</td>
+        </tr>
+        <tr>
+          <td>auth-service</td>
+          <td>Comptes, login, JWT, endpoints admin de moderation utilisateurs</td>
+          <td>8080, <code>/login</code>, <code>/me</code>, <code>/admin/users</code></td>
+        </tr>
+        <tr>
+          <td>catalog-service</td>
+          <td>Catalogue, ventes, commandes, categories, reviews, wishlist</td>
+          <td>8081, <code>/article</code>, <code>/order</code>, <code>/admin/stats</code></td>
+        </tr>
+        <tr>
+          <td>price-tracker-service</td>
+          <td>Historique de prix, alertes fraude, resolution d'alertes</td>
+          <td>8082, <code>/api/v1/items/:id/price-history</code>, <code>/api/v1/alerts</code></td>
+        </tr>
+        <tr>
+          <td>notification-service</td>
+          <td>Notifications persistees, WebSocket, messagerie</td>
+          <td>8083, <code>/ws</code>, <code>/api/v1/notifications</code>, <code>/api/v1/messages</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. Flux cles</h2>
+    <h3>Connexion</h3>
+    <div class="diagram">Utilisateur -> Frontend -> POST /login -> auth-service
+auth-service -> JWT -> Frontend
+Frontend -> GET /me -> auth-service
+auth-service -> profil utilisateur -> Frontend</div>
+
+    <h3>Mise a jour de prix et anti-fraude</h3>
+    <div class="diagram">Frontend -> PUT /article/:id -> catalog-service
+catalog-service -> publish price.updated -> RabbitMQ
+RabbitMQ -> price-tracker-service
+price-tracker-service -> persist history -> PostgreSQL collector_price
+price-tracker-service -> detecte spike / flood / dumping
+price-tracker-service -> publish fraud.alert -> RabbitMQ
+RabbitMQ -> notification-service
+notification-service -> persist notification -> PostgreSQL collector_notifications
+notification-service -> push WebSocket -> navigateur</div>
+
+    <h3>Achat et notification</h3>
+    <div class="diagram">Acheteur -> Frontend -> POST /article/:id/buy -> catalog-service
+catalog-service -> cree la commande
+catalog-service -> publish order.created -> RabbitMQ
+RabbitMQ -> notification-service
+notification-service -> notification vendeur + event temps reel</div>
+
+    <h2>6. Donnees et conventions</h2>
+    <div class="grid">
+      <section class="card">
+        <h3>Bases</h3>
+        <ul>
+          <li><code>collector</code> : auth et catalogue</li>
+          <li><code>collector_price</code> : historique et alertes</li>
+          <li><code>collector_notifications</code> : notifications et messages</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h3>Convention d'identifiants</h3>
+        <p>
+          Le catalogue utilise des <code>uint</code> internes, convertis en UUID deterministes pour les
+          services consommateurs et le frontend price tracking / notifications.
+        </p>
+      </section>
+    </div>
+
+    <h2>7. Execution locale</h2>
+    <p>
+      Le fichier <code>apps/docker-compose.yml</code> lance PostgreSQL, RabbitMQ, Mailhog, les quatre
+      services backend, le frontend, Prometheus et Grafana.
+    </p>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Port</th>
+          <th>Usage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>collector-front</td><td>5173</td><td>frontend</td></tr>
+        <tr><td>auth-service</td><td>8080</td><td>authentification</td></tr>
+        <tr><td>catalog-service</td><td>8081</td><td>catalogue et ventes</td></tr>
+        <tr><td>price-tracker</td><td>8082</td><td>historique / fraude</td></tr>
+        <tr><td>notification-service</td><td>8083</td><td>notifications / messages</td></tr>
+        <tr><td>RabbitMQ UI</td><td>15672</td><td>broker et inspection</td></tr>
+        <tr><td>Mailhog</td><td>8025</td><td>emails de test</td></tr>
+        <tr><td>Prometheus</td><td>9090</td><td>metriques</td></tr>
+        <tr><td>Grafana</td><td>3000</td><td>dashboards</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. GitOps et DevSecOps</h2>
+    <div class="diagram">Commit Git
+  -> GitHub Actions
+  -> lint / tests / SAST / SCA / build image / Trivy
+  -> SBOM + signature cosign
+  -> commit du digest dans overlay staging
+  -> Argo CD synchronise le cluster
+  -> promotion prod par Pull Request puis sync manuel</div>
+
+    <p>
+      Le projet integre deja des controles importants : <code>gosec</code>, <code>govulncheck</code>,
+      <code>Semgrep</code>, <code>Trivy</code>, <code>gitleaks</code>, <code>SBOM</code>,
+      <code>cosign</code> et des politiques Kubernetes via <code>Kyverno</code>.
+    </p>
+
+    <h2>9. Forces et limites</h2>
+    <div class="grid">
+      <section class="card">
+        <h3>Forces</h3>
+        <ul>
+          <li>bonne separation des domaines</li>
+          <li>flux event-driven coherents</li>
+          <li>observabilite et supervision presentes</li>
+          <li>chaine CI/CD defendable</li>
+          <li>cible GitOps industrialisable</li>
+        </ul>
+      </section>
+      <section class="card">
+        <h3>Limites</h3>
+        <ul>
+          <li>couverture de tests encore extensible</li>
+          <li>contrats JSON a homogeniser</li>
+          <li>gestion des roles encore simple</li>
+          <li>documentation d'API formelle encore a completer</li>
+          <li>certaines parties restent de niveau POC avance</li>
+        </ul>
+      </section>
+    </div>
+
+    <h2>10. Conclusion</h2>
+    <p>
+      <code>collector.shop</code> constitue un projet complet pour demonstrer une architecture moderne :
+      separation frontend / services, integration asynchrone, stockage segmente, deploiement GitOps
+      et controles DevSecOps integrés.
+    </p>
+
+    <p class="footer">
+      Version HTML prevue pour export PDF via navigateur. Source detaillee associee :
+      <code>docs/dossier-projet/README.md</code>.
+    </p>
+  </main>
+</body>
+</html>

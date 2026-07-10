@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Synthese Architecture - collector.shop</title>
+  <style>
+    :root {
+      --bg: #fbf8f3;
+      --ink: #1f1e1a;
+      --muted: #5b594f;
+      --line: #d8cfbe;
+      --accent: #38506a;
+      --soft: #eef3f7;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 "Segoe UI", Arial, sans-serif;
+    }
+    main {
+      max-width: 980px;
+      margin: 24px auto;
+      background: white;
+      border: 1px solid var(--line);
+      padding: 36px 40px 44px;
+    }
+    h1, h2, h3 { margin: 0 0 10px; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 20px; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 16px; }
+    .lead { color: var(--muted); max-width: 75ch; }
+    .schema {
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 10px;
+      padding: 16px;
+      font: 13px/1.45 Consolas, "Courier New", monospace;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: #fcfcfb;
+    }
+    ul { margin: 8px 0 0; padding-left: 18px; }
+    code { background: #eef3f7; padding: 2px 5px; border-radius: 4px; }
+    @media (max-width: 800px) {
+      main { margin: 10px; padding: 20px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+    @page {
+      size: A4;
+      margin: 14mm;
+    }
+    @media print {
+      body { background: white; }
+      main { margin: 0; border: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Synthese Architecture - collector.shop</h1>
+    <p class="lead">
+      Fiche courte destinee a la soutenance, a la revue technique ou a une lecture rapide du systeme.
+    </p>
+
+    <h2>Vue d'ensemble</h2>
+    <div class="schema">Utilisateur
+    |
+    v
+collector-front
+    |----> auth-service ------------> PostgreSQL collector
+    |----> catalog-service ---------> PostgreSQL collector
+    |----> price-tracker-service ---> PostgreSQL collector_price
+    |----> notification-service ---> PostgreSQL collector_notifications
+    `----> WebSocket notification-service
+
+catalog-service -- price.updated / order.* --> RabbitMQ
+RabbitMQ -------> price-tracker-service
+RabbitMQ -------> notification-service
+price-tracker-service -- fraud.alert --> RabbitMQ</div>
+
+    <h2>Domaines</h2>
+    <div class="grid">
+      <section class="box">
+        <h3>Frontend</h3>
+        <ul>
+          <li>SvelteKit + TypeScript</li>
+          <li>catalogue, dashboard, admin, vente, messages</li>
+          <li>consomme REST et WebSocket</li>
+        </ul>
+      </section>
+      <section class="box">
+        <h3>Auth</h3>
+        <ul>
+          <li>creation de compte et login</li>
+          <li>JWT partage avec les autres services</li>
+          <li>routes admin pour la moderation utilisateurs</li>
+        </ul>
+      </section>
+      <section class="box">
+        <h3>Catalogue</h3>
+        <ul>
+          <li>articles, images, categories</li>
+          <li>achat, commandes, wishlist, reviews</li>
+          <li>publication des evenements metier</li>
+        </ul>
+      </section>
+      <section class="box">
+        <h3>Prix et notifications</h3>
+        <ul>
+          <li>historique des prix et anti-fraude</li>
+          <li>alertes admin</li>
+          <li>notifications temps reel et messagerie</li>
+        </ul>
+      </section>
+    </div>
+
+    <h2>Flux cle</h2>
+    <div class="schema">1. Login
+Frontend -> auth-service -> JWT
+
+2. Mise a jour de prix
+Frontend -> catalog-service -> RabbitMQ -> price-tracker-service
+price-tracker-service -> collector_price
+price-tracker-service -> RabbitMQ -> notification-service -> WebSocket
+
+3. Achat
+Frontend -> catalog-service -> order.created -> RabbitMQ -> notification-service</div>
+
+    <h2>Execution et livraison</h2>
+    <div class="schema">Local :
+Docker Compose -> postgres, rabbitmq, mailhog, services, front, prometheus, grafana
+
+Cible :
+GitHub Actions -> scans / build / SBOM / cosign
+-> commit des digests dans infra/k8s/overlays
+-> Argo CD synchronise le cluster
+-> prod promue par PR puis sync manuel</div>
+
+    <h2>Points differenciants</h2>
+    <ul>
+      <li>architecture event-driven sur un sujet fonctionnel concret</li>
+      <li>separation nette entre identite, catalogue, prix et notifications</li>
+      <li>approche DevSecOps deja visible dans le depot</li>
+      <li>cible GitOps coherente avec un environnement de staging et de prod</li>
+    </ul>
+  </main>
+</body>
+</html>
