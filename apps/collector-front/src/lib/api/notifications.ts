@@ -12,7 +12,11 @@ export type NotificationType =
 	| 'ITEM_SOLD'
 	| 'ORDER_PENDING'
 	| 'ORDER_ACCEPTED'
-	| 'ORDER_REJECTED';
+	| 'ORDER_REJECTED'
+	| 'OFFER_RECEIVED'
+	| 'OFFER_ACCEPTED'
+	| 'OFFER_REJECTED'
+	| 'OFFER_PURCHASED';
 
 export type NotificationAPI = {
 	id: string;
@@ -30,30 +34,28 @@ export type WebSocketMessage = {
 	data: Record<string, unknown>;
 };
 
-const request = <T>(path: string, token: string, init?: RequestInit) =>
-	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: `notification-service ${path}` });
+const request = <T>(path: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { init, errorPrefix: `notification-service ${path}` });
 
 export async function fetchNotifications(
-	token: string,
 	limit = 50
 ): Promise<{ count: number; notifications: NotificationAPI[] }> {
 	const data = await request<{ count: number; notifications: NotificationAPI[] | null }>(
-		`/api/v1/notifications?limit=${limit}`,
-		token
+		`/api/v1/notifications?limit=${limit}`
 	);
 	return { count: data.count, notifications: data.notifications ?? [] };
 }
 
-export async function markRead(token: string, id: string): Promise<void> {
-	await request(`/api/v1/notifications/${id}/read`, token, { method: 'PUT' });
+export async function markRead(id: string): Promise<void> {
+	await request(`/api/v1/notifications/${id}/read`, { method: 'PUT' });
 }
 
-export async function markAllRead(token: string): Promise<void> {
-	await request('/api/v1/notifications/read-all', token, { method: 'PUT' });
+export async function markAllRead(): Promise<void> {
+	await request('/api/v1/notifications/read-all', { method: 'PUT' });
 }
 
-export async function fetchUnreadCount(token: string): Promise<number> {
-	const data = await request<{ unread_count: number }>('/api/v1/notifications/unread-count', token);
+export async function fetchUnreadCount(): Promise<number> {
+	const data = await request<{ unread_count: number }>('/api/v1/notifications/unread-count');
 	return data.unread_count;
 }
 
@@ -64,13 +66,15 @@ export type NotificationSocket = { close: () => void };
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
 
+// Authentifie par le cookie httpOnly de session : le navigateur le joint
+// automatiquement a la requete d'upgrade WS (meme domaine/sous-domaine),
+// impossible de toute facon de le lire en JS pour le poser en ?token=.
 export function connectNotifications(
-	token: string,
 	onMessage: (msg: WebSocketMessage) => void
 ): NotificationSocket {
 	if (!browser) return { close: () => {} };
 
-	const wsUrl = BASE_URL.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(token)}`;
+	const wsUrl = BASE_URL.replace(/^http/, 'ws') + '/ws';
 	let socket: WebSocket | null = null;
 	let backoff = INITIAL_BACKOFF_MS;
 	let closed = false;

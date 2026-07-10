@@ -114,3 +114,44 @@ func TestInitWithEmptyURLUsesNoop(t *testing.T) {
 		t.Errorf("avec RABBITMQ_URL vide, Current devrait etre NoopPublisher, obtenu %T", Current)
 	}
 }
+
+// TestInitWithURLCreatesAMQPPublisher verifie que Init bascule Current vers un
+// AMQPPublisher des qu'une URL est fournie, meme si le broker est injoignable
+// (connectLoop tourne en arriere-plan et n'empeche jamais le demarrage).
+func TestInitWithURLCreatesAMQPPublisher(t *testing.T) {
+	Init("amqp://guest:guest@localhost:1/") // port invalide, jamais joignable
+	p, ok := Current.(*AMQPPublisher)
+	if !ok {
+		t.Fatalf("avec une URL non vide, Current devrait etre *AMQPPublisher, obtenu %T", Current)
+	}
+	p.Close()
+	Current = NoopPublisher{}
+}
+
+// TestMessageIDIsDeterministic garantit que deux evenements identiques
+// produisent le meme MessageId AMQP (necessaire a la deduplication cote
+// consumer), et que des evenements differents produisent des ids differents.
+func TestMessageIDIsDeterministic(t *testing.T) {
+	e1 := PriceUpdatedEvent{ItemID: ToEventUUID(1), SellerID: ToEventUUID(2), OldPrice: 10, NewPrice: 20}
+	e2 := PriceUpdatedEvent{ItemID: ToEventUUID(1), SellerID: ToEventUUID(2), OldPrice: 10, NewPrice: 20}
+	if messageID(e1) != messageID(e2) {
+		t.Error("deux evenements identiques devraient produire le meme MessageId")
+	}
+
+	e3 := PriceUpdatedEvent{ItemID: ToEventUUID(1), SellerID: ToEventUUID(2), OldPrice: 10, NewPrice: 30}
+	if messageID(e1) == messageID(e3) {
+		t.Error("deux evenements differents ne devraient pas produire le meme MessageId")
+	}
+}
+
+// TestAMQPPublisherClose_Idempotent verifie que Close peut etre appele sans
+// connexion active (avant tout Dial reussi) sans paniquer, et que closed=true
+// empeche connectLoop de retenter une connexion.
+func TestAMQPPublisherClose_Idempotent(t *testing.T) {
+	p := &AMQPPublisher{}
+	p.Close()
+	p.Close() // deuxieme appel : ne doit pas paniquer
+	if !p.closed {
+		t.Error("closed devrait etre true apres Close()")
+	}
+}

@@ -7,6 +7,13 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+/coverage
+
+# Playwright (e2e)
+/playwright-report
+/test-results
+/blob-report
+/playwright/.cache
 
 # OS
 .DS_Store

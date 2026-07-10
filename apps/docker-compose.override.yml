@@ -1,0 +1,36 @@
+services:
+  auth-service:
+    ports: !override
+      - "18080:8080"
+
+  catalog-service:
+    ports: !override
+      - "18081:8081"
+
+  price-tracker:
+    ports: !override
+      - "18082:8082"
+
+  notification-service:
+    ports: !override
+      - "18083:8083"
+
+  mailhog:
+    ports: !override
+      - "1025:1025"
+      - "18025:8025"
+
+  prometheus:
+    ports: !override
+      - "19090:9090"
+
+  grafana:
+    ports: !override
+      - "13000:3000"
+
+  collector-front:
+    environment:
+      PUBLIC_CATALOG_API_BASE_URL: http://localhost:18081
+      PUBLIC_AUTH_API_BASE_URL: http://localhost:18080
+      PUBLIC_NOTIFICATION_API_BASE_URL: http://localhost:18083
+      PUBLIC_PRICE_TRACKER_API_BASE_URL: http://localhost:18082

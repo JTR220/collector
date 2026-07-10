@@ -1,20 +1,33 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { auth } from '$lib/stores/auth';
-	import { fetchArticles, articleImage, type ArticleAPI } from '$lib/api/catalog';
+	import {
+		fetchArticles,
+		fetchCategories,
+		articleImage,
+		type ArticleAPI,
+		type CategoryAPI
+	} from '$lib/api/catalog';
 	import { eur, pct } from '$lib/utils/format';
-	import GChip from '$lib/components/galerie/GChip.svelte';
-	import GSpark from '$lib/components/galerie/GSpark.svelte';
 	import GSelect from '$lib/components/galerie/GSelect.svelte';
-	import Kicker from '$lib/components/galerie/Kicker.svelte';
 
 	let articles = $state<ArticleAPI[]>([]);
+	let categories = $state<CategoryAPI[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
+	// Collage décoratif du bandeau hero (en attente d'une vraie photo d'ambiance).
+	const heroGlyphs = [
+		{ icon: '🎴', label: 'Cartes', r: -4 },
+		{ icon: '🎮', label: 'Consoles', r: 3 },
+		{ icon: '📚', label: 'Comics', r: -2 },
+		{ icon: '💿', label: 'Vinyles', r: 4 },
+		{ icon: '🧸', label: 'Designer toys', r: -3 },
+		{ icon: '⌚', label: 'Horlogerie', r: 2 }
+	];
+
 	onMount(async () => {
 		try {
-			articles = await fetchArticles();
+			[articles, categories] = await Promise.all([fetchArticles(), fetchCategories()]);
 		} catch (e) {
 			error = 'Impossible de charger le catalogue. Vérifiez que le catalog-service est démarré.';
 			console.error(e);
@@ -26,11 +39,15 @@
 	// Recherche & filtres (état local, orientés marketplace)
 	let search = $state('');
 	let filterCat = $state('');
+	let filterRarity = $state('');
+	let filterGrade = $state('');
 	let filterMax = $state(0);
 	let availableOnly = $state(false);
 	let sort = $state<'recent' | 'price-asc' | 'price-desc' | 'name'>('recent');
 
-	const categories = $derived([...new Set(articles.map((a) => a.category.name))].sort());
+	const categoryNames = $derived([...categories].map((c) => c.name).sort());
+	const rarities = $derived([...new Set(articles.map((a) => a.rarity).filter(Boolean))].sort());
+	const grades = $derived([...new Set(articles.map((a) => a.grade).filter(Boolean))].sort());
 
 	const filtered = $derived(
 		articles
@@ -45,6 +62,8 @@
 				return (
 					matchQ &&
 					(!filterCat || a.category.name === filterCat) &&
+					(!filterRarity || a.rarity === filterRarity) &&
+					(!filterGrade || a.grade === filterGrade) &&
 					(!filterMax || a.prix <= filterMax) &&
 					(!availableOnly || !a.sold)
 				);
@@ -63,64 +82,70 @@
 			})
 	);
 
-	const hasFilters = $derived(!!(search || filterCat || filterMax || availableOnly));
+	const sortLabels: Record<string, string> = {
+		recent: 'Plus récents',
+		'price-asc': 'Prix croissant',
+		'price-desc': 'Prix décroissant',
+		name: 'Nom A→Z'
+	};
+
+	const hasFilters = $derived(
+		!!(search || filterCat || filterRarity || filterGrade || filterMax || availableOnly)
+	);
 	function resetFilters() {
 		search = '';
 		filterCat = '';
+		filterRarity = '';
+		filterGrade = '';
 		filterMax = 0;
 		availableOnly = false;
 		sort = 'recent';
-	}
-
-	// Hue dérivée du nom de catégorie pour le placeholder art
-	function categoryHue(name: string): number {
-		const map: Record<string, number> = {
-			TCG: 18,
-			Console: 48,
-			Comics: 220,
-			Vinyle: 350,
-			'Designer Toy': 280,
-			Horlogerie: 195
-		};
-		return map[name] ?? (name.charCodeAt(0) * 47) % 360;
-	}
-
-	// Sparkline fictive dérivée du prix (pour la démo)
-	function demoSpark(prix: number, delta: number): number[] {
-		const base = prix / (1 + delta / 100);
-		return [
-			base * 0.88,
-			base * 0.91,
-			base * 0.94,
-			base * 0.97,
-			base,
-			prix * 0.98,
-			prix * 0.99,
-			prix
-		];
 	}
 </script>
 
 <svelte:head><title>Collector.shop · Marché</title></svelte:head>
 
-<!-- En-tête marché -->
-<section class="market-head">
-	<div class="mh-text">
-		<Kicker>Marché</Kicker>
-		<h1 class="mh-title">Le marché des collectionneurs</h1>
-		<p class="mh-sub">
-			Achat direct entre membres · chaque lot authentifié · grading PSA / CGC. Trouvez la pièce, ou
-			mettez la vôtre en vente.
+<!-- Hero -->
+<section class="hero">
+	<div class="hero-text">
+		<div class="hero-eyebrow">Marché entre collectionneurs</div>
+		<h1 class="hero-title">Chinez la pièce rare, vendez vos trésors.</h1>
+		<p class="hero-sub">
+			Cartes à jouer, consoles, comics, vinyles, designer toys, horlogerie&nbsp;: chaque pièce est
+			authentifiée et vendue en direct entre particuliers vérifiés.
 		</p>
+		<a class="hero-cta" href="#grille">Découvrir la sélection</a>
 	</div>
-	{#if $auth.user}
-		<a class="mh-sell" href="/vendre">+ Vendre une pièce</a>
-	{:else}
-		<a class="mh-sell" href="/login">Se connecter pour vendre</a>
-	{/if}
+	<div class="hero-art" aria-hidden="true">
+		<div class="hero-collage">
+			{#each heroGlyphs as g}
+				<div class="hero-tile" style="--r:{g.r}deg">
+					<span class="hero-tile-icon">{g.icon}</span>
+					<span class="hero-tile-label">{g.label}</span>
+				</div>
+			{/each}
+		</div>
+	</div>
 </section>
 
-<!-- Barre de recherche & filtres -->
+<!-- Filtres catégorie (pills) -->
+<div class="pill-row">
+	<button class="pill" class:pill-active={!filterCat} onclick={() => (filterCat = '')}>Tout</button>
+	{#each categoryNames as cat}
+		<button class="pill" class:pill-active={filterCat === cat} onclick={() => (filterCat = cat)}>
+			{cat}
+		</button>
+	{/each}
+	<div class="pill-spacer"></div>
+	<GSelect
+		bind:value={sort}
+		ariaLabel="Tri"
+		compact
+		options={Object.entries(sortLabels).map(([value, label]) => ({ value, label }))}
+	/>
+</div>
+
+<!-- Recherche & filtres avancés -->
 <div class="toolbar">
 	<div class="tb-search">
 		<span class="tb-ico" aria-hidden="true">⌕</span>
@@ -132,34 +157,33 @@
 		/>
 	</div>
 	<GSelect
-		bind:value={filterCat}
-		ariaLabel="Catégorie"
-		placeholder="Toutes catégories"
+		bind:value={filterRarity}
+		ariaLabel="Rareté"
+		placeholder="Toutes raretés"
+		compact
 		options={[
-			{ value: '', label: 'Toutes catégories' },
-			...categories.map((c) => ({ value: c, label: c }))
+			{ value: '', label: 'Toutes raretés' },
+			...rarities.map((r) => ({ value: r, label: r }))
 		]}
+	/>
+	<GSelect
+		bind:value={filterGrade}
+		ariaLabel="Grade"
+		placeholder="Tous grades"
+		compact
+		options={[{ value: '', label: 'Tous grades' }, ...grades.map((g) => ({ value: g, label: g }))]}
 	/>
 	<GSelect
 		bind:value={filterMax}
 		ariaLabel="Prix maximum"
 		placeholder="Tous prix"
+		compact
 		options={[
 			{ value: 0, label: 'Tous prix' },
 			{ value: 100, label: '≤ 100 €' },
 			{ value: 500, label: '≤ 500 €' },
 			{ value: 1000, label: '≤ 1 000 €' },
 			{ value: 5000, label: '≤ 5 000 €' }
-		]}
-	/>
-	<GSelect
-		bind:value={sort}
-		ariaLabel="Tri"
-		options={[
-			{ value: 'recent', label: 'Plus récents' },
-			{ value: 'price-asc', label: 'Prix croissant' },
-			{ value: 'price-desc', label: 'Prix décroissant' },
-			{ value: 'name', label: 'Nom A→Z' }
 		]}
 	/>
 	<label class="tb-check">
@@ -191,25 +215,11 @@
 	{/if}
 
 	<!-- Grille de cartes -->
-	<section class="grid-section">
+	<section class="grid-section" id="grille">
 		{#each filtered as article (article.ID)}
-			{@const hue = categoryHue(article.category.name)}
-			{@const spark = demoSpark(article.prix, article.delta)}
-			{@const up = article.delta >= 0}
 			{@const img = articleImage(article)}
-			<article class="card">
-				<div class="card-eyebrow">
-					<span class="card-cat">{article.category.name} · {article.year}</span>
-					<span class="card-id">{article.slug || `#${article.ID}`}</span>
-				</div>
-
-				<!-- Photo produit (placeholder dégradé en dessous si l'image manque ou casse) -->
-				<div
-					class="card-art"
-					style="background:linear-gradient(155deg, oklch(0.30 0.045 {hue}) 0%, oklch(0.24 0.045 {hue}) 100%)"
-				>
-					<div class="card-art-trame" aria-hidden="true"></div>
-					<span class="card-art-label">photo produit<br />{article.slug || `#${article.ID}`}</span>
+			<a class="card" href={`/lot/${article.ID}`}>
+				<div class="card-art">
 					{#if img}
 						<img
 							class="card-art-img"
@@ -218,42 +228,24 @@
 							loading="lazy"
 							onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
 						/>
+					{:else}
+						<span class="card-art-label">photo produit</span>
 					{/if}
 					{#if article.sold}
 						<span class="card-sold">vendu</span>
 					{/if}
-					<span class="card-rarity">{article.rarity}</span>
 				</div>
 
 				<div class="card-body">
-					<div class="card-name-row">
-						<div>
-							<p class="card-name">{article.name}</p>
-							<p class="card-series">{article.series}</p>
-						</div>
-						<div class="card-chips">
-							<GChip>{article.grade}</GChip>
-						</div>
+					<div class="card-top-row">
+						{#if article.grade}<span class="card-condition">{article.grade}</span>{/if}
+						<span class="card-wish" aria-hidden="true"></span>
 					</div>
-
-					<div class="card-divider"></div>
-
-					<div class="card-price-row">
-						<div>
-							<div class="card-price-label">Cote actuelle</div>
-							<div class="card-price">{eur(article.prix)}</div>
-						</div>
-						<div class="card-spark-col">
-							<GSpark values={spark} color={up ? '#86c099' : '#d79c86'} w={80} h={24} dot={false} />
-							<span class="card-delta" style="color:{up ? '#86c099' : '#d79c86'}"
-								>{pct(article.delta)}</span
-							>
-						</div>
-					</div>
-
-					<a class="card-cta" href={`/lot/${article.ID}`}>Voir le lot</a>
+					<p class="card-name">{article.name}</p>
+					<span class="card-price">{eur(article.prix)}</span>
+					<p class="card-seller">Vendu par {article.seller} · Particulier vérifié</p>
 				</div>
-			</article>
+			</a>
 		{/each}
 	</section>
 
@@ -267,10 +259,9 @@
 			<div class="ticker-inner">
 				{#each [...articles, ...articles] as article}
 					<span class="ticker-item">
-						<span class="ticker-id">{article.slug || `#${article.ID}`}</span>
 						<span class="ticker-name">{article.name}</span>
 						<span class="ticker-price">{eur(article.prix)}</span>
-						<span style="color:{article.delta >= 0 ? '#86c099' : '#d79c86'}"
+						<span style="color:{article.delta >= 0 ? '#3f7a52' : '#b0432a'}"
 							>{pct(article.delta)}</span
 						>
 					</span>
@@ -281,46 +272,139 @@
 {/if}
 
 <style>
-	/* ── En-tête marché ── */
-	.market-head {
+	/* ── Hero ── */
+	.hero {
 		display: flex;
-		align-items: flex-end;
+		align-items: center;
 		justify-content: space-between;
-		gap: 24px;
-		padding: 28px 0 18px;
+		gap: 32px;
+		margin: 24px 0;
+		padding: 48px;
+		border-radius: 20px;
+		background: linear-gradient(135deg, #1e3b2c, #2a4e3a);
+		color: var(--c-bg);
 		flex-wrap: wrap;
 	}
-	.mh-title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: clamp(30px, 4vw, 42px);
-		line-height: 1.05;
-		color: #ece5da;
-		margin: 8px 0 10px;
+	.hero-text {
+		max-width: 560px;
+	}
+	.hero-eyebrow {
+		font-family: var(--f-body);
+		font-size: 12px;
+		letter-spacing: 0.15em;
+		text-transform: uppercase;
+		color: #c9e0ce;
+		margin-bottom: 12px;
+	}
+	.hero-title {
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: clamp(28px, 4vw, 38px);
+		line-height: 1.15;
+		margin: 0 0 16px;
 		text-wrap: balance;
 	}
-	.mh-sub {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 14px;
-		color: #a39a8c;
+	.hero-sub {
+		font-family: var(--f-body);
+		font-size: 15px;
+		color: #d8e6db;
 		line-height: 1.55;
-		max-width: 520px;
-		margin: 0;
+		margin: 0 0 24px;
 	}
-	.mh-sell {
-		flex-shrink: 0;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 13px;
-		font-weight: 600;
-		padding: 11px 20px;
+	.hero-cta {
+		display: inline-block;
+		padding: 12px 28px;
+		background: var(--c-accent);
+		color: #fff;
 		border-radius: 8px;
-		background: #86b3a4;
-		color: #191714;
+		font-size: 14px;
+		font-weight: 600;
 		text-decoration: none;
 		transition: filter 120ms;
 	}
-	.mh-sell:hover {
+	.hero-cta:hover {
 		filter: brightness(1.08);
+		color: #fff;
+	}
+	.hero-art {
+		flex: none;
+		width: 340px;
+		height: 220px;
+	}
+	.hero-collage {
+		width: 100%;
+		height: 100%;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 12px;
+		padding: 4px;
+	}
+	.hero-tile {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		background: var(--c-bg);
+		border-radius: 10px;
+		box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+		transform: rotate(var(--r));
+		transition: transform 150ms;
+	}
+	.hero-tile:hover {
+		transform: rotate(0deg) scale(1.05);
+	}
+	.hero-tile-icon {
+		font-size: 24px;
+	}
+	.hero-tile-label {
+		font-family: var(--f-body);
+		font-size: 10px;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		color: var(--c-ink);
+		text-align: center;
+	}
+	@media (max-width: 900px) {
+		.hero-art {
+			display: none;
+		}
+	}
+
+	/* ── Pills catégories ── */
+	.pill-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		flex-wrap: wrap;
+		padding: 8px 0 14px;
+	}
+	.pill {
+		padding: 8px 16px;
+		border-radius: var(--r-pill);
+		border: 1px solid var(--c-border);
+		background: var(--c-surface);
+		font-family: var(--f-body);
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--c-text-tertiary);
+		cursor: pointer;
+		white-space: nowrap;
+		transition:
+			background 120ms,
+			color 120ms,
+			border-color 120ms;
+	}
+	.pill:hover {
+		border-color: var(--c-ink);
+	}
+	.pill-active {
+		background: var(--c-ink);
+		border-color: var(--c-ink);
+		color: var(--c-bg);
+	}
+	.pill-spacer {
+		flex: 1;
 	}
 
 	/* ── Barre de recherche & filtres ── */
@@ -329,28 +413,26 @@
 		gap: 10px;
 		flex-wrap: wrap;
 		align-items: center;
-		padding: 12px 0 18px;
-		border-top: 1px solid rgba(236, 229, 218, 0.08);
+		padding: 4px 0 18px;
+		border-top: 1px solid var(--c-border);
+		padding-top: 16px;
 	}
 	.tb-search {
 		flex: 1 1 260px;
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(236, 229, 218, 0.12);
-		border-radius: 8px;
-		padding: 0 12px;
-		transition:
-			border-color 150ms,
-			box-shadow 150ms;
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: var(--r-pill);
+		padding: 0 16px;
+		transition: border-color 150ms;
 	}
 	.tb-search:focus-within {
-		border-color: rgba(134, 179, 164, 0.5);
-		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+		border-color: var(--c-ink);
 	}
 	.tb-ico {
-		color: #766d60;
+		color: var(--c-text-muted);
 		font-size: 15px;
 	}
 	.tb-input {
@@ -359,25 +441,26 @@
 		border: none;
 		outline: none;
 		padding: 11px 0;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 14px;
+		color: var(--c-text);
+		font-family: var(--f-body);
+		font-size: 13px;
 	}
 	.tb-input::placeholder {
-		color: rgba(236, 229, 218, 0.28);
+		color: var(--c-text-muted);
 	}
 	.tb-check {
 		display: flex;
 		align-items: center;
 		gap: 7px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #a39a8c;
+		color: var(--c-text-tertiary);
 		cursor: pointer;
 		user-select: none;
+		white-space: nowrap;
 	}
 	.tb-check input {
-		accent-color: #86b3a4;
+		accent-color: var(--c-ink);
 		cursor: pointer;
 	}
 
@@ -390,39 +473,38 @@
 		margin-bottom: 16px;
 	}
 	.result-count {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		letter-spacing: 0.04em;
-		color: #a39a8c;
+		font-family: var(--f-body);
+		font-size: 13px;
+		color: var(--c-text-muted);
 	}
 	.result-clear {
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.result-clear:hover {
-		color: #ece5da;
+		color: var(--c-ink);
 	}
 
 	/* ── États ── */
 	.state-msg {
 		text-align: center;
 		padding: 60px 0;
-		font-family: 'Newsreader', Georgia, serif;
+		font-family: var(--f-serif);
 		font-style: italic;
 		font-size: 16px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.state-error {
 		padding: 12px 16px;
 		border-radius: 7px;
-		background: rgba(215, 156, 134, 0.06);
-		border: 1px solid rgba(215, 156, 134, 0.3);
-		color: #d79c86;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		background: #fbe9e3;
+		border: 1px solid rgba(176, 67, 42, 0.3);
+		color: var(--c-error);
+		font-family: var(--f-body);
 		font-size: 13px;
 		margin-bottom: 20px;
 	}
@@ -430,16 +512,22 @@
 	/* ── Grille ── */
 	.grid-section {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 18px;
-		padding: 4px 0 24px;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 24px;
+		padding: 4px 0 40px;
 	}
-	@media (max-width: 900px) {
+	@media (max-width: 1100px) {
 		.grid-section {
-			grid-template-columns: repeat(2, 1fr);
+			grid-template-columns: repeat(3, 1fr);
 		}
 	}
-	@media (max-width: 580px) {
+	@media (max-width: 780px) {
+		.grid-section {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 14px;
+		}
+	}
+	@media (max-width: 480px) {
 		.grid-section {
 			grid-template-columns: 1fr;
 		}
@@ -448,64 +536,33 @@
 	/* ── Carte ── */
 	.card {
 		position: relative;
-		background: #221f1b;
-		border: 1px solid rgba(236, 229, 218, 0.1);
-		border-radius: 9px;
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: var(--r-card);
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+		text-decoration: none;
 		transition: border-color 120ms;
-		cursor: pointer;
 	}
 	.card:hover {
-		border-color: rgba(236, 229, 218, 0.17);
+		border-color: var(--c-ink);
 	}
 
-	.card-eyebrow {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 12px 14px 0;
-	}
-	.card-cat {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 10px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: #766d60;
-	}
-	.card-id {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 10px;
-		color: #766d60;
-	}
-
-	/* Art placeholder */
 	.card-art {
 		position: relative;
-		height: 132px;
-		margin: 10px 14px 0;
-		border-radius: 6px;
-		border: 1px solid rgba(236, 229, 218, 0.08);
+		height: 180px;
+		background: var(--c-bg);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		overflow: hidden;
 	}
-	.card-art-trame {
-		position: absolute;
-		inset: 0;
-		opacity: 0.08;
-		background: repeating-linear-gradient(45deg, #ece5da 0 1px, transparent 1px 9px);
-	}
 	.card-art-label {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 10px;
+		font-family: var(--f-body);
+		font-size: 11px;
 		letter-spacing: 0.08em;
-		text-align: center;
-		line-height: 1.5;
-		color: rgba(236, 229, 218, 0.35);
-		position: relative;
+		color: var(--c-icon-muted);
 	}
 	.card-art-img {
 		position: absolute;
@@ -516,131 +573,68 @@
 	}
 	.card-sold {
 		position: absolute;
-		top: 7px;
-		right: 8px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 9px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		padding: 2px 7px;
-		border-radius: 3px;
-		color: #ece5da;
-		background: rgba(215, 156, 134, 0.85);
+		top: 10px;
+		right: 10px;
+		font-family: var(--f-body);
+		font-size: 10px;
 		font-weight: 600;
-	}
-	.card-rarity {
-		position: absolute;
-		bottom: 7px;
-		right: 8px;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 9px;
-		letter-spacing: 0.14em;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
-		padding: 2px 7px;
-		border: 1px solid rgba(236, 229, 218, 0.2);
-		border-radius: 3px;
-		color: rgba(236, 229, 218, 0.55);
-		background: rgba(0, 0, 0, 0.25);
+		padding: 3px 9px;
+		border-radius: 5px;
+		color: #fff;
+		background: var(--c-accent);
 	}
 
 	.card-body {
-		padding: 12px 14px 14px;
+		padding: 16px;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 8px;
 		flex: 1;
 	}
-
-	.card-name-row {
+	.card-top-row {
 		display: flex;
+		align-items: center;
 		justify-content: space-between;
-		align-items: flex-start;
-		gap: 8px;
+		gap: 6px;
+	}
+	.card-condition {
+		font-family: var(--f-body);
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--c-ink);
+		background: var(--c-badge-verified-bg);
+		padding: 3px 8px;
+		border-radius: 5px;
+	}
+	.card-wish {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		border: 1.5px solid var(--c-icon-muted);
+		flex-shrink: 0;
+		margin-left: auto;
 	}
 	.card-name {
-		font-family: 'Newsreader', Georgia, serif;
-		font-size: 19px;
-		color: #ece5da;
-		margin: 0 0 3px;
-		line-height: 1.1;
-	}
-	.card-series {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 11px;
-		color: #766d60;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--c-text);
+		line-height: 1.35;
 		margin: 0;
-	}
-	.card-chips {
-		flex-shrink: 0;
-	}
-
-	.card-divider {
-		border: none;
-		border-top: 1px solid rgba(236, 229, 218, 0.08);
-	}
-
-	.card-price-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
-	}
-	.card-price-label {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		font-size: 10px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: #766d60;
-		margin-bottom: 3px;
+		min-height: 38px;
 	}
 	.card-price {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 21px;
-		color: #ece5da;
-		font-weight: 500;
-		line-height: 1;
+		font-family: var(--f-serif);
+		font-size: 19px;
+		font-weight: 600;
+		color: var(--c-ink);
 	}
-	.card-spark-col {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 3px;
-	}
-	.card-delta {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 11px;
-	}
-
-	.card-cta {
-		display: block;
-		text-align: center;
-		text-decoration: none;
-		box-sizing: border-box;
-		width: 100%;
-		padding: 9px;
-		border-radius: 6px;
-		border: 1px solid rgba(236, 229, 218, 0.12);
-		background: transparent;
-		color: #a39a8c;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+	.card-seller {
+		font-family: var(--f-body);
 		font-size: 12px;
-		font-weight: 500;
-		cursor: pointer;
-		transition:
-			border-color 120ms,
-			color 120ms,
-			background 120ms;
-		margin-top: auto;
-	}
-	.card-cta:hover {
-		border-color: #86b3a4;
-		color: #86b3a4;
-		background: rgba(134, 179, 164, 0.04);
-	}
-	/* Lien étendu : toute la carte est cliquable via le CTA */
-	.card-cta::after {
-		content: '';
-		position: absolute;
-		inset: 0;
+		color: var(--c-text-muted);
+		margin: 0;
 	}
 
 	/* ── Ticker ── */
@@ -648,8 +642,8 @@
 		display: flex;
 		align-items: center;
 		gap: 18px;
-		border-top: 1px solid rgba(236, 229, 218, 0.1);
-		padding: 12px 0;
+		border-top: 1px solid var(--c-border);
+		padding: 14px 0;
 		overflow: hidden;
 	}
 	.ticker-live {
@@ -657,17 +651,17 @@
 		align-items: center;
 		gap: 6px;
 		flex-shrink: 0;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11px;
 		font-weight: 600;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		letter-spacing: 0.04em;
 	}
 	.ticker-dot {
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: #86c099;
+		background: #3f7a52;
 		display: inline-block;
 	}
 	.ticker-track {
@@ -685,17 +679,15 @@
 		margin-right: 32px;
 		align-items: center;
 		white-space: nowrap;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 11px;
-	}
-	.ticker-id {
-		color: #86b3a4;
+		font-family: var(--f-body);
+		font-size: 12px;
 	}
 	.ticker-name {
-		color: #766d60;
+		color: var(--c-text-muted);
 	}
 	.ticker-price {
-		color: #ece5da;
+		color: var(--c-text);
+		font-weight: 600;
 	}
 
 	@keyframes ticker {

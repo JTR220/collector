@@ -6,18 +6,21 @@
 	import { messages } from '$lib/stores/messages';
 	import GFrame from '$lib/components/galerie/GFrame.svelte';
 	import GHeader from '$lib/components/galerie/GHeader.svelte';
+	import GFooter from '$lib/components/galerie/GFooter.svelte';
 
 	let { children } = $props();
 
 	// Connexion WebSocket notifications liee a la session : ouverte au login,
-	// fermee au logout ou en quittant le layout.
-	let currentToken: string | null = null;
+	// fermee au logout ou en quittant le layout. L'authentification passe par
+	// le cookie httpOnly (envoye automatiquement) : plus besoin de token cote JS.
+	let wasAuthenticated = false;
 	const unsubAuth = auth.subscribe(($auth) => {
-		if ($auth.token === currentToken) return;
-		currentToken = $auth.token;
-		if ($auth.token) {
-			notifications.start($auth.token);
-			messages.start($auth.token);
+		const isAuth = !!$auth.user;
+		if (isAuth === wasAuthenticated) return;
+		wasAuthenticated = isAuth;
+		if (isAuth) {
+			notifications.start();
+			messages.start();
 		} else {
 			notifications.reset();
 			messages.reset();
@@ -51,10 +54,18 @@
 	<main class="g-main">
 		{@render children()}
 	</main>
+	<GFooter />
 </GFrame>
 
 <style>
 	.g-main {
-		padding-top: 26px;
+		max-width: 1440px;
+		margin: 0 auto;
+		padding: 0 48px 40px;
+	}
+	@media (max-width: 640px) {
+		.g-main {
+			padding: 0 20px 32px;
+		}
 	}
 </style>

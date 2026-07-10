@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // enregistre le driver "postgres" pour database/sql (utilise via sqlx.Connect)
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -21,7 +21,9 @@ import (
 	"github.com/JTR220/collector/notification-service/internal/handler"
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/mailer"
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/JTR220/collector/notification-service/internal/repository"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -44,6 +46,9 @@ func main() {
 	repo := repository.New(db)
 	if err := repo.Migrate(); err != nil {
 		log.Fatal().Err(err).Msg("migration failed")
+	}
+	if err := repo.SeedDemoData(context.Background()); err != nil {
+		log.Warn().Err(err).Msg("seed demo data failed (non-fatal)")
 	}
 
 	// Verification de connectivite au demarrage (fail-fast) : la connexion
@@ -84,8 +89,9 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(corsMiddleware())
+	router.Use(metrics.Middleware())
 
-	h := handler.New(wsHub, repo, cfg.JWT.Secret, authCli)
+	h := handler.New(wsHub, repo, cfg.JWT.Secret, authCli, cfg.Internal.Secret)
 	h.RegisterRoutes(router)
 
 	srv := &http.Server{
@@ -95,15 +101,34 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
+	// /metrics sur un port interne dedie, jamais route par l'ingress public
+	// (qui ne proxy que le port "http" du Service k8s) : evite d'exposer des
+	// metriques metier (messages, emails, erreurs RabbitMQ...) sur Internet.
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsSrv := &http.Server{
+		Addr:              ":9100",
+		Handler:           metricsMux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go mgr.Start(ctx, cfg.RabbitMQ.URL)
+	go runRetentionWorker(ctx, repo, cfg.Retention.Days)
 
 	go func() {
 		log.Info().Str("port", cfg.Server.Port).Msg("HTTP server listening")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("HTTP server error")
+		}
+	}()
+
+	go func() {
+		log.Info().Str("port", "9100").Msg("metrics server listening")
+		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error().Err(err).Msg("metrics server error")
 		}
 	}()
 
@@ -119,8 +144,42 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error().Err(err).Msg("HTTP server shutdown error")
 	}
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("metrics server shutdown error")
+	}
 
 	log.Info().Msg("notification-service stopped")
+}
+
+// runRetentionWorker purge periodiquement les notifications et messages
+// au-dela de la duree de conservation configuree (RETENTION_DAYS, 365 jours
+// par defaut) : minimisation des donnees (art. 5.1.e RGPD). Une premiere
+// purge tourne au demarrage, puis toutes les 24h jusqu'a l'arret du service.
+func runRetentionWorker(ctx context.Context, repo *repository.NotificationRepository, retentionDays int) {
+	purge := func() {
+		cutoff := time.Now().AddDate(0, 0, -retentionDays)
+		notifs, messages, err := repo.PurgeOlderThan(ctx, cutoff)
+		if err != nil {
+			log.Error().Err(err).Msg("purge de retention echouee")
+			return
+		}
+		if notifs > 0 || messages > 0 {
+			log.Info().Int64("notifications", notifs).Int64("messages", messages).
+				Msg("purge de retention effectuee")
+		}
+	}
+
+	purge()
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			purge()
+		}
+	}
 }
 
 // corsMiddleware reprend la convention du catalog-service (FRONTEND_ORIGIN).
@@ -132,7 +191,11 @@ func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+		// Le cookie de session httpOnly doit transiter sur les requetes
+		// cross-origin front -> API : Allow-Credentials cote serveur +
+		// credentials:'include' cote client (fetch).
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)

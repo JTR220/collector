@@ -18,6 +18,11 @@ const (
 	TypeOrderPending  NotificationType = "ORDER_PENDING"  // nouvelle commande a valider (pour le vendeur)
 	TypeOrderAccepted NotificationType = "ORDER_ACCEPTED" // commande acceptee (pour l'acheteur)
 	TypeOrderRejected NotificationType = "ORDER_REJECTED" // commande refusee (pour l'acheteur)
+
+	TypeOfferReceived  NotificationType = "OFFER_RECEIVED"  // nouvelle offre de prix a traiter (pour le vendeur)
+	TypeOfferAccepted  NotificationType = "OFFER_ACCEPTED"  // offre acceptee, paiement possible (pour l'acheteur)
+	TypeOfferRejected  NotificationType = "OFFER_REJECTED"  // offre refusee (pour l'acheteur)
+	TypeOfferPurchased NotificationType = "OFFER_PURCHASED" // offre payee, vente finalisee (pour le vendeur)
 )
 
 // Notification is persisted in the database and sent via WebSocket
@@ -99,6 +104,45 @@ type OrderDecisionEvent struct {
 	Price     float64   `json:"price"`
 	Accepted  bool      `json:"accepted"`
 	DecidedAt time.Time `json:"decided_at"`
+}
+
+// OfferCreatedEvent from catalog-service (via collector.events) : un acheteur
+// vient de proposer un prix negocie, le vendeur doit accepter ou refuser.
+type OfferCreatedEvent struct {
+	OfferID   uuid.UUID `json:"offer_id"`
+	ItemID    uuid.UUID `json:"item_id"`
+	ItemName  string    `json:"item_name"`
+	BuyerID   uuid.UUID `json:"buyer_id"`
+	SellerID  uuid.UUID `json:"seller_id"`
+	Price     float64   `json:"price"`
+	ListPrice float64   `json:"list_price"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// OfferDecisionEvent from catalog-service (via collector.events) : le vendeur
+// a accepte ou refuse une offre.
+type OfferDecisionEvent struct {
+	OfferID   uuid.UUID `json:"offer_id"`
+	ItemID    uuid.UUID `json:"item_id"`
+	ItemName  string    `json:"item_name"`
+	BuyerID   uuid.UUID `json:"buyer_id"`
+	SellerID  uuid.UUID `json:"seller_id"`
+	Price     float64   `json:"price"`
+	Accepted  bool      `json:"accepted"`
+	DecidedAt time.Time `json:"decided_at"`
+}
+
+// OfferPurchasedEvent from catalog-service (via collector.events) : l'acheteur
+// a paye une offre acceptee, la vente est finalisee.
+type OfferPurchasedEvent struct {
+	OfferID     uuid.UUID `json:"offer_id"`
+	OrderID     uuid.UUID `json:"order_id"`
+	ItemID      uuid.UUID `json:"item_id"`
+	ItemName    string    `json:"item_name"`
+	BuyerID     uuid.UUID `json:"buyer_id"`
+	SellerID    uuid.UUID `json:"seller_id"`
+	Price       float64   `json:"price"`
+	PurchasedAt time.Time `json:"purchased_at"`
 }
 
 // FraudAlertEvent from price-tracker-service (via collector.alerts)

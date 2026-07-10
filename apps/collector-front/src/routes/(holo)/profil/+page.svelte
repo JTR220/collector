@@ -9,10 +9,21 @@
 		fetchMySales,
 		acceptOrder,
 		rejectOrder,
+		leaveReview,
 		ORDER_STATUS_LABELS,
 		type Order,
 		type OrderStatus
 	} from '$lib/api/market';
+	import { fetchMyArticles, deleteArticle, type ArticleAPI } from '$lib/api/catalog';
+	import {
+		fetchReceivedOffers,
+		fetchSentOffers,
+		acceptOffer,
+		rejectOffer,
+		payOffer,
+		OFFER_STATUS_LABELS,
+		type Offer
+	} from '$lib/api/offers';
 	import { eur } from '$lib/utils/format';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GAvatar from '$lib/components/galerie/GAvatar.svelte';
@@ -26,8 +37,31 @@
 	let sales = $state<Order[]>([]);
 	let salesBusyId = $state<number | null>(null);
 	let salesMsg = $state<string | null>(null);
+	let receivedOffers = $state<Offer[]>([]);
+	let sentOffers = $state<Offer[]>([]);
+	let offersBusyId = $state<number | null>(null);
+	let offersMsg = $state<string | null>(null);
+	let confirmOffer = $state<Offer | null>(null);
+	let myArticles = $state<ArticleAPI[]>([]);
+	let articleBusyId = $state<number | null>(null);
+	let articlesMsg = $state<string | null>(null);
+	let reviewFormOrderId = $state<number | null>(null);
+	let reviewRating = $state(5);
+	let reviewComment = $state('');
+	let reviewBusy = $state(false);
+	let reviewMsg = $state<string | null>(null);
 
 	const pendingSales = $derived(sales.filter((s) => s.status === 'pending'));
+	const reviewableStatuses: OrderStatus[] = ['paid', 'shipped', 'delivered'];
+	function canReview(o: Order) {
+		return !o.reviewed && reviewableStatuses.includes(o.status);
+	}
+
+	const articleStats = $derived({
+		listed: myArticles.filter((a) => !a.sold).length,
+		sold: myArticles.filter((a) => a.sold).length,
+		totalViews: myArticles.reduce((sum, a) => sum + a.views, 0)
+	});
 
 	const initials = $derived(
 		me?.name
@@ -42,15 +76,15 @@
 	const handle = $derived(me?.name ? me.name.toLowerCase().replace(/\s+/g, '_') : '…');
 
 	onMount(async () => {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
 		// Seul un echec d'authentification (/me) deconnecte l'utilisateur.
 		try {
-			me = await fetchMe($auth.token);
+			me = await fetchMe();
 			// On rafraichit le role dans le store pour garder l'onglet Admin fiable.
-			auth.login($auth.token, {
+			auth.login({
 				id: me.id,
 				name: me.name,
 				email: me.email,
@@ -63,31 +97,133 @@
 		}
 		// Wishlist et commandes viennent du catalog-service : une panne de ce
 		// service ne doit PAS deconnecter — on charge ce qui repond.
-		const [w, o, s] = await Promise.allSettled([
-			fetchMyWishlist($auth.token),
-			fetchMyOrders($auth.token),
-			fetchMySales($auth.token)
+		const [w, o, s, a, ro, so] = await Promise.allSettled([
+			fetchMyWishlist(),
+			fetchMyOrders(),
+			fetchMySales(),
+			fetchMyArticles(),
+			fetchReceivedOffers(),
+			fetchSentOffers()
 		]);
 		if (w.status === 'fulfilled') wishlist = w.value;
 		if (o.status === 'fulfilled') orders = o.value;
 		if (s.status === 'fulfilled') sales = s.value;
+		if (a.status === 'fulfilled') myArticles = a.value;
+		if (ro.status === 'fulfilled') receivedOffers = ro.value;
+		if (so.status === 'fulfilled') sentOffers = so.value;
 		loading = false;
 	});
 
+	async function removeArticle(article: ArticleAPI) {
+		if (!$auth.user) return;
+		if (!confirm(`Retirer « ${article.name} » du catalogue ?`)) return;
+		articleBusyId = article.ID;
+		articlesMsg = null;
+		try {
+			await deleteArticle(article.ID);
+			myArticles = myArticles.filter((a) => a.ID !== article.ID);
+		} catch (e) {
+			articlesMsg = e instanceof Error ? e.message : "Impossible de retirer l'annonce.";
+		} finally {
+			articleBusyId = null;
+		}
+	}
+
+	function toggleReview(order: Order) {
+		reviewMsg = null;
+		if (reviewFormOrderId === order.ID) {
+			reviewFormOrderId = null;
+			return;
+		}
+		reviewFormOrderId = order.ID;
+		reviewRating = 5;
+		reviewComment = '';
+	}
+
+	async function submitReview(order: Order) {
+		if (!$auth.user) return;
+		reviewBusy = true;
+		reviewMsg = null;
+		try {
+			await leaveReview(order.ID, reviewRating, reviewComment.trim());
+			orders = orders.map((o) => (o.ID === order.ID ? { ...o, reviewed: true } : o));
+			reviewFormOrderId = null;
+		} catch (e) {
+			reviewMsg = e instanceof Error ? e.message : "Impossible d'enregistrer l'avis.";
+		} finally {
+			reviewBusy = false;
+		}
+	}
+
 	async function decide(order: Order, accept: boolean) {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		salesBusyId = order.ID;
 		salesMsg = null;
 		try {
-			const { order: updated } = accept
-				? await acceptOrder($auth.token, order.ID)
-				: await rejectOrder($auth.token, order.ID);
+			const { order: updated } = accept ? await acceptOrder(order.ID) : await rejectOrder(order.ID);
 			sales = sales.map((s) => (s.ID === updated.ID ? { ...s, status: updated.status } : s));
-			salesMsg = accept ? 'Commande acceptée.' : 'Commande refusée — la pièce redevient disponible.';
+			salesMsg = accept
+				? 'Commande acceptée.'
+				: 'Commande refusée — la pièce redevient disponible.';
 		} catch (e) {
 			salesMsg = e instanceof Error ? e.message : 'Erreur lors du traitement de la commande.';
 		} finally {
 			salesBusyId = null;
+		}
+	}
+
+	function openAcceptConfirm(offer: Offer) {
+		offersMsg = null;
+		confirmOffer = offer;
+	}
+
+	function closeAcceptConfirm() {
+		confirmOffer = null;
+	}
+
+	async function confirmAcceptOffer() {
+		if (!confirmOffer) return;
+		const offer = confirmOffer;
+		offersBusyId = offer.ID;
+		offersMsg = null;
+		try {
+			await acceptOffer(offer.ID);
+			receivedOffers = receivedOffers.filter((o) => o.ID !== offer.ID);
+			offersMsg = 'Offre acceptée — l’acheteur peut désormais payer au prix négocié.';
+		} catch (e) {
+			offersMsg = e instanceof Error ? e.message : "Impossible d'accepter l'offre.";
+		} finally {
+			offersBusyId = null;
+			confirmOffer = null;
+		}
+	}
+
+	async function declineOffer(offer: Offer) {
+		offersBusyId = offer.ID;
+		offersMsg = null;
+		try {
+			await rejectOffer(offer.ID);
+			receivedOffers = receivedOffers.filter((o) => o.ID !== offer.ID);
+			offersMsg = 'Offre refusée.';
+		} catch (e) {
+			offersMsg = e instanceof Error ? e.message : "Impossible de refuser l'offre.";
+		} finally {
+			offersBusyId = null;
+		}
+	}
+
+	async function payAcceptedOffer(offer: Offer) {
+		offersBusyId = offer.ID;
+		offersMsg = null;
+		try {
+			const { order } = await payOffer(offer.ID);
+			sentOffers = sentOffers.map((o) => (o.ID === offer.ID ? { ...o, status: 'purchased' } : o));
+			orders = [order, ...orders];
+			offersMsg = 'Paiement effectué — retrouvez la commande dans « Mes achats ».';
+		} catch (e) {
+			offersMsg = e instanceof Error ? e.message : 'Impossible de payer cette offre.';
+		} finally {
+			offersBusyId = null;
 		}
 	}
 
@@ -160,7 +296,9 @@
 			<div class="item-list">
 				{#each pendingSales as s (s.ID)}
 					<div class="sale-row">
-						<span class="item-name">{s.article?.name ?? `Lot #${s.articleId}`}</span>
+						<a class="item-name" href={`/lot/${s.articleId}`}
+							>{s.article?.name ?? `Lot #${s.articleId}`}</a
+						>
 						<span class="item-price">{eur(s.price)}</span>
 						<div class="sale-actions">
 							<button
@@ -182,6 +320,96 @@
 			{/if}
 		</GPanel>
 	{/if}
+
+	{#if receivedOffers.length > 0}
+		<GPanel style="margin-bottom:14px">
+			<Kicker>Offres reçues · {receivedOffers.length}</Kicker>
+			<div class="item-list">
+				{#each receivedOffers as o (o.ID)}
+					<div class="sale-row">
+						<a class="item-name" href={`/lot/${o.articleId}`}
+							>{o.article?.name ?? `Lot #${o.articleId}`}</a
+						>
+						{#if o.article}
+							<span class="offer-vs-price">{eur(o.article.prix)}</span>
+						{/if}
+						<span class="item-price">{eur(o.price)}</span>
+						<div class="sale-actions">
+							<button
+								class="btn-accept"
+								disabled={offersBusyId === o.ID}
+								onclick={() => openAcceptConfirm(o)}>Accepter</button
+							>
+							<button
+								class="btn-reject"
+								disabled={offersBusyId === o.ID}
+								onclick={() => declineOffer(o)}>Refuser</button
+							>
+						</div>
+					</div>
+					{#if o.message}<p class="offer-message">« {o.message} »</p>{/if}
+				{/each}
+			</div>
+			{#if offersMsg}
+				<p class="action-msg">{offersMsg}</p>
+			{/if}
+		</GPanel>
+	{/if}
+
+	{#if confirmOffer}
+		<div
+			class="modal-overlay"
+			role="button"
+			tabindex="0"
+			onclick={closeAcceptConfirm}
+			onkeydown={(e) => e.key === 'Escape' && closeAcceptConfirm()}
+		>
+			<div
+				class="modal-box"
+				role="dialog"
+				aria-modal="true"
+				tabindex="-1"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<h3 class="modal-title">Accepter cette offre ?</h3>
+				<p class="modal-text">
+					Accepter l'offre à <strong>{eur(confirmOffer.price)}</strong> pour «
+					{confirmOffer.article?.name ?? `Lot #${confirmOffer.articleId}`} »
+					{#if confirmOffer.article}
+						(au lieu de {eur(confirmOffer.article.prix)})
+					{/if}
+					? L'acheteur pourra payer à ce prix réduit.
+				</p>
+				<div class="modal-actions">
+					<button class="btn-ghost-sm" onclick={closeAcceptConfirm}>Annuler</button>
+					<button
+						class="btn-accept"
+						disabled={offersBusyId === confirmOffer.ID}
+						onclick={confirmAcceptOffer}>Confirmer l'acceptation</button
+					>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Statistiques -->
+	<GPanel style="margin-bottom:14px">
+		<Kicker>Statistiques</Kicker>
+		<div class="stats-row">
+			<div class="stat-tile">
+				<span class="stat-value">{articleStats.listed}</span>
+				<span class="stat-label">En vente</span>
+			</div>
+			<div class="stat-tile">
+				<span class="stat-value">{articleStats.sold}</span>
+				<span class="stat-label">Vendues</span>
+			</div>
+			<div class="stat-tile">
+				<span class="stat-value">{articleStats.totalViews}</span>
+				<span class="stat-label">Vues cumulées</span>
+			</div>
+		</div>
+	</GPanel>
 
 	<div class="two-col">
 		<!-- Wishlist -->
@@ -208,18 +436,107 @@
 			<Kicker>Mes achats · {orders.length}</Kicker>
 			<div class="item-list">
 				{#each orders as o (o.ID)}
-					<a class="item-row" href={`/lot/${o.articleId}`}>
+					<div class="item-row">
 						<span class="item-date">{fmtDate(o.CreatedAt)}</span>
-						<span class="item-name">{o.article?.name ?? `Lot #${o.articleId}`}</span>
+						<a class="item-name" href={`/lot/${o.articleId}`}
+							>{o.article?.name ?? `Lot #${o.articleId}`}</a
+						>
 						<GChip>{ORDER_STATUS_LABELS[o.status] ?? o.status}</GChip>
 						<span class="item-price">{eur(o.price)}</span>
-					</a>
+						{#if o.reviewed}
+							<span class="review-tag">avis laissé</span>
+						{:else if canReview(o)}
+							<button class="btn-ghost-sm" onclick={() => toggleReview(o)}>★ Avis</button>
+						{/if}
+					</div>
+					{#if reviewFormOrderId === o.ID}
+						<div class="review-form">
+							<div class="review-stars-input">
+								{#each [1, 2, 3, 4, 5] as n}
+									<button
+										type="button"
+										class="star-btn"
+										class:star-on={n <= reviewRating}
+										onclick={() => (reviewRating = n)}
+										aria-label={`${n} étoile${n > 1 ? 's' : ''}`}>★</button
+									>
+								{/each}
+							</div>
+							<textarea
+								placeholder="Commentaire (facultatif)…"
+								bind:value={reviewComment}
+								disabled={reviewBusy}
+								rows="2"></textarea>
+							<button class="btn-accept" disabled={reviewBusy} onclick={() => submitReview(o)}>
+								Envoyer l'avis
+							</button>
+						</div>
+					{/if}
 				{:else}
 					<p class="item-empty">Aucun achat pour l'instant.</p>
 				{/each}
 			</div>
+			{#if reviewMsg}<p class="action-msg">{reviewMsg}</p>{/if}
 		</GPanel>
 	</div>
+
+	{#if sentOffers.length > 0}
+		<GPanel style="margin-top:14px">
+			<Kicker>Mes offres envoyées · {sentOffers.length}</Kicker>
+			<div class="item-list">
+				{#each sentOffers as o (o.ID)}
+					<div class="item-row">
+						<span class="item-date">{fmtDate(o.CreatedAt)}</span>
+						<a class="item-name" href={`/lot/${o.articleId}`}
+							>{o.article?.name ?? `Lot #${o.articleId}`}</a
+						>
+						<GChip>{OFFER_STATUS_LABELS[o.status] ?? o.status}</GChip>
+						<span class="item-price">{eur(o.price)}</span>
+						{#if o.status === 'accepted'}
+							<button
+								class="btn-accept"
+								disabled={offersBusyId === o.ID}
+								onclick={() => payAcceptedOffer(o)}>Payer {eur(o.price)}</button
+							>
+						{/if}
+					</div>
+				{:else}
+					<p class="item-empty">Aucune offre envoyée pour l'instant.</p>
+				{/each}
+			</div>
+			{#if offersMsg}<p class="action-msg">{offersMsg}</p>{/if}
+		</GPanel>
+	{/if}
+
+	<!-- Mes annonces -->
+	<GPanel style="margin-top:14px">
+		<Kicker>Mes annonces · {myArticles.length}</Kicker>
+		<div class="item-list">
+			{#each myArticles as a (a.ID)}
+				<div class="listing-row">
+					<a class="item-name" href={`/lot/${a.ID}`}>{a.name}</a>
+					<span class="item-views" title="Vues">👁 {a.views}</span>
+					<GChip>{a.sold ? 'Vendue' : 'En vente'}</GChip>
+					<span class="item-price">{eur(a.prix)}</span>
+					<div class="listing-actions">
+						<a class="btn-ghost-sm" href={`/vendre?edit=${a.ID}`}>Modifier</a>
+						<button
+							class="btn-reject-sm"
+							disabled={articleBusyId === a.ID}
+							onclick={() => removeArticle(a)}>Supprimer</button
+						>
+					</div>
+				</div>
+			{:else}
+				<p class="item-empty">
+					Aucune annonce pour l'instant. <a href="/vendre">Mettez une pièce en vente</a>.
+				</p>
+			{/each}
+		</div>
+		{#if articlesMsg}
+			<p class="action-msg">{articlesMsg}</p>
+		{/if}
+	</GPanel>
 
 	<!-- Historique d'activité -->
 	<div class="history-wrap">
@@ -251,10 +568,10 @@
 	.state-msg {
 		text-align: center;
 		padding: 80px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #a39a8c;
-		letter-spacing: 0.18em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 
 	/* Identité */
@@ -270,25 +587,25 @@
 		min-width: 200px;
 	}
 	.identity-name {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: 46px;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: 40px;
 		line-height: 1.05;
 		margin: 8px 0 0;
 		letter-spacing: -0.01em;
-		color: #ece5da;
+		color: var(--c-text);
 	}
 	.identity-meta {
 		display: flex;
 		gap: 10px;
 		align-items: center;
 		margin-top: 8px;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.meta-sep {
-		color: #766d60;
+		color: var(--c-border);
 	}
 	.identity-btns {
 		display: flex;
@@ -297,21 +614,21 @@
 		flex-shrink: 0;
 	}
 	.btn-ghost {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
 		padding: 9px 22px;
 		border-radius: 7px;
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		border: 1px solid var(--c-border);
 		cursor: pointer;
 		background: transparent;
-		color: #a39a8c;
+		color: var(--c-text-tertiary);
 		transition:
 			border-color 120ms,
 			color 120ms;
 	}
 	.btn-ghost:hover {
-		border-color: rgba(236, 229, 218, 0.22);
-		color: #ece5da;
+		border-color: var(--c-ink);
+		color: var(--c-ink);
 	}
 
 	/* Ventes à valider */
@@ -320,7 +637,7 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 	}
 	.sale-actions {
 		display: flex;
@@ -329,7 +646,7 @@
 	}
 	.btn-accept,
 	.btn-reject {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12px;
 		font-weight: 600;
 		padding: 7px 14px;
@@ -339,13 +656,13 @@
 		transition: filter 120ms;
 	}
 	.btn-accept {
-		background: #86b3a4;
-		color: #191714;
+		background: var(--c-ink);
+		color: var(--c-bg);
 	}
 	.btn-reject {
 		background: transparent;
-		border: 1px solid rgba(215, 156, 134, 0.5);
-		color: #d79c86;
+		border: 1px solid var(--c-error);
+		color: var(--c-error);
 	}
 	.btn-accept:hover:not(:disabled),
 	.btn-reject:hover:not(:disabled) {
@@ -357,10 +674,196 @@
 		cursor: not-allowed;
 	}
 	.action-msg {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #86b3a4;
+		color: var(--c-ink);
+		font-weight: 600;
 		margin-top: 10px;
+	}
+
+	/* Statistiques */
+	.stats-row {
+		display: flex;
+		gap: 14px;
+		margin-top: 10px;
+		flex-wrap: wrap;
+	}
+	.stat-tile {
+		flex: 1;
+		min-width: 120px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 12px 16px;
+		border-radius: 8px;
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
+	}
+	.stat-value {
+		font-family: var(--f-serif);
+		font-size: 22px;
+		font-weight: 600;
+		color: var(--c-ink);
+	}
+	.stat-label {
+		font-family: var(--f-body);
+		font-size: 11.5px;
+		color: var(--c-text-muted);
+	}
+
+	/* Mes annonces */
+	.listing-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 11px 0;
+		border-bottom: 1px solid var(--c-border);
+	}
+	.item-views {
+		font-family: var(--f-body);
+		font-size: 11.5px;
+		color: var(--c-text-muted);
+		flex-shrink: 0;
+	}
+	.listing-actions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.btn-ghost-sm,
+	.btn-reject-sm {
+		font-family: var(--f-body);
+		font-size: 12px;
+		font-weight: 600;
+		padding: 6px 12px;
+		border-radius: 6px;
+		cursor: pointer;
+		text-decoration: none;
+		transition: filter 120ms;
+	}
+	.btn-ghost-sm {
+		background: transparent;
+		border: 1px solid var(--c-border);
+		color: var(--c-text-tertiary);
+	}
+	.btn-reject-sm {
+		background: transparent;
+		border: 1px solid var(--c-error);
+		color: var(--c-error);
+	}
+	.btn-ghost-sm:hover,
+	.btn-reject-sm:hover:not(:disabled) {
+		filter: brightness(1.15);
+	}
+	.btn-reject-sm:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Avis */
+	.review-tag {
+		font-family: var(--f-body);
+		font-size: 11.5px;
+		color: var(--c-text-muted);
+		font-style: italic;
+		flex-shrink: 0;
+	}
+	.review-form {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px 0 16px;
+		border-bottom: 1px solid var(--c-border);
+	}
+	.review-stars-input {
+		display: flex;
+		gap: 4px;
+	}
+	.star-btn {
+		background: none;
+		border: none;
+		font-size: 18px;
+		color: var(--c-border);
+		cursor: pointer;
+		padding: 0;
+		line-height: 1;
+	}
+	.star-btn.star-on {
+		color: var(--c-accent);
+	}
+
+	/* Offres */
+	.offer-vs-price {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-text-muted);
+		text-decoration: line-through;
+		flex-shrink: 0;
+	}
+	.offer-message {
+		font-family: var(--f-body);
+		font-size: 12px;
+		font-style: italic;
+		color: var(--c-text-muted);
+		margin: -4px 0 8px;
+		padding-bottom: 8px;
+		border-bottom: 1px solid var(--c-border);
+	}
+
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(43, 38, 32, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 20000;
+		padding: 20px;
+	}
+	.modal-box {
+		background: var(--c-surface);
+		border: 1px solid var(--c-border);
+		border-radius: 14px;
+		max-width: 420px;
+		width: 100%;
+		padding: 24px;
+		box-shadow: 0 20px 48px -12px rgba(43, 38, 32, 0.35);
+	}
+	.modal-title {
+		font-family: var(--f-serif);
+		font-size: 19px;
+		font-weight: 600;
+		color: var(--c-text);
+		margin: 0 0 12px;
+	}
+	.modal-text {
+		font-family: var(--f-body);
+		font-size: 13.5px;
+		line-height: 1.6;
+		color: var(--c-text-tertiary);
+		margin: 0 0 20px;
+	}
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+	}
+	.review-form textarea {
+		resize: vertical;
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
+		border-radius: 8px;
+		padding: 9px 12px;
+		color: var(--c-text);
+		font-family: var(--f-body);
+		font-size: 13px;
+	}
+	.review-form textarea:focus {
+		outline: none;
+		border-color: var(--c-ink);
+	}
+	.review-form .btn-accept {
+		align-self: flex-start;
 	}
 
 	/* 2 colonnes */
@@ -386,42 +889,46 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 		text-decoration: none;
 	}
 	.item-date {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 11px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 	}
 	.item-name {
 		flex: 1;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #ece5da;
+		color: var(--c-text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		text-decoration: none;
 	}
-	.item-row:hover .item-name {
-		color: #86b3a4;
+	.item-row:hover .item-name,
+	a.item-name:hover {
+		color: var(--c-ink);
 	}
 	.item-price {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		font-weight: 600;
+		color: var(--c-ink);
 		flex-shrink: 0;
 	}
 	.item-empty {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		line-height: 1.5;
 		padding: 12px 0;
 	}
 	.item-empty a {
-		color: #86b3a4;
+		color: var(--c-ink);
+		font-weight: 600;
 	}
 
 	/* Historique */
@@ -438,51 +945,52 @@
 		align-items: center;
 		gap: 12px;
 		padding: 11px 0;
-		border-bottom: 1px solid rgba(236, 229, 218, 0.1);
+		border-bottom: 1px solid var(--c-border);
 		text-decoration: none;
 	}
 	.tl-dot {
 		width: 7px;
 		height: 7px;
 		border-radius: 50%;
-		background: #766d60;
+		background: var(--c-border);
 		flex-shrink: 0;
 	}
 	.tl-dot.tl-buy {
-		background: #86b3a4;
+		background: var(--c-ink);
 	}
 	.tl-date {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 11px;
-		color: #766d60;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 		width: 82px;
 	}
 	.tl-action {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 10.5px;
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		flex-shrink: 0;
 		width: 68px;
 	}
 	.tl-name {
 		flex: 1;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
-		color: #ece5da;
+		color: var(--c-text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.tl-row:hover .tl-name {
-		color: #86b3a4;
+		color: var(--c-ink);
 	}
 	.tl-price {
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
+		font-family: var(--f-body);
 		font-size: 12.5px;
-		color: #a39a8c;
+		font-weight: 600;
+		color: var(--c-ink);
 		flex-shrink: 0;
 	}
 </style>

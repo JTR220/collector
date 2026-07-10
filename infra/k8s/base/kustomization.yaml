@@ -16,14 +16,27 @@ resources:
   - rabbitmq/service.yaml
   - auth-service/deployment.yaml
   - auth-service/service.yaml
+  - auth-service/servicemonitor.yaml
+  - auth-service/hpa.yaml
   - catalog-service/deployment.yaml
   - catalog-service/service.yaml
+  - catalog-service/pvc.yaml
+  - catalog-service/servicemonitor.yaml
   - price-tracker-service/deployment.yaml
   - price-tracker-service/service.yaml
+  - price-tracker-service/servicemonitor.yaml
+  - price-tracker-service/hpa.yaml
   - notification-service/deployment.yaml
   - notification-service/service.yaml
+  - notification-service/servicemonitor.yaml
+  - notification-service/hpa.yaml
   - collector-front/deployment.yaml
   - collector-front/service.yaml
+  - collector-front/hpa.yaml
+  - monitoring/grafana-dashboard-configmap.yaml
+
+# catalog-service reste hors HPA : son volume uploads est ReadWriteOnce,
+# donc replicas fige a 1 (voir catalog-service/pvc.yaml).
 
 # URLs d'API consommées au runtime par le front ($env/dynamic/public).
 # Valeurs localhost par défaut ; chaque overlay les remplace (behavior: replace)

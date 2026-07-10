@@ -10,7 +10,7 @@ describe('priceTracker API', () => {
 		vi.stubGlobal('fetch', fetchMock);
 	});
 
-	it('fetchPriceHistory ne requiert pas de token (route publique)', async () => {
+	it('fetchPriceHistory route publique (aucune coordonnee particuliere requise)', async () => {
 		fetchMock.mockResolvedValue({
 			ok: true,
 			json: async () => ({ count: 1, history: [{ new_price: 42 }] })
@@ -18,10 +18,9 @@ describe('priceTracker API', () => {
 
 		const history = await fetchPriceHistory(1);
 
-		const [url, init] = fetchMock.mock.calls[0];
+		const [url] = fetchMock.mock.calls[0];
 		expect(url).toContain('/api/v1/items/');
 		expect(url).toContain('/price-history');
-		expect((init?.headers as Record<string, string> | undefined)?.Authorization).toBeUndefined();
 		expect(history).toEqual([{ new_price: 42 }]);
 	});
 
@@ -30,29 +29,29 @@ describe('priceTracker API', () => {
 		expect(await fetchPriceHistory(1)).toEqual([]);
 	});
 
-	it('fetchAlerts envoie le token Bearer et le filtre unresolved', async () => {
+	it('fetchAlerts envoie credentials:include et le filtre unresolved', async () => {
 		fetchMock.mockResolvedValue({ ok: true, json: async () => ({ count: 0, alerts: [] }) });
 
-		await fetchAlerts('tok-abc', true);
+		await fetchAlerts(true);
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/api/v1/alerts?unresolved=true');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 	});
 
-	it('resolveAlert envoie PUT avec le token Bearer', async () => {
+	it('resolveAlert envoie PUT avec credentials:include', async () => {
 		fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
 
-		await resolveAlert('tok-abc', 'alert-1');
+		await resolveAlert('alert-1');
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/api/v1/alerts/alert-1/resolve');
 		expect(init.method).toBe('PUT');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 	});
 
 	it('rejette sur reponse non-ok', async () => {
 		fetchMock.mockResolvedValue({ ok: false, status: 403 });
-		await expect(fetchAlerts('tok', false)).rejects.toThrow(/403/);
+		await expect(fetchAlerts(false)).rejects.toThrow(/403/);
 	});
 });

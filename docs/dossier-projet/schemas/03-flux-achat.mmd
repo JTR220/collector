@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant B as Acheteur
+    participant F as Frontend
+    participant C as catalog-service
+    participant R as RabbitMQ
+    participant N as notification-service
+    B->>F: acheter un article
+    F->>C: POST /article/:id/buy
+    C-->>F: commande creee
+    C->>R: publish order.created
+    R->>N: notification vendeur

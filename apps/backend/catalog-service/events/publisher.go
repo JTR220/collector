@@ -17,6 +17,9 @@ const (
 	routingKeyPrice        = "price.updated"
 	routingKeyOrderCreated = "order.created"
 	routingKeyOrderDecided = "order.decided"
+	routingKeyOfferCreated = "offer.created"
+	routingKeyOfferDecided = "offer.decided"
+	routingKeyOfferBought  = "offer.purchased"
 )
 
 // Publisher publie les evenements metier du catalogue.
@@ -24,6 +27,9 @@ type Publisher interface {
 	PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64)
 	PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64)
 	PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool)
+	PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64)
+	PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool)
+	PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64)
 	Close()
 }
 
@@ -34,12 +40,27 @@ var Current Publisher = NoopPublisher{}
 // le service fonctionne normalement, sans publication.
 type NoopPublisher struct{}
 
-func (NoopPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {}
+func (NoopPublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
 func (NoopPublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
 }
 func (NoopPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
 }
-func (NoopPublisher) Close() {}
+func (NoopPublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
+func (NoopPublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
+func (NoopPublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	// no-op : RABBITMQ_URL absent, aucune publication attendue.
+}
+func (NoopPublisher) Close() {
+	// no-op : aucune connexion a fermer.
+}
 
 // AMQPPublisher publie sur RabbitMQ. La connexion s'etablit en arriere-plan
 // avec retry : le demarrage du service ne depend jamais du broker.
@@ -59,52 +80,75 @@ func NewAMQPPublisher(url string) *AMQPPublisher {
 
 func (p *AMQPPublisher) connectLoop() {
 	backoff := time.Second
-	for {
-		p.mu.Lock()
-		if p.closed {
-			p.mu.Unlock()
+	for !p.isClosed() {
+		conn, ch, err := p.dialAndDeclare()
+		if err != nil {
+			log.Printf("RabbitMQ indisponible (%v), nouvel essai dans %s", err, backoff)
+			time.Sleep(backoff)
+			backoff = nextPublisherBackoff(backoff)
+			continue
+		}
+
+		p.setActive(conn, ch)
+		log.Printf("RabbitMQ connecte, exchange %q pret", exchangeEvents)
+		<-conn.NotifyClose(make(chan *amqp.Error, 1))
+
+		if p.clearActive() {
 			return
 		}
-		p.mu.Unlock()
-
-		conn, err := amqp.Dial(p.url)
-		if err == nil {
-			ch, chErr := conn.Channel()
-			if chErr == nil {
-				chErr = ch.ExchangeDeclare(exchangeEvents, "topic", true, false, false, false, nil)
-			}
-			if chErr == nil {
-				p.mu.Lock()
-				p.conn = conn
-				p.ch = ch
-				p.mu.Unlock()
-				log.Printf("RabbitMQ connecte, exchange %q pret", exchangeEvents)
-
-				closeCh := conn.NotifyClose(make(chan *amqp.Error, 1))
-				<-closeCh
-
-				p.mu.Lock()
-				p.conn = nil
-				p.ch = nil
-				closed := p.closed
-				p.mu.Unlock()
-				if closed {
-					return
-				}
-				log.Printf("Connexion RabbitMQ perdue, reconnexion...")
-				backoff = time.Second
-				continue
-			}
-			_ = conn.Close()
-			err = chErr
-		}
-
-		log.Printf("RabbitMQ indisponible (%v), nouvel essai dans %s", err, backoff)
-		time.Sleep(backoff)
-		if backoff < 30*time.Second {
-			backoff *= 2
-		}
+		log.Printf("Connexion RabbitMQ perdue, reconnexion...")
+		backoff = time.Second
 	}
+}
+
+func (p *AMQPPublisher) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
+}
+
+// dialAndDeclare ouvre une connexion et un canal AMQP, puis declare
+// l'exchange collector.events. En cas d'erreur a n'importe quelle etape,
+// la connexion ouverte est refermee et l'erreur remontee telle quelle.
+func (p *AMQPPublisher) dialAndDeclare() (*amqp.Connection, *amqp.Channel, error) {
+	conn, err := amqp.Dial(p.url)
+	if err != nil {
+		return nil, nil, err
+	}
+	ch, err := conn.Channel()
+	if err == nil {
+		err = ch.ExchangeDeclare(exchangeEvents, "topic", true, false, false, false, nil)
+	}
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	return conn, ch, nil
+}
+
+func (p *AMQPPublisher) setActive(conn *amqp.Connection, ch *amqp.Channel) {
+	p.mu.Lock()
+	p.conn = conn
+	p.ch = ch
+	p.mu.Unlock()
+}
+
+// clearActive efface la connexion/canal courants et renvoie true si le
+// publisher a ete ferme entre-temps (Close), auquel cas connectLoop doit
+// s'arreter plutot que de tenter une reconnexion.
+func (p *AMQPPublisher) clearActive() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.conn = nil
+	p.ch = nil
+	return p.closed
+}
+
+func nextPublisherBackoff(d time.Duration) time.Duration {
+	if d >= 30*time.Second {
+		return 30 * time.Second
+	}
+	return d * 2
 }
 
 // PublishPriceUpdated publie l'evenement price.updated. Si le broker est
@@ -189,6 +233,55 @@ func (p *AMQPPublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID 
 		DecidedAt: time.Now().UTC(),
 	}
 	p.publishJSON(routingKeyOrderDecided, event, fmt.Sprintf("order.decided:%d:%v", orderID, accepted))
+}
+
+// PublishOfferCreated publie offer.created quand un acheteur propose un prix
+// negocie : le vendeur doit accepter ou refuser (notification-service s'en
+// charge, avec notification + email au vendeur).
+func (p *AMQPPublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+	event := OfferCreatedEvent{
+		OfferID:   ToEventUUID(offerID),
+		ItemID:    ToEventUUID(itemID),
+		ItemName:  itemName,
+		BuyerID:   ToEventUUID(buyerID),
+		SellerID:  ToEventUUID(sellerID),
+		Price:     price,
+		ListPrice: listPrice,
+		CreatedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOfferCreated, event, fmt.Sprintf("offer.created:%d", offerID))
+}
+
+// PublishOfferDecision publie offer.decided quand le vendeur accepte ou
+// refuse une offre : l'acheteur est notifie du resultat.
+func (p *AMQPPublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	event := OfferDecisionEvent{
+		OfferID:   ToEventUUID(offerID),
+		ItemID:    ToEventUUID(itemID),
+		ItemName:  itemName,
+		BuyerID:   ToEventUUID(buyerID),
+		SellerID:  ToEventUUID(sellerID),
+		Price:     price,
+		Accepted:  accepted,
+		DecidedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOfferDecided, event, fmt.Sprintf("offer.decided:%d:%v", offerID, accepted))
+}
+
+// PublishOfferPurchased publie offer.purchased quand l'acheteur a paye une
+// offre acceptee : le vendeur est informe que la vente est finalisee.
+func (p *AMQPPublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	event := OfferPurchasedEvent{
+		OfferID:     ToEventUUID(offerID),
+		OrderID:     ToEventUUID(orderID),
+		ItemID:      ToEventUUID(itemID),
+		ItemName:    itemName,
+		BuyerID:     ToEventUUID(buyerID),
+		SellerID:    ToEventUUID(sellerID),
+		Price:       price,
+		PurchasedAt: time.Now().UTC(),
+	}
+	p.publishJSON(routingKeyOfferBought, event, fmt.Sprintf("offer.purchased:%d", offerID))
 }
 
 // publishJSON serialise et publie un evenement sur l'exchange collector.events.

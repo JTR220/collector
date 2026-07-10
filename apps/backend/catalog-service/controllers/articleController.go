@@ -2,15 +2,25 @@ package controllers
 
 import (
 	"catalog-service/events"
+	"catalog-service/metrics"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/response"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+var errArticleNotPendingReview = errors.New("annonce deja moderee")
+
+const (
+	whereIDEquals      = "id = ?"
+	errArticleNotFound = "Article introuvable"
 )
 
 // sanitizeImageURL ne garde une URL de photo fournie par le vendeur que si
@@ -51,6 +61,7 @@ func CreateArticle(c *gin.Context) {
 	var article models.Article
 
 	if err := c.ShouldBindJSON(&article); err != nil {
+		metrics.RecordArticleCreated("invalid_input")
 		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
 		return
 	}
@@ -63,18 +74,28 @@ func CreateArticle(c *gin.Context) {
 	article.Seller = sellerDisplayName(c)
 	article.SaleType = "direct"
 	article.Sold = false
+	// Toute nouvelle annonce passe par la moderation avant d'etre visible
+	// publiquement (voir ApproveArticle/RejectArticle) ; le statut envoye par
+	// le client, s'il y en a un, est ignore (anti-auto-approbation).
+	article.Status = models.ArticleStatusPendingReview
 	// Visuel par defaut (Unsplash themee) si le vendeur n'a pas fourni de photo
-	// valide (schema https obligatoire — voir sanitizeImageURL).
+	// valide (schema https obligatoire — voir sanitizeImageURL). Galerie de
+	// depart alignee sur la couverture ; complete ensuite via l'upload.
 	article.ImageURL = sanitizeImageURL(article.ImageURL)
 	if article.ImageURL == "" {
-		article.ImageURL = repository.DefaultImageFor(article.CategoryID)
+		article.Images = repository.DefaultImagesFor(article.CategoryID)
+		article.ImageURL = article.Images[0]
+	} else {
+		article.Images = models.StringSlice{article.ImageURL}
 	}
 
 	if err := repository.DB.Create(&article).Error; err != nil {
+		metrics.RecordArticleCreated("error")
 		response.Error(c, http.StatusInternalServerError, "Erreur lors de la creation de l'article")
 		return
 	}
 
+	metrics.RecordArticleCreated("success")
 	c.JSON(http.StatusCreated, gin.H{
 		"status":  "created",
 		"article": article,
@@ -86,21 +107,70 @@ func GetArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.Preload("Category").First(&article, "id = ?", id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "Article introuvable")
+	// Route publique, sans contexte d'authentification : une annonce encore
+	// pending_review ou rejetee par la moderation ne doit pas etre consultable
+	// par lien direct. Le vendeur suit ses propres annonces (tous statuts)
+	// via /me/articles.
+	if err := repository.DB.Preload("Category").
+		Where("status = ?", models.ArticleStatusApproved).
+		First(&article, whereIDEquals, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
 		return
 	}
 
+	// Compteur de vues informatif (fiche consultee) : incrementation atomique
+	// en base puis reflet immediat dans la reponse, sans re-frapper la DB.
+	repository.DB.Model(&models.Article{}).Where(whereIDEquals, article.ID).UpdateColumn("views", gorm.Expr("views + 1"))
+	article.Views++
+
 	c.JSON(http.StatusOK, article)
+}
+
+// GetMyArticles renvoie toutes les annonces de l'utilisateur courant (vendues
+// incluses), pour la gestion depuis son profil — contrairement a
+// GetAllArticles qui n'expose que le catalogue public encore en vente.
+func GetMyArticles(c *gin.Context) {
+	var articles []models.Article
+	if err := repository.DB.Preload("Category").
+		Where("seller_id = ?", currentUserID(c)).
+		Order("id desc").Find(&articles).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer vos annonces")
+		return
+	}
+	c.JSON(http.StatusOK, articles)
+}
+
+// GetAllArticlesAdmin renvoie tout le catalogue (vendues incluses, tous
+// vendeurs, tous statuts de moderation), pour la moderation back-office —
+// reserve aux administrateurs. Filtre optionnel ?status=pending_review pour
+// cibler la file d'attente de moderation.
+func GetAllArticlesAdmin(c *gin.Context) {
+	var articles []models.Article
+	query := repository.DB.Preload("Category").Order("id desc")
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Find(&articles).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Impossible de recuperer le catalogue")
+		return
+	}
+	c.JSON(http.StatusOK, articles)
 }
 
 // GetAllArticles renvoie le catalogue, avec pagination optionnelle
 // (?limit=&offset=) pour que les clients puissent borner la reponse quand le
 // catalogue grossit. Sans parametre, le comportement historique est conserve.
+// Les pieces deja vendues sont exclues : une fois achetee, une annonce
+// disparait du catalogue public (l'historique acheteur/vendeur passe par
+// /me/orders et /me/sales, pas par cette route).
 func GetAllArticles(c *gin.Context) {
 	var articles []models.Article
 
-	query := repository.DB.Preload("Category").Order("id desc")
+	// Seules les annonces approuvees par la moderation sont visibles dans le
+	// catalogue public (voir ApproveArticle/RejectArticle).
+	query := repository.DB.Preload("Category").Order("id desc").
+		Where("sold = ?", false).
+		Where("status = ?", models.ArticleStatusApproved)
 	if limit, err := strconv.Atoi(c.Query("limit")); err == nil && limit > 0 {
 		query = query.Limit(limit)
 		if offset, err := strconv.Atoi(c.Query("offset")); err == nil && offset > 0 {
@@ -120,8 +190,8 @@ func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "Article introuvable")
+	if err := repository.DB.First(&article, whereIDEquals, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
 		return
 	}
 
@@ -143,8 +213,8 @@ func UpdateArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 
-	if err := repository.DB.First(&article, "id = ?", id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "Article introuvable")
+	if err := repository.DB.First(&article, whereIDEquals, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
 		return
 	}
 
@@ -166,6 +236,13 @@ func UpdateArticle(c *gin.Context) {
 	article.Description = input.Description
 	article.Prix = input.Prix
 	article.FraisPort = input.FraisPort
+	// Champ facultatif : laisse la photo actuelle inchangee si le vendeur ne
+	// fournit rien ou une URL invalide (pas de retour silencieux au visuel
+	// par defaut, contrairement a la creation ou une annonce sans photo est
+	// normale).
+	if sanitized := sanitizeImageURL(input.ImageURL); sanitized != "" {
+		article.ImageURL = sanitized
+	}
 	article.CategoryID = input.CategoryID
 	if input.Prix != oldPrix {
 		article.PriceHistory = append(article.PriceHistory, input.Prix)
@@ -186,4 +263,73 @@ func UpdateArticle(c *gin.Context) {
 		"status":  "success",
 		"article": article,
 	})
+}
+
+// ── Moderation ───────────────────────────────────────────────────────────
+//
+// Toute nouvelle annonce est creee au statut pending_review (CreateArticle)
+// et reste invisible du catalogue public (GetAllArticles, GetArticle)
+// jusqu'a decision d'un administrateur.
+
+// ApproveArticle rend une annonce en attente visible dans le catalogue
+// public. Reserve aux administrateurs (middleware AdminRequired).
+func ApproveArticle(c *gin.Context) {
+	decideArticleModeration(c, true)
+}
+
+// RejectArticle refuse une annonce en attente : elle reste invisible du
+// catalogue public. Reserve aux administrateurs (middleware AdminRequired).
+func RejectArticle(c *gin.Context) {
+	decideArticleModeration(c, false)
+}
+
+func decideArticleModeration(c *gin.Context, approve bool) {
+	var article models.Article
+	if err := repository.DB.First(&article, whereIDEquals, c.Param("id")).Error; err != nil {
+		metrics.RecordModerationDecision(moderationLabel(approve), "not_found")
+		response.Error(c, http.StatusNotFound, errArticleNotFound)
+		return
+	}
+
+	newStatus := models.ArticleStatusRejected
+	if approve {
+		newStatus = models.ArticleStatusApproved
+	}
+
+	// UPDATE conditionne sur le statut actuel (comme decideOrder) : une
+	// double moderation concurrente (deux clics admin) ne peut pas faire
+	// passer une annonce deja approuvee/rejetee par un nouvel etat.
+	err := func() error {
+		res := repository.DB.Model(&models.Article{}).
+			Where("id = ? AND status = ?", article.ID, models.ArticleStatusPendingReview).
+			Update("status", newStatus)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return errArticleNotPendingReview
+		}
+		return nil
+	}()
+	if errors.Is(err, errArticleNotPendingReview) {
+		metrics.RecordModerationDecision(moderationLabel(approve), "already_decided")
+		response.Error(c, http.StatusConflict, "Cette annonce a deja ete moderee")
+		return
+	}
+	if err != nil {
+		metrics.RecordModerationDecision(moderationLabel(approve), "error")
+		response.Error(c, http.StatusInternalServerError, "Impossible de traiter la moderation")
+		return
+	}
+
+	article.Status = newStatus
+	metrics.RecordModerationDecision(moderationLabel(approve), "success")
+	c.JSON(http.StatusOK, gin.H{"article": article})
+}
+
+func moderationLabel(approve bool) string {
+	if approve {
+		return "approved"
+	}
+	return "rejected"
 }

@@ -1,33 +1,49 @@
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
+import { env } from '$env/dynamic/public';
+import { cart } from './cart';
+
+const AUTH_BASE_URL = env.PUBLIC_AUTH_API_BASE_URL ?? 'http://localhost:8080';
 
 export type AuthUser = { id: number; name: string; email: string; role?: string };
-type AuthState = { token: string | null; user: AuthUser | null };
+type AuthState = { user: AuthUser | null };
 
+// Le JWT lui-meme ne transite plus jamais par du JS (cookie httpOnly de
+// session, voir auth-service) : seul le profil utilisateur — non sensible —
+// est mis en cache ici pour un affichage optimiste (garde de route
+// synchrone, en-tete) sans attendre un aller-retour reseau. Il n'a aucune
+// valeur d'authentification : chaque appel API protege reste verifie
+// serveur via le cookie (credentials:'include').
 function createAuth() {
 	const initial: AuthState = browser
-		? {
-				token: localStorage.getItem('collector_token'),
-				user: JSON.parse(localStorage.getItem('collector_user') ?? 'null')
-			}
-		: { token: null, user: null };
+		? { user: JSON.parse(localStorage.getItem('collector_user') ?? 'null') }
+		: { user: null };
 
 	const { subscribe, set } = writable<AuthState>(initial);
 
 	return {
 		subscribe,
-		login(token: string, user: AuthUser) {
-			localStorage.setItem('collector_token', token);
+		login(user: AuthUser) {
 			localStorage.setItem('collector_user', JSON.stringify(user));
-			set({ token, user });
+			set({ user });
 		},
 		logout() {
-			localStorage.removeItem('collector_token');
 			localStorage.removeItem('collector_user');
-			set({ token: null, user: null });
+			set({ user: null });
+			// Le panier est un etat par utilisateur : sans ce clear, il survit a
+			// la deconnexion et le prochain compte connecte sur ce navigateur
+			// heriterait des articles du precedent.
+			cart.clear();
+			// Efface le cookie de session cote serveur. Best-effort (fire-and-
+			// forget) : meme si l'appel echoue, l'etat local est deja nettoye.
+			if (browser) {
+				fetch(`${AUTH_BASE_URL}/logout`, { method: 'POST', credentials: 'include' }).catch(
+					() => {}
+				);
+			}
 		}
 	};
 }
 
 export const auth = createAuth();
-export const isAuthenticated = derived(auth, ($auth) => !!$auth.token);
+export const isAuthenticated = derived(auth, ($auth) => !!$auth.user);

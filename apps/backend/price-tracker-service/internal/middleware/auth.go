@@ -3,11 +3,15 @@ package middleware
 import (
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
+
+// AuthCookieName est le cookie httpOnly de session pose par auth-service
+// (voir auth-service/middlewares.AuthCookieName — meme nom, doit rester en
+// phase).
+const AuthCookieName = "collector_token"
 
 // AuthRequired reprend la convention JWT partagee par auth-service et
 // catalog-service : meme secret HS256 (JWT_SECRET), memes claims.
@@ -22,13 +26,13 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		authHeader := c.GetHeader("Authorization")
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+		// Seul mecanisme d'authentification : le cookie httpOnly de session
+		// (jamais de fallback Authorization Bearer).
+		tokenString, err := c.Cookie(AuthCookieName)
+		if err != nil || tokenString == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token requis"})
 			return
 		}
-
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {

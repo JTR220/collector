@@ -1,8 +1,8 @@
 # Secrets — génération des SealedSecrets (staging & prod)
 
 Les services lisent leurs secrets depuis un `Secret` Kubernetes nommé
-**`collector-secrets`** (clés : `JWT_SECRET`, `DB_PASSWORD`, `RABBITMQ_URL`,
-`RABBITMQ_DEFAULT_USER/PASS`, `PRICE_DATABASE_DSN`, `NOTIF_DATABASE_DSN`).
+**`collector-secrets`** (clés : `JWT_SECRET`, `DB_PASSWORD`, `INTERNAL_SECRET`,
+`RABBITMQ_URL`, `RABBITMQ_DEFAULT_USER/PASS`, `PRICE_DATABASE_DSN`, `NOTIF_DATABASE_DSN`).
 
 On ne committe **jamais** ce Secret en clair. On committe un **SealedSecret**
 chiffré avec la clé publique du cluster : seul le controller `sealed-secrets`

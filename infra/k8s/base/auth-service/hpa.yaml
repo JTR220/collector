@@ -1,0 +1,21 @@
+# HPA CPU : demo de montee en charge (grille eval, indicateur "environnement
+# managé + montée en charge démontrée"). catalog-service reste hors HPA
+# (volume ReadWriteOnce -> replicas fige a 1, voir pvc.yaml).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

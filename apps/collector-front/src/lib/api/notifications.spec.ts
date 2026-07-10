@@ -18,17 +18,17 @@ describe('notifications REST', () => {
 		vi.stubGlobal('fetch', fetchMock);
 	});
 
-	it('fetchNotifications appelle la bonne URL avec le token Bearer', async () => {
+	it('fetchNotifications appelle la bonne URL avec credentials:include', async () => {
 		fetchMock.mockResolvedValue({
 			ok: true,
 			json: async () => ({ count: 0, notifications: [] })
 		});
 
-		await fetchNotifications('tok-abc', 10);
+		await fetchNotifications(10);
 
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(url).toContain('/api/v1/notifications?limit=10');
-		expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-abc');
+		expect(init.credentials).toBe('include');
 	});
 
 	it('fetchUnreadCount extrait unread_count', async () => {
@@ -37,13 +37,13 @@ describe('notifications REST', () => {
 			json: async () => ({ unread_count: 7 })
 		});
 
-		const count = await fetchUnreadCount('tok-abc');
+		const count = await fetchUnreadCount();
 		expect(count).toBe(7);
 	});
 
 	it('rejette sur reponse non-ok', async () => {
 		fetchMock.mockResolvedValue({ ok: false, status: 500 });
-		await expect(fetchUnreadCount('tok')).rejects.toThrow(/500/);
+		await expect(fetchUnreadCount()).rejects.toThrow(/500/);
 	});
 });
 
@@ -75,15 +75,15 @@ describe('connectNotifications (reconnexion)', () => {
 		vi.useRealTimers();
 	});
 
-	it('ouvre une connexion WebSocket vers /ws?token=', () => {
-		socket = connectNotifications('tok-xyz', () => {});
+	it('ouvre une connexion WebSocket vers /ws (auth par cookie httpOnly, envoye automatiquement)', () => {
+		socket = connectNotifications(() => {});
 		expect(FakeWebSocket.instances).toHaveLength(1);
 		// nosemgrep: javascript.lang.security.detect-insecure-websocket -- URL de dev attendue dans le test
-		expect(FakeWebSocket.instances[0].url).toBe('ws://localhost:8083/ws?token=tok-xyz');
+		expect(FakeWebSocket.instances[0].url).toBe('ws://localhost:8083/ws');
 	});
 
 	it('se reconnecte apres une fermeture', () => {
-		socket = connectNotifications('tok-xyz', () => {});
+		socket = connectNotifications(() => {});
 		expect(FakeWebSocket.instances).toHaveLength(1);
 
 		// Simule une perte de connexion : un nouveau socket apparait apres le backoff.
@@ -93,7 +93,7 @@ describe('connectNotifications (reconnexion)', () => {
 	});
 
 	it('ne se reconnecte pas apres close()', () => {
-		socket = connectNotifications('tok-xyz', () => {});
+		socket = connectNotifications(() => {});
 		socket.close();
 		FakeWebSocket.instances[0].onclose?.();
 		vi.advanceTimersByTime(5000);

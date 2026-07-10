@@ -2,6 +2,47 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+:root {
+	/* Fonds */
+	--c-bg: #f6f1e6;
+	--c-surface: #fffdf8;
+	--c-border: #e4dcc8;
+
+	/* Ink / accents de marque */
+	--c-ink: #1e3b2c;
+	--c-ink-hover: #16301f;
+	--c-accent: #c1552f;
+	--c-accent-hover: #a8481f;
+
+	/* Texte */
+	--c-text: #2b2620;
+	--c-text-muted: #8a7a64;
+	--c-text-tertiary: #5b5142;
+
+	/* Badges */
+	--c-badge-verified-bg: #e4eee6;
+	--c-badge-moderation-bg: #f1e7ce;
+	--c-icon-muted: #c9be9e;
+
+	/* Etats */
+	--c-success: #3f7a52;
+	--c-error: #b0432a;
+
+	/* Typo */
+	--f-serif: 'Domine', Georgia, serif;
+	--f-body: 'Work Sans', system-ui, sans-serif;
+
+	/* Rayons */
+	--r-card: 14px;
+	--r-input: 9px;
+	--r-pill: 999px;
+}
+
+body {
+	background: var(--c-bg);
+	color: var(--c-text);
+}
+
 @keyframes holoPulse {
 	0%,
 	100% {

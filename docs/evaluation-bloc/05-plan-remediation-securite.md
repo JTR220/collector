@@ -3,16 +3,24 @@
 ## Méthode
 
 Analyse basée sur (1) une revue du code des flux sensibles (authentification,
-paiement, messagerie), (2) l'état des scans automatisés du pipeline (Trivy,
-gosec, govulncheck — 0 CRITICAL/HIGH bloquant en CI au moment de la
-rédaction), et (3) la confrontation du comportement réel de l'application aux
-exigences explicites du contexte métier (notamment l'interdiction d'échanger
-des coordonnées personnelles entre acheteur et vendeur).
+paiement, messagerie, publication d'annonce), (2) l'état des scans automatisés
+du pipeline (Trivy, gosec, govulncheck — 0 CRITICAL/HIGH bloquant en CI), et
+(3) la confrontation du comportement réel de l'application aux exigences
+explicites du contexte métier (notamment l'interdiction d'échanger des
+coordonnées personnelles entre acheteur et vendeur).
+
+**Mise à jour (10/07/2026)** : les 5 constats de l'audit initial ont été
+revérifiés directement dans le code et l'infrastructure courante. **Les 5 sont
+désormais couverts** — 4 par des évolutions déjà livrées au fil des sessions
+précédentes, la 5e (Kyverno) par le passage `Audit → Enforce` effectué dans le
+cadre de cette mise à jour. Le détail de chaque remédiation est conservé
+ci-dessous pour la soutenance (constat → remédiation → preuve), plutôt que
+supprimé, afin de pouvoir présenter la démarche d'audit elle-même au jury.
 
 ## Bonnes pratiques déjà en place dans le POC
 
 Pour mémoire (le sujet demande ≥2 bonnes pratiques intégrées, en voici plus
-de deux, déjà en production dans le code) :
+de deux) :
 
 - **JWT fail-fast** : les 4 services refusent de démarrer sans `JWT_SECRET`
   explicite (aucun secret par défaut compilé en dur), et rejettent toute
@@ -31,101 +39,120 @@ de deux, déjà en production dans le code) :
   secret n'est pas configuré.
 - **Chaîne de confiance des images** : distroless non-root, scan Trivy
   bloquant avant push, signature cosign keyless, SBOM Syft, vérification de
-  signature à l'admission par Kyverno.
+  signature à l'admission par Kyverno (désormais bloquante, cf. ci-dessous).
 - **Anti double-vente** : transaction SQL avec `UPDATE ... WHERE sold=false`
   conditionnel, empêchant deux acheteurs concurrents de réserver la même
   pièce.
 
-## Vulnérabilités / risques identifiés
+## État des remédiations (constat → action → preuve)
 
-### Critique — messagerie sans filtre anti-coordonnées personnelles
+### 1. Critique — messagerie sans filtre anti-coordonnées personnelles — **Résolu**
 
-Le contexte est explicite : *« Le système doit donc empêcher l'échange
-d'informations personnelles telles que l'email, un numéro de téléphone »*.
-La messagerie directe acheteur↔vendeur actuellement implémentée
-(`notification-service`, table `messages`) ne filtre **aucun** contenu — un
-utilisateur peut transmettre librement un email ou un numéro de téléphone
-pour organiser un paiement hors plateforme, contournant la commission de 5 %
-et la garantie qualité assurée par Collector.shop.
+**Constat initial** : le contexte exige explicitement d'empêcher l'échange
+d'email ou de téléphone dans la messagerie acheteur↔vendeur, pour protéger la
+commission de 5 % et la garantie qualité de Collector.shop. Aucun filtre
+n'existait sur `SendMessage`.
 
-**Impact** : contournement direct du modèle économique (perte de commission)
-et de la garantie transactionnelle mise en avant par la direction.
+**Remédiation en place** : détection par expression régulière (email +
+téléphone FR/international) avant persistance du message, message rejeté avec
+erreur explicite à l'expéditeur.
 
-**Remédiation proposée** : validation du corps du message côté
-`notification-service` (`SendMessage`) avant persistance — détection par
-expression régulière des motifs email et numéro de téléphone (formats FR/
-internationaux courants), rejet ou masquage du message avec message
-d'erreur explicite à l'expéditeur. Complément possible : détection de
-motifs contournés (espacement volontaire, « at » écrit en toutes lettres) en
-V2, hors périmètre du prototype.
+**Preuve** : [`notification-service/internal/pii/filter.go`](../../apps/backend/notification-service/internal/pii/filter.go)
+(fonction `Detect`), testé par
+[`filter_test.go`](../../apps/backend/notification-service/internal/pii/filter_test.go).
 
-### Élevé — jeton d'authentification en `localStorage`
+### 2. Élevé — jeton d'authentification en `localStorage` — **Résolu**
 
-Le front stocke le JWT en `localStorage` (`src/lib/stores/auth.ts`),
-accessible à tout script exécuté dans la page — une faille XSS, même
-mineure, entraînerait un vol de session complet. Un cookie `httpOnly` est
-déjà utilisé en parallèle côté `auth-service` (`collector_token`) pour la
-session navigateur, mais le front continue d'utiliser le token JavaScript
-pour les appels `Authorization: Bearer` vers les autres services.
+**Constat initial** : le JWT complet était stocké en `localStorage`,
+exploitable par toute injection XSS pour un vol de session total.
 
-**Remédiation proposée** : faire porter l'authentification inter-services
-par le cookie `httpOnly` existant (déjà posé au login) plutôt que par un
-`Authorization` header lu depuis `localStorage` — nécessite que chaque
-service backend accepte le cookie en plus du header (patron déjà présent
-côté `auth-service`, `TokenFromRequest`), et une configuration CORS
-`credentials: include` cohérente entre tous les services.
+**Remédiation en place** : le JWT ne transite plus jamais côté JavaScript.
+Seul le profil utilisateur (non sensible) est mis en cache en `localStorage`
+pour un affichage optimiste ; l'authentification effective repose sur le
+cookie `httpOnly` posé par `auth-service`, envoyé via `credentials: include`.
 
-### Moyen — publication d'annonce sans contrôle avant mise en ligne
+**Preuve** : [`collector-front/src/lib/stores/auth.ts`](../../apps/collector-front/src/lib/stores/auth.ts)
+(commentaire explicite ligne 10 : *« Le JWT lui-même ne transite plus jamais
+par du JS »*).
 
-Le contexte exige : *« La mise en ligne d'un article est proposé à la vente
-qu'après contrôle de Collector. Le contrôle doit pouvoir être automatisé le
-plus possible. »* `CreateArticle` publie aujourd'hui l'annonce immédiatement,
-sans état intermédiaire de modération.
+### 3. Moyen — publication d'annonce sans contrôle avant mise en ligne — **Résolu (contrôle manuel ; automatisation encore à faire)**
 
-**Remédiation proposée** : ajouter un statut `Article.ModerationStatus`
-(`pending_review` par défaut → `approved`/`rejected`), avec un contrôle
-automatisé de premier niveau (prix aberrant vs médiane de la catégorie,
-description trop courte, image absente) réutilisant la logique déjà en place
-dans `price-tracker-service` pour la détection d'anomalies de prix ; passage
-en `approved` automatique si aucun signal, sinon file de modération admin.
+**Constat initial** : le contexte exige un contrôle avant mise en vente
+publique, si possible automatisé. `CreateArticle` publiait l'annonce
+immédiatement.
 
-### Moyen — Kyverno en mode Audit, pas Enforce
+**Remédiation en place** : chaque annonce créée passe par défaut en statut
+`pending_review` (jamais le statut envoyé par le client, anti-auto-
+approbation) ; seules les annonces `approved` apparaissent dans le catalogue
+public ou sont consultables par lien direct ; un admin décide via
+`ApproveArticle`/`RejectArticle` (décisions tracées par métrique Prometheus).
 
-Les politiques Kyverno (vérification de signature cosign, interdiction de
-`:latest`, non-root obligatoire, limites de ressources) sont déployées mais
-en mode `Audit` (`docs/DEVSECOPS.md`) : elles journalisent les violations
-sans les bloquer. Un déploiement non conforme pourrait donc atteindre le
-cluster sans être arrêté.
+**Limite assumée** : la décision reste **100 % manuelle** — le premier niveau
+de contrôle automatisé évoqué à titre d'exemple dans le constat initial (prix
+aberrant vs médiane, description trop courte, image absente, auto-approbation
+si aucun signal) n'est pas implémenté. C'est un axe d'amélioration réaliste à
+mentionner à l'oral plutôt qu'un point à cacher : la porte de sécurité
+(rien de non modéré n'est public) est fermée, l'optimisation de charge de
+modération reste ouverte.
 
-**Remédiation proposée** : purger les `PolicyReport` existants
-(`kubectl get policyreport -A`), confirmer zéro violation résiduelle, puis
-basculer `validationFailureAction: Enforce` — déjà identifié comme prochain
-chantier dans `docs/DEVSECOPS.md`.
+**Preuve** : [`catalog-service/models/article.go`](../../apps/backend/catalog-service/models/article.go)
+(constantes `ArticleStatusPendingReview/Approved/Rejected`),
+[`catalog-service/controllers/articleController.go`](../../apps/backend/catalog-service/controllers/articleController.go)
+(`CreateArticle`, `GetArticle`, `decideArticleModeration`).
 
-### Faible — pas de composante d'observabilité applicative
+### 4. Moyen — Kyverno en mode Audit, pas Enforce — **Résolu**
 
-Le stack `kube-prometheus-stack` est déployé au niveau infrastructure, mais
-aucun service Go n'expose de métriques applicatives (`/metrics`). En cas
-d'incident (ex. pic de commandes refusées, latence de la messagerie), il n'y
-a aujourd'hui aucune donnée applicative pour diagnostiquer rapidement.
+**Constat initial** : les 4 policies Kyverno (signature cosign, non-root,
+no-latest, requests/limits) journalisaient les violations sans bloquer
+l'admission — un déploiement non conforme aurait pu atteindre le cluster.
 
-**Remédiation proposée** : instrumenter au minimum `catalog-service` et
-`notification-service` avec le client Prometheus Go standard (compteur de
-requêtes par statut, histogramme de latence), pré-requis déjà noté dans
-`docs/DEVSECOPS.md` pour l'analyse canary automatique.
+**Remédiation appliquée le 10/07/2026** : `validationFailureAction` basculé de
+`Audit` à `Enforce` sur les 4 policies.
 
-## Priorisation
+**Preuve** : [`infra/policies/verify-images.yaml`](../../infra/policies/verify-images.yaml),
+[`disallow-latest-tag.yaml`](../../infra/policies/disallow-latest-tag.yaml),
+[`require-resources.yaml`](../../infra/policies/require-resources.yaml),
+[`require-run-as-nonroot.yaml`](../../infra/policies/require-run-as-nonroot.yaml).
 
-| # | Remédiation | Sévérité | Effort estimé | Priorité |
-|---|---|---|---|---|
-| 1 | Filtre anti-coordonnées personnelles (messagerie) | Critique | Faible (regex + test) | **P0** |
-| 2 | Cookie httpOnly pour tous les appels inter-services | Élevé | Moyen (tous les clients front) | P1 |
-| 3 | Contrôle de modération avant publication d'article | Moyen | Moyen | P1 |
-| 4 | Kyverno Audit → Enforce | Moyen | Faible (une fois purgé) | P2 |
-| 5 | Instrumentation Prometheus applicative | Faible (mais bloque la démo de charge outillée) | Moyen | P2 |
+**Point de vigilance avant la soutenance** : ce changement n'a pas pu être
+revérifié contre les `PolicyReport` du cluster réel depuis ce poste (pas
+d'accès `kubectl`/`kubeseal` configuré ici). Avant de synchroniser Argo CD sur
+ce commit, lancer `kubectl get policyreport -A` sur le cluster pour confirmer
+zéro violation résiduelle — sinon des pods existants non conformes (image non
+signée, ressources non définies) seraient bloqués au prochain rollout.
 
-La priorisation reflète à la fois la sévérité métier (P0 = contournement
-direct du modèle économique et d'une exigence contractuelle explicite du
-contexte) et le rapport effort/risque (les remédiations P1/P2 sont
-importantes mais n'exposent pas à un contournement immédiat de l'exigence
-métier).
+### 5. Faible — pas de composante d'observabilité applicative — **Résolu**
+
+**Constat initial** : `kube-prometheus-stack` était déployé au niveau
+infrastructure, mais aucun service Go n'exposait de métriques applicatives.
+
+**Remédiation en place** : `catalog-service` expose désormais `/metrics`
+(compteurs requêtes HTTP par route/statut, histogramme de latence, compteurs
+métier — créations d'articles, commandes, décisions de modération, uploads
+d'image).
+
+**Preuve** : [`catalog-service/metrics/metrics.go`](../../apps/backend/catalog-service/metrics/metrics.go).
+
+## Priorisation (état au 10/07/2026)
+
+| # | Remédiation | Sévérité | Statut |
+|---|---|---|---|
+| 1 | Filtre anti-coordonnées personnelles (messagerie) | Critique | ✅ Résolu |
+| 2 | Cookie httpOnly pour l'authentification | Élevé | ✅ Résolu |
+| 3 | Contrôle de modération avant publication d'article | Moyen | ✅ Résolu (manuel) |
+| 4 | Kyverno Audit → Enforce | Moyen | ✅ Résolu (à revalider sur cluster) |
+| 5 | Instrumentation Prometheus applicative | Faible | ✅ Résolu (catalog-service) |
+
+## Axes ouverts identifiés en repassant l'audit
+
+Ces points ne sont pas des vulnérabilités mais des limites assumées, à
+mentionner spontanément à l'oral pour montrer la maîtrise du périmètre :
+
+- **Automatisation de la modération** (cf. #3) : premier niveau de règles
+  auto-approve/à-signaler non implémenté, tout passe par un admin humain.
+- **Instrumentation Prometheus incomplète** : seul `catalog-service` expose
+  des métriques applicatives ; `auth-service`, `notification-service` et
+  `price-tracker-service` restent à instrumenter pour une observabilité
+  homogène.
+- **Rotation de la clé privée sealed-secrets** non encore sauvegardée hors
+  cluster (voir `infra/secrets/README.md`, section Rotation).

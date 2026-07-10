@@ -12,7 +12,10 @@ import (
 
 const testSecret = "secret-de-test"
 
-func performRequest(t *testing.T, authHeader string) *httptest.ResponseRecorder {
+// performRequest simule une requete navigateur : le JWT (s'il y en a un)
+// est porte par le cookie httpOnly, seul mecanisme d'authentification
+// (voir TokenFromRequest) — plus de fallback Authorization Bearer.
+func performRequest(t *testing.T, cookieValue string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -26,8 +29,8 @@ func performRequest(t *testing.T, authHeader string) *httptest.ResponseRecorder 
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	if authHeader != "" {
-		req.Header.Set("Authorization", authHeader)
+	if cookieValue != "" {
+		req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: cookieValue})
 	}
 	r.ServeHTTP(w, req)
 	return w
@@ -50,13 +53,13 @@ func TestAuthRequiredWithoutConfiguredSecretReturns503(t *testing.T) {
 		"user_id": float64(1),
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performRequest(t, "Bearer "+token)
+	w := performRequest(t, token)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status attendu 503, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }
 
-func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
+func TestAuthRequiredMissingCookieReturns401(t *testing.T) {
 	t.Setenv("JWT_SECRET", testSecret)
 	w := performRequest(t, "")
 	if w.Code != http.StatusUnauthorized {
@@ -64,17 +67,31 @@ func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
 	}
 }
 
-func TestAuthRequiredMalformedHeaderReturns401(t *testing.T) {
+func TestAuthRequiredBearerHeaderAloneIsRejected(t *testing.T) {
+	// Plus de fallback Authorization Bearer : un header pose a la main sans
+	// le cookie httpOnly ne doit plus authentifier personne.
 	t.Setenv("JWT_SECRET", testSecret)
-	w := performRequest(t, "Basic somevalue")
+	token := signToken(t, testSecret, jwt.MapClaims{
+		"user_id": float64(1),
+		"email":   "alice@example.com",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	r := gin.New()
+	r.Use(AuthRequired())
+	r.GET("/protected", func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
+		t.Fatalf("status attendu 401 (Bearer seul, sans cookie), obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }
 
 func TestAuthRequiredInvalidTokenReturns401(t *testing.T) {
 	t.Setenv("JWT_SECRET", testSecret)
-	w := performRequest(t, "Bearer not-a-real-jwt")
+	w := performRequest(t, "not-a-real-jwt")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -87,7 +104,7 @@ func TestAuthRequiredExpiredTokenReturns401(t *testing.T) {
 		"email":   "alice@example.com",
 		"exp":     time.Now().Add(-time.Hour).Unix(),
 	})
-	w := performRequest(t, "Bearer "+token)
+	w := performRequest(t, token)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -100,7 +117,7 @@ func TestAuthRequiredWrongSigningSecretReturns401(t *testing.T) {
 		"email":   "alice@example.com",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performRequest(t, "Bearer "+token)
+	w := performRequest(t, token)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -113,7 +130,7 @@ func TestAuthRequiredValidTokenSetsContextAndPasses(t *testing.T) {
 		"email":   "alice@example.com",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performRequest(t, "Bearer "+token)
+	w := performRequest(t, token)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}

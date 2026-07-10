@@ -51,9 +51,13 @@ services:
       DB_PORT: 5432
       FRONTEND_ORIGIN: http://localhost:5173
       JWT_SECRET: collector-jwt-secret-dev
-      # Secret partage avec notification-service pour l'endpoint interne
-      # /internal/users/:id (resolution d'email lors des commandes).
+      # Secret partage avec catalog-service/notification-service : verifie
+      # par leur endpoint interne /internal/users/:id/anonymize (cascade
+      # d'anonymisation a la suppression d'un compte, droit a l'effacement),
+      # et par /internal/users/:id (resolution d'email lors des commandes).
       INTERNAL_SECRET: collector-internal-secret-dev
+      CATALOG_SERVICE_URL: http://catalog-service:8081
+      NOTIFICATION_SERVICE_URL: http://notification-service:8083
     ports:
       - "8080:8080"
 
@@ -86,8 +90,13 @@ services:
       FRONTEND_ORIGIN: http://localhost:5173
       JWT_SECRET: collector-jwt-secret-dev
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      # Verifie par l'endpoint interne /internal/users/:id/anonymize, appele
+      # par auth-service a la suppression d'un compte (droit a l'effacement).
+      INTERNAL_SECRET: collector-internal-secret-dev
     ports:
       - "8081:8081"
+    volumes:
+      - catalog_uploads:/data/uploads
 
   price-tracker:
     build:
@@ -171,5 +180,40 @@ services:
     ports:
       - "5173:5173"
 
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: collector-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - auth-service
+      - catalog-service
+      - price-tracker
+      - notification-service
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: collector-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
+  catalog_uploads:
+  prometheus_data:
+  grafana_data:

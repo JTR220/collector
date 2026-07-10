@@ -26,6 +26,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/JTR220/collector/notification-service/internal/hub"
+	"github.com/JTR220/collector/notification-service/internal/idconv"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 )
 
@@ -48,7 +49,7 @@ func newIntegrationRouter(t *testing.T) (*gin.Engine, uuid.UUID, uuid.UUID) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := New(hub.New(), repo, testJWTSecret, nil)
+	h := New(hub.New(), repo, testJWTSecret, nil, testInternalSecret)
 	h.RegisterRoutes(r)
 
 	return r, uuid.New(), uuid.New()
@@ -63,12 +64,15 @@ func bearerToken(t *testing.T, userID uuid.UUID, name string) string {
 	})
 }
 
-func jsonBody(r http.Handler, method, path, bearer, body string) *httptest.ResponseRecorder {
+// jsonBody simule une requete navigateur : le JWT est porte par le cookie
+// httpOnly, seul mecanisme d'authentification — plus de fallback
+// Authorization Bearer.
+func jsonBody(r http.Handler, method, path, sessionToken, body string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
+	if sessionToken != "" {
+		req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: sessionToken})
 	}
 	r.ServeHTTP(w, req)
 	return w
@@ -149,5 +153,38 @@ func TestAcceptance_MessagingFullFlow(t *testing.T) {
 	w = jsonBody(router, http.MethodGet, "/api/v1/conversations", bobToken, "")
 	if bytes.Contains(w.Body.Bytes(), []byte(`"unread_count":1`)) {
 		t.Errorf("Bob ne devrait plus avoir de message non lu apres lecture, reponse : %s", w.Body.String())
+	}
+}
+
+// ── RGPD : la cascade d'anonymisation redige le nom d'un compte supprime dans ses messages ──
+
+func TestAcceptance_AnonymizeUserRedactsMessageNames(t *testing.T) {
+	router, _, _ := newIntegrationRouter(t)
+
+	alice := idconv.ToUUID(501)
+	bob := idconv.ToUUID(502)
+	aliceToken := bearerToken(t, alice, "Alice")
+
+	w := jsonBody(router, http.MethodPost, "/api/v1/messages", aliceToken,
+		`{"recipient_id":"`+bob.String()+`","body":"Bonjour, toujours dispo ?"}`)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("envoi message : status attendu 201, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodPatch, "/internal/users/501/anonymize", nil)
+	req.Header.Set("X-Internal-Secret", testInternalSecret)
+	anonW := httptest.NewRecorder()
+	router.ServeHTTP(anonW, req)
+	if anonW.Code != http.StatusOK {
+		t.Fatalf("anonymisation : status attendu 200, obtenu %d (%s)", anonW.Code, anonW.Body.String())
+	}
+
+	bobToken := bearerToken(t, bob, "Bob")
+	w = jsonBody(router, http.MethodGet, "/api/v1/conversations", bobToken, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("liste conversations (Bob) : status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"other_user_name":"Utilisateur supprime"`)) {
+		t.Errorf("le nom d'Alice devrait etre anonymise, reponse : %s", w.Body.String())
 	}
 }

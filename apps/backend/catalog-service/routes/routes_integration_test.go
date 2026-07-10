@@ -7,10 +7,18 @@ package routes_test
 // passent par le vrai routeur (routes.InitRouter), donc par le vrai
 // middleware JWT et le vrai enchainement HTTP method+path+params — c'est le
 // deuxieme type de test exige par le sujet, en plus des tests unitaires.
+//
+// Les tests TestAcceptance_*PublishesOrderCreatedEvent /
+// *PublishesOrderDecidedEvent verifient, toujours au niveau HTTP (via le
+// routeur reel), que les evenements RabbitMQ order.created / order.decided
+// sont bien publies (ou non publies quand ils ne doivent pas l'etre) : le
+// vrai AMQPPublisher est remplace par un fakePublisher qui capture les
+// appels sans necessiter de broker.
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,17 +29,58 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 
+	"catalog-service/events"
+	"catalog-service/middlewares"
 	"catalog-service/models"
 	"catalog-service/repository"
 	"catalog-service/routes"
 )
 
-const testJWTSecret = "acceptance-test-secret"
+// ── Donnees de test variabilisees ───────────────────────────────────────
+//
+// Regroupees ici pour que chaque test lise son intention (qui achete, qui
+// vend, quel statut est attendu) sans re-hardcoder des valeurs eparpillees.
+
+const (
+	testJWTSecret      = "acceptance-test-secret"
+	testFrontendOrigin = "http://localhost:5173"
+
+	testUserEmail = "user@example.com"
+	testUserRole  = "user"
+	testUserName  = "Testeur"
+	testTokenTTL  = time.Hour
+
+	// Identifiants d'utilisateurs de test. thirdPartyID represente un
+	// utilisateur tiers a la transaction acheteur/vendeur : "stranger" dans
+	// les tests d'autorisation, "autre acheteur" dans les tests de rachat
+	// apres refus — jamais les deux roles dans le meme test.
+	sellerID     = uint(1)
+	buyerID      = uint(2)
+	thirdPartyID = uint(3)
+
+	testCategoryName        = "Cartes"
+	testCategoryDescription = "TCG"
+	testArticleName         = "Dracaufeu 1ere edition"
+	testArticleDescription  = "PSA 9"
+	testArticlePrice        = 100.0
+	testArticleShippingFee  = 5.0
+
+	pathMyOrders = "/me/orders"
+	pathMySales  = "/me/sales"
+)
+
+func buyPath(articleID uint) string  { return "/article/" + itoaU(articleID) + "/buy" }
+func acceptPath(orderID uint) string { return "/order/" + itoaU(orderID) + "/accept" }
+func rejectPath(orderID uint) string { return "/order/" + itoaU(orderID) + "/reject" }
+
+func statusJSONField(status string) []byte {
+	return []byte(fmt.Sprintf(`"status":"%s"`, status))
+}
 
 func setupAcceptanceDB(t *testing.T) {
 	t.Helper()
 	t.Setenv("JWT_SECRET", testJWTSecret)
-	t.Setenv("FRONTEND_ORIGIN", "http://localhost:5173")
+	t.Setenv("FRONTEND_ORIGIN", testFrontendOrigin)
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -49,10 +98,10 @@ func tokenFor(t *testing.T, userID uint) string {
 	t.Helper()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
-		"email":   "user@example.com",
-		"role":    "user",
-		"name":    "Testeur",
-		"exp":     time.Now().Add(time.Hour).Unix(),
+		"email":   testUserEmail,
+		"role":    testUserRole,
+		"name":    testUserName,
+		"exp":     time.Now().Add(testTokenTTL).Unix(),
 	})
 	signed, err := token.SignedString([]byte(testJWTSecret))
 	if err != nil {
@@ -61,15 +110,16 @@ func tokenFor(t *testing.T, userID uint) string {
 	return signed
 }
 
-func seedSellableArticle(t *testing.T, sellerID uint) models.Article {
+func seedSellableArticle(t *testing.T, ownerID uint) models.Article {
 	t.Helper()
-	cat := models.Categorie{Name: "Cartes", Description: "TCG"}
+	cat := models.Categorie{Name: testCategoryName, Description: testCategoryDescription}
 	if err := repository.DB.Create(&cat).Error; err != nil {
 		t.Fatalf("seed categorie : %v", err)
 	}
 	art := models.Article{
-		Name: "Dracaufeu 1ere edition", Description: "PSA 9", Prix: 100, FraisPort: 5,
-		CategoryID: cat.ID, SellerID: sellerID,
+		Name: testArticleName, Description: testArticleDescription,
+		Prix: testArticlePrice, FraisPort: testArticleShippingFee,
+		CategoryID: cat.ID, SellerID: ownerID,
 	}
 	if err := repository.DB.Create(&art).Error; err != nil {
 		t.Fatalf("seed article : %v", err)
@@ -77,11 +127,14 @@ func seedSellableArticle(t *testing.T, sellerID uint) models.Article {
 	return art
 }
 
-func doJSON(r http.Handler, method, path, bearer string) *httptest.ResponseRecorder {
+// doJSON simule une requete navigateur authentifiee par le cookie httpOnly
+// de session (seul mecanisme d'authentification — plus de fallback
+// Authorization Bearer, voir middlewares.AuthRequired).
+func doJSON(r http.Handler, method, path, sessionToken string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, bytes.NewReader(nil))
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
+	if sessionToken != "" {
+		req.AddCookie(&http.Cookie{Name: middlewares.AuthCookieName, Value: sessionToken})
 	}
 	r.ServeHTTP(w, req)
 	return w
@@ -98,6 +151,87 @@ func decodeOrder(t *testing.T, w *httptest.ResponseRecorder) models.Order {
 	return body.Order
 }
 
+// ── Fake publisher : capture des evenements RabbitMQ sans broker reel ────
+
+type publishedOrderCreated struct {
+	orderID, itemID, buyerID, sellerID uint
+	itemName                           string
+	price                              float64
+}
+
+type publishedOrderDecision struct {
+	orderID, itemID, buyerID, sellerID uint
+	itemName                           string
+	price                              float64
+	accepted                           bool
+}
+
+type publishedOfferCreated struct {
+	offerID, itemID, buyerID, sellerID uint
+	itemName                           string
+	price, listPrice                   float64
+}
+
+type publishedOfferDecision struct {
+	offerID, itemID, buyerID, sellerID uint
+	itemName                           string
+	price                              float64
+	accepted                           bool
+}
+
+type publishedOfferPurchased struct {
+	offerID, orderID, itemID, buyerID, sellerID uint
+	itemName                                    string
+	price                                       float64
+}
+
+// fakePublisher implemente events.Publisher et se contente d'enregistrer les
+// appels, pour verifier depuis un test HTTP qu'un event a (ou n'a pas) ete
+// publie, sans dependre d'un broker RabbitMQ.
+type fakePublisher struct {
+	orderCreated   []publishedOrderCreated
+	orderDecided   []publishedOrderDecision
+	offerCreated   []publishedOfferCreated
+	offerDecided   []publishedOfferDecision
+	offerPurchased []publishedOfferPurchased
+}
+
+func (f *fakePublisher) PublishPriceUpdated(itemID, sellerID uint, oldPrice, newPrice float64) {}
+
+func (f *fakePublisher) PublishOrderCreated(orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	f.orderCreated = append(f.orderCreated, publishedOrderCreated{orderID, itemID, buyerID, sellerID, itemName, price})
+}
+
+func (f *fakePublisher) PublishOrderDecision(orderID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	f.orderDecided = append(f.orderDecided, publishedOrderDecision{orderID, itemID, buyerID, sellerID, itemName, price, accepted})
+}
+
+func (f *fakePublisher) PublishOfferCreated(offerID, itemID, buyerID, sellerID uint, itemName string, price, listPrice float64) {
+	f.offerCreated = append(f.offerCreated, publishedOfferCreated{offerID, itemID, buyerID, sellerID, itemName, price, listPrice})
+}
+
+func (f *fakePublisher) PublishOfferDecision(offerID, itemID, buyerID, sellerID uint, itemName string, price float64, accepted bool) {
+	f.offerDecided = append(f.offerDecided, publishedOfferDecision{offerID, itemID, buyerID, sellerID, itemName, price, accepted})
+}
+
+func (f *fakePublisher) PublishOfferPurchased(offerID, orderID, itemID, buyerID, sellerID uint, itemName string, price float64) {
+	f.offerPurchased = append(f.offerPurchased, publishedOfferPurchased{offerID, orderID, itemID, buyerID, sellerID, itemName, price})
+}
+
+func (f *fakePublisher) Close() {}
+
+// installFakePublisher remplace events.Current par un fakePublisher le temps
+// du test et restaure le publisher d'origine a la fin (t.Cleanup), pour ne
+// pas fuiter d'etat entre tests executes dans le meme package.
+func installFakePublisher(t *testing.T) *fakePublisher {
+	t.Helper()
+	fp := &fakePublisher{}
+	original := events.Current
+	events.Current = fp
+	t.Cleanup(func() { events.Current = original })
+	return fp
+}
+
 // ── Critère d'acceptation 1 : un acheteur ne peut pas acheter sa propre annonce ──
 
 func TestAcceptance_CannotBuyOwnArticle(t *testing.T) {
@@ -105,10 +239,9 @@ func TestAcceptance_CannotBuyOwnArticle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := routes.InitRouter()
 
-	seller := uint(1)
-	art := seedSellableArticle(t, seller)
+	art := seedSellableArticle(t, sellerID)
 
-	w := doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, seller))
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, sellerID))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("achat de sa propre annonce : status attendu 400, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -121,16 +254,15 @@ func TestAcceptance_BuyCreatesPendingOrderAndReservesArticle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := routes.InitRouter()
 
-	seller, buyer := uint(1), uint(2)
-	art := seedSellableArticle(t, seller)
+	art := seedSellableArticle(t, sellerID)
 
-	w := doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, buyer))
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("achat : status attendu 201, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 	order := decodeOrder(t, w)
-	if order.Status != "pending" {
-		t.Errorf("statut attendu 'pending' (en attente de validation vendeur), obtenu %q", order.Status)
+	if order.Status != models.OrderStatusPending {
+		t.Errorf("statut attendu %q (en attente de validation vendeur), obtenu %q", models.OrderStatusPending, order.Status)
 	}
 
 	var reloaded models.Article
@@ -147,13 +279,12 @@ func TestAcceptance_OnlySellerCanAcceptOrder(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := routes.InitRouter()
 
-	seller, buyer, stranger := uint(1), uint(2), uint(3)
-	art := seedSellableArticle(t, seller)
+	art := seedSellableArticle(t, sellerID)
 
-	w := doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, buyer))
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
 	order := decodeOrder(t, w)
 
-	w = doJSON(router, http.MethodPatch, "/order/"+itoaU(order.ID)+"/accept", tokenFor(t, stranger))
+	w = doJSON(router, http.MethodPatch, acceptPath(order.ID), tokenFor(t, thirdPartyID))
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("acceptation par un tiers : status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -166,28 +297,27 @@ func TestAcceptance_SellerAcceptsOrder(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := routes.InitRouter()
 
-	seller, buyer := uint(1), uint(2)
-	art := seedSellableArticle(t, seller)
+	art := seedSellableArticle(t, sellerID)
 
-	w := doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, buyer))
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
 	order := decodeOrder(t, w)
 
-	w = doJSON(router, http.MethodPatch, "/order/"+itoaU(order.ID)+"/accept", tokenFor(t, seller))
+	w = doJSON(router, http.MethodPatch, acceptPath(order.ID), tokenFor(t, sellerID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("acceptation vendeur : status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}
-	if got := decodeOrder(t, w).Status; got != "paid" {
-		t.Errorf("statut attendu 'paid' apres acceptation, obtenu %q", got)
+	if got := decodeOrder(t, w).Status; got != models.OrderStatusPaid {
+		t.Errorf("statut attendu %q apres acceptation, obtenu %q", models.OrderStatusPaid, got)
 	}
 
-	w = doJSON(router, http.MethodGet, "/me/orders", tokenFor(t, buyer))
-	if w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), []byte(`"status":"paid"`)) {
-		t.Errorf("/me/orders devrait lister la commande payee, obtenu %d (%s)", w.Code, w.Body.String())
+	w = doJSON(router, http.MethodGet, pathMyOrders, tokenFor(t, buyerID))
+	if w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), statusJSONField(models.OrderStatusPaid)) {
+		t.Errorf("%s devrait lister la commande payee, obtenu %d (%s)", pathMyOrders, w.Code, w.Body.String())
 	}
 
-	w = doJSON(router, http.MethodGet, "/me/sales", tokenFor(t, seller))
-	if w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), []byte(`"status":"paid"`)) {
-		t.Errorf("/me/sales devrait lister la vente payee, obtenu %d (%s)", w.Code, w.Body.String())
+	w = doJSON(router, http.MethodGet, pathMySales, tokenFor(t, sellerID))
+	if w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), statusJSONField(models.OrderStatusPaid)) {
+		t.Errorf("%s devrait lister la vente payee, obtenu %d (%s)", pathMySales, w.Code, w.Body.String())
 	}
 }
 
@@ -198,18 +328,17 @@ func TestAcceptance_SellerRejectsOrderReleasesArticle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := routes.InitRouter()
 
-	seller, buyer, otherBuyer := uint(1), uint(2), uint(3)
-	art := seedSellableArticle(t, seller)
+	art := seedSellableArticle(t, sellerID)
 
-	w := doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, buyer))
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
 	order := decodeOrder(t, w)
 
-	w = doJSON(router, http.MethodPatch, "/order/"+itoaU(order.ID)+"/reject", tokenFor(t, seller))
+	w = doJSON(router, http.MethodPatch, rejectPath(order.ID), tokenFor(t, sellerID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("refus vendeur : status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}
-	if got := decodeOrder(t, w).Status; got != "cancelled" {
-		t.Errorf("statut attendu 'cancelled' apres refus, obtenu %q", got)
+	if got := decodeOrder(t, w).Status; got != models.OrderStatusCancelled {
+		t.Errorf("statut attendu %q apres refus, obtenu %q", models.OrderStatusCancelled, got)
 	}
 
 	var reloaded models.Article
@@ -219,7 +348,7 @@ func TestAcceptance_SellerRejectsOrderReleasesArticle(t *testing.T) {
 	}
 
 	// La piece liberee doit pouvoir etre rachetee par un autre acheteur.
-	w = doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, otherBuyer))
+	w = doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, thirdPartyID))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("rachat apres refus : status attendu 201, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -232,20 +361,144 @@ func TestAcceptance_CannotDecideOrderTwice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := routes.InitRouter()
 
-	seller, buyer := uint(1), uint(2)
-	art := seedSellableArticle(t, seller)
+	art := seedSellableArticle(t, sellerID)
 
-	w := doJSON(router, http.MethodPost, "/article/"+itoaU(art.ID)+"/buy", tokenFor(t, buyer))
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
 	order := decodeOrder(t, w)
 
-	w = doJSON(router, http.MethodPatch, "/order/"+itoaU(order.ID)+"/accept", tokenFor(t, seller))
+	w = doJSON(router, http.MethodPatch, acceptPath(order.ID), tokenFor(t, sellerID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("premiere acceptation : status attendu 200, obtenu %d", w.Code)
 	}
 
-	w = doJSON(router, http.MethodPatch, "/order/"+itoaU(order.ID)+"/reject", tokenFor(t, seller))
+	w = doJSON(router, http.MethodPatch, rejectPath(order.ID), tokenFor(t, sellerID))
 	if w.Code != http.StatusConflict {
 		t.Fatalf("second traitement d'une commande deja acceptee : status attendu 409, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+// ── Critère d'acceptation 7/8 : publication des evenements RabbitMQ order.created / order.decided ──
+//
+// Le backlog (docs/evaluation-bloc/02-backlog-fonctionnalite-metier.md)
+// documentait ces criteres comme "verifies manuellement" faute de test
+// automatise : ces tests comblent ce trou, toujours au niveau HTTP (routeur
+// reel), en substituant un fakePublisher au vrai AMQPPublisher.
+
+func TestAcceptance_BuyPublishesOrderCreatedEvent(t *testing.T) {
+	setupAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+	fp := installFakePublisher(t)
+
+	art := seedSellableArticle(t, sellerID)
+
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
+	order := decodeOrder(t, w)
+
+	if len(fp.orderCreated) != 1 {
+		t.Fatalf("order.created : 1 publication attendue, obtenu %d", len(fp.orderCreated))
+	}
+	got := fp.orderCreated[0]
+	want := publishedOrderCreated{
+		orderID: order.ID, itemID: art.ID, buyerID: buyerID, sellerID: sellerID,
+		itemName: testArticleName, price: testArticlePrice,
+	}
+	if got != want {
+		t.Errorf("order.created publie = %+v, attendu %+v", got, want)
+	}
+}
+
+func TestAcceptance_FailedBuyDoesNotPublishOrderCreatedEvent(t *testing.T) {
+	setupAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+	fp := installFakePublisher(t)
+
+	art := seedSellableArticle(t, sellerID)
+
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, sellerID))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("achat de sa propre annonce : status attendu 400, obtenu %d", w.Code)
+	}
+	if len(fp.orderCreated) != 0 {
+		t.Errorf("aucun order.created ne devrait etre publie apres un achat refuse, obtenu %d", len(fp.orderCreated))
+	}
+}
+
+func TestAcceptance_AcceptPublishesOrderDecidedEvent(t *testing.T) {
+	setupAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+	fp := installFakePublisher(t)
+
+	art := seedSellableArticle(t, sellerID)
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
+	order := decodeOrder(t, w)
+
+	w = doJSON(router, http.MethodPatch, acceptPath(order.ID), tokenFor(t, sellerID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("acceptation vendeur : status attendu 200, obtenu %d", w.Code)
+	}
+
+	if len(fp.orderDecided) != 1 {
+		t.Fatalf("order.decided : 1 publication attendue, obtenu %d", len(fp.orderDecided))
+	}
+	got := fp.orderDecided[0]
+	want := publishedOrderDecision{
+		orderID: order.ID, itemID: art.ID, buyerID: buyerID, sellerID: sellerID,
+		itemName: testArticleName, price: testArticlePrice, accepted: true,
+	}
+	if got != want {
+		t.Errorf("order.decided publie = %+v, attendu %+v", got, want)
+	}
+}
+
+func TestAcceptance_RejectPublishesOrderDecidedEvent(t *testing.T) {
+	setupAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+	fp := installFakePublisher(t)
+
+	art := seedSellableArticle(t, sellerID)
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
+	order := decodeOrder(t, w)
+
+	w = doJSON(router, http.MethodPatch, rejectPath(order.ID), tokenFor(t, sellerID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("refus vendeur : status attendu 200, obtenu %d", w.Code)
+	}
+
+	if len(fp.orderDecided) != 1 {
+		t.Fatalf("order.decided : 1 publication attendue, obtenu %d", len(fp.orderDecided))
+	}
+	got := fp.orderDecided[0]
+	want := publishedOrderDecision{
+		orderID: order.ID, itemID: art.ID, buyerID: buyerID, sellerID: sellerID,
+		itemName: testArticleName, price: testArticlePrice, accepted: false,
+	}
+	if got != want {
+		t.Errorf("order.decided publie = %+v, attendu %+v", got, want)
+	}
+}
+
+func TestAcceptance_SecondDecisionDoesNotPublishEvent(t *testing.T) {
+	setupAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+	fp := installFakePublisher(t)
+
+	art := seedSellableArticle(t, sellerID)
+	w := doJSON(router, http.MethodPost, buyPath(art.ID), tokenFor(t, buyerID))
+	order := decodeOrder(t, w)
+
+	doJSON(router, http.MethodPatch, acceptPath(order.ID), tokenFor(t, sellerID))
+	w = doJSON(router, http.MethodPatch, rejectPath(order.ID), tokenFor(t, sellerID))
+	if w.Code != http.StatusConflict {
+		t.Fatalf("second traitement : status attendu 409, obtenu %d", w.Code)
+	}
+
+	if len(fp.orderDecided) != 1 {
+		t.Errorf("order.decided : une seule publication attendue malgre la double tentative, obtenu %d", len(fp.orderDecided))
 	}
 }
 

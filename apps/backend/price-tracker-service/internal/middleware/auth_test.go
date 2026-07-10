@@ -22,7 +22,10 @@ func signToken(t *testing.T, secret string, claims jwt.MapClaims) string {
 	return signed
 }
 
-func performAuthedRequest(t *testing.T, authHeader string, extraMiddleware ...gin.HandlerFunc) *httptest.ResponseRecorder {
+// performAuthedRequest simule une requete navigateur : le JWT (s'il y en a
+// un) est porte par le cookie httpOnly, seul mecanisme d'authentification —
+// plus de fallback Authorization Bearer.
+func performAuthedRequest(t *testing.T, cookieValue string, extraMiddleware ...gin.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -34,14 +37,14 @@ func performAuthedRequest(t *testing.T, authHeader string, extraMiddleware ...gi
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	if authHeader != "" {
-		req.Header.Set("Authorization", authHeader)
+	if cookieValue != "" {
+		req.AddCookie(&http.Cookie{Name: AuthCookieName, Value: cookieValue})
 	}
 	r.ServeHTTP(w, req)
 	return w
 }
 
-func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
+func TestAuthRequiredMissingCookieReturns401(t *testing.T) {
 	t.Setenv("JWT_SECRET", testSecret)
 	w := performAuthedRequest(t, "")
 	if w.Code != http.StatusUnauthorized {
@@ -49,9 +52,27 @@ func TestAuthRequiredMissingHeaderReturns401(t *testing.T) {
 	}
 }
 
+func TestAuthRequiredBearerHeaderAloneIsRejected(t *testing.T) {
+	// Plus de fallback Authorization Bearer : un header pose a la main sans
+	// le cookie httpOnly ne doit plus authentifier personne.
+	t.Setenv("JWT_SECRET", testSecret)
+	token := signToken(t, testSecret, jwt.MapClaims{"user_id": "1", "exp": time.Now().Add(time.Hour).Unix()})
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	r := gin.New()
+	r.Use(AuthRequired())
+	r.GET("/protected", func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status attendu 401 (Bearer seul, sans cookie), obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
 func TestAuthRequiredInvalidTokenReturns401(t *testing.T) {
 	t.Setenv("JWT_SECRET", testSecret)
-	w := performAuthedRequest(t, "Bearer not-a-real-jwt")
+	w := performAuthedRequest(t, "not-a-real-jwt")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -64,7 +85,7 @@ func TestAuthRequiredValidTokenPasses(t *testing.T) {
 		"role":    "user",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performAuthedRequest(t, "Bearer "+token)
+	w := performAuthedRequest(t, token)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -77,7 +98,7 @@ func TestAdminRequiredBlocksNonAdmin(t *testing.T) {
 		"role":    "user",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performAuthedRequest(t, "Bearer "+token, AdminRequired())
+	w := performAuthedRequest(t, token, AdminRequired())
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -90,7 +111,7 @@ func TestAdminRequiredAllowsAdmin(t *testing.T) {
 		"role":    "admin",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performAuthedRequest(t, "Bearer "+token, AdminRequired())
+	w := performAuthedRequest(t, token, AdminRequired())
 	if w.Code != http.StatusOK {
 		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
 	}
@@ -104,7 +125,7 @@ func TestAdminRequiredBlocksMissingRoleClaim(t *testing.T) {
 		"user_id": "1",
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	})
-	w := performAuthedRequest(t, "Bearer "+token, AdminRequired())
+	w := performAuthedRequest(t, token, AdminRequired())
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
 	}

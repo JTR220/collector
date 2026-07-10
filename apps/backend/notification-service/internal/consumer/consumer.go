@@ -18,6 +18,7 @@ import (
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/idconv"
 	"github.com/JTR220/collector/notification-service/internal/mailer"
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 )
@@ -65,10 +66,25 @@ func Setup(ch *amqp.Channel, cfg *config.RabbitMQConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := ch.QueueBind(qOrders.Name, "order.created", cfg.ExchangeEvents, false, nil); err != nil {
+	if err := ch.QueueBind(qOrders.Name, routingKeyOrderCreated, cfg.ExchangeEvents, false, nil); err != nil {
 		return err
 	}
-	if err := ch.QueueBind(qOrders.Name, "order.decided", cfg.ExchangeEvents, false, nil); err != nil {
+	if err := ch.QueueBind(qOrders.Name, routingKeyOrderDecided, cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+
+	// Queue: offres (negociation de prix : creation, decision, paiement)
+	qOffers, err := ch.QueueDeclare(queueOfferEvents, true, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOffers.Name, routingKeyOfferCreated, cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOffers.Name, routingKeyOfferDecided, cfg.ExchangeEvents, false, nil); err != nil {
+		return err
+	}
+	if err := ch.QueueBind(qOffers.Name, routingKeyOfferPurchased, cfg.ExchangeEvents, false, nil); err != nil {
 		return err
 	}
 
@@ -97,6 +113,7 @@ func (m *Manager) Start(ctx context.Context, url string) {
 	for ctx.Err() == nil {
 		conn, ch, err := dialAndSetup(url, &m.cfg.RabbitMQ)
 		if err != nil {
+			metrics.RecordRabbitMQError("connect")
 			log.Error().Err(err).Msg("connexion RabbitMQ (consumer) echouee, nouvel essai")
 			if !sleepOrDone(ctx, backoff) {
 				return
@@ -133,10 +150,11 @@ func (m *Manager) runUntilClosed(ctx context.Context, ch *amqp.Channel, closeCh 
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 	go func() { defer wg.Done(); m.consumePriceUpdates(cycleCtx, ch) }()
 	go func() { defer wg.Done(); m.consumeFraudAlerts(cycleCtx, ch) }()
 	go func() { defer wg.Done(); m.consumeOrderEvents(cycleCtx, ch) }()
+	go func() { defer wg.Done(); m.consumeOfferEvents(cycleCtx, ch) }()
 	wg.Wait()
 
 	return ctx.Err() == nil
@@ -181,6 +199,7 @@ func nextBackoff(d time.Duration) time.Duration {
 func (m *Manager) consumePriceUpdates(ctx context.Context, ch *amqp.Channel) {
 	msgs, err := ch.Consume(m.cfg.RabbitMQ.QueuePriceNotif, "notif-price-consumer", false, false, false, false, nil)
 	if err != nil {
+		metrics.RecordRabbitMQError("consume_price")
 		log.Error().Err(err).Msg("failed to start price consumer")
 		return
 	}
@@ -202,6 +221,7 @@ func (m *Manager) consumePriceUpdates(ctx context.Context, ch *amqp.Channel) {
 func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 	var event model.PriceUpdatedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("price", "invalid_payload")
 		log.Error().Err(err).Msg("invalid price event payload")
 		_ = msg.Nack(false, false)
 		return
@@ -209,7 +229,8 @@ func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 
 	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "price.updated"))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		metrics.RecordNotification("price", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -249,7 +270,10 @@ func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	if err := m.repo.Save(ctx, notif); err != nil {
+		metrics.RecordNotification(string(notif.Type), "error")
 		log.Error().Err(err).Msg("failed to persist price notification")
+	} else {
+		metrics.RecordNotification(string(notif.Type), "success")
 	}
 
 	// Build WebSocket message
@@ -285,6 +309,7 @@ func (m *Manager) handlePriceEvent(ctx context.Context, msg amqp.Delivery) {
 func (m *Manager) consumeFraudAlerts(ctx context.Context, ch *amqp.Channel) {
 	msgs, err := ch.Consume(m.cfg.RabbitMQ.QueueFraudNotif, "notif-fraud-consumer", false, false, false, false, nil)
 	if err != nil {
+		metrics.RecordRabbitMQError("consume_fraud")
 		log.Error().Err(err).Msg("failed to start fraud consumer")
 		return
 	}
@@ -306,6 +331,7 @@ func (m *Manager) consumeFraudAlerts(ctx context.Context, ch *amqp.Channel) {
 func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 	var event model.FraudAlertEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("fraud", "invalid_payload")
 		log.Error().Err(err).Msg("invalid fraud alert payload")
 		_ = msg.Nack(false, false)
 		return
@@ -313,7 +339,8 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 
 	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "fraud.alert"))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		metrics.RecordNotification("fraud", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -338,7 +365,10 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 	}
 
 	if err := m.repo.Save(ctx, notif); err != nil {
+		metrics.RecordNotification(string(notif.Type), "error")
 		log.Error().Err(err).Msg("failed to persist fraud notification")
+	} else {
+		metrics.RecordNotification(string(notif.Type), "success")
 	}
 
 	wsMsg := model.WebSocketMessage{
@@ -372,11 +402,21 @@ func (m *Manager) handleFraudAlert(ctx context.Context, msg amqp.Delivery) {
 
 // ── Order Events Consumer ────────────────────────────────────────────────────
 
-const queueOrderEvents = "notification-service.order.events"
+const (
+	queueOrderEvents          = "notification-service.order.events"
+	routingKeyOrderCreated    = "order.created"
+	routingKeyOrderDecided    = "order.decided"
+	queueOfferEvents          = "notification-service.offer.events"
+	routingKeyOfferCreated    = "offer.created"
+	routingKeyOfferDecided    = "offer.decided"
+	routingKeyOfferPurchased  = "offer.purchased"
+	msgIdempotenceCheckFailed = "failed to check message idempotence — requeuing"
+)
 
 func (m *Manager) consumeOrderEvents(ctx context.Context, ch *amqp.Channel) {
 	msgs, err := ch.Consume(queueOrderEvents, "notif-order-consumer", false, false, false, false, nil)
 	if err != nil {
+		metrics.RecordRabbitMQError("consume_order")
 		log.Error().Err(err).Msg("failed to start order consumer")
 		return
 	}
@@ -391,9 +431,9 @@ func (m *Manager) consumeOrderEvents(ctx context.Context, ch *amqp.Channel) {
 				return
 			}
 			switch msg.RoutingKey {
-			case "order.created":
+			case routingKeyOrderCreated:
 				m.handleOrderCreated(ctx, msg)
-			case "order.decided":
+			case routingKeyOrderDecided:
 				m.handleOrderDecided(ctx, msg)
 			default:
 				_ = msg.Ack(false)
@@ -407,7 +447,10 @@ func (m *Manager) consumeOrderEvents(ctx context.Context, ch *amqp.Channel) {
 // auth-service. L'echec de l'email ne bloque jamais le flux (log uniquement).
 func (m *Manager) notifyAndEmail(ctx context.Context, notif *model.Notification, recipientNumericID uint, emailSubject, emailBody string) {
 	if err := m.repo.Save(ctx, notif); err != nil {
+		metrics.RecordNotification(string(notif.Type), "error")
 		log.Error().Err(err).Msg("failed to persist order notification")
+	} else {
+		metrics.RecordNotification(string(notif.Type), "success")
 	}
 
 	wsMsg := model.WebSocketMessage{
@@ -428,6 +471,7 @@ func (m *Manager) notifyAndEmail(ctx context.Context, notif *model.Notification,
 	}
 	user, err := m.auth.GetUser(ctx, recipientNumericID)
 	if err != nil {
+		metrics.RecordEmail("recipient_lookup_error")
 		log.Warn().Err(err).Uint("user_id", recipientNumericID).Msg("email non envoye : resolution utilisateur echouee")
 		return
 	}
@@ -437,14 +481,16 @@ func (m *Manager) notifyAndEmail(ctx context.Context, notif *model.Notification,
 func (m *Manager) handleOrderCreated(ctx context.Context, msg amqp.Delivery) {
 	var event model.OrderCreatedEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("order_created", "invalid_payload")
 		log.Error().Err(err).Msg("invalid order.created payload")
 		_ = msg.Nack(false, false)
 		return
 	}
 
-	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "order.created"))
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOrderCreated))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		metrics.RecordNotification("order_created", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -481,14 +527,16 @@ func (m *Manager) handleOrderCreated(ctx context.Context, msg amqp.Delivery) {
 func (m *Manager) handleOrderDecided(ctx context.Context, msg amqp.Delivery) {
 	var event model.OrderDecisionEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("order_decided", "invalid_payload")
 		log.Error().Err(err).Msg("invalid order.decided payload")
 		_ = msg.Nack(false, false)
 		return
 	}
 
-	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, "order.decided"))
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOrderDecided))
 	if err != nil {
-		log.Error().Err(err).Msg("failed to check message idempotence — requeuing")
+		metrics.RecordNotification("order_decided", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
 		_ = msg.Nack(false, true)
 		return
 	}
@@ -522,5 +570,179 @@ func (m *Manager) handleOrderDecided(ctx context.Context, msg amqp.Delivery) {
 	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.BuyerID), title, emailBody)
 
 	log.Info().Str("item_id", event.ItemID.String()).Bool("accepted", event.Accepted).Msg("order.decided notification dispatched")
+	_ = msg.Ack(false)
+}
+
+// ── Offer Events Consumer ────────────────────────────────────────────────────
+
+func (m *Manager) consumeOfferEvents(ctx context.Context, ch *amqp.Channel) {
+	msgs, err := ch.Consume(queueOfferEvents, "notif-offer-consumer", false, false, false, false, nil)
+	if err != nil {
+		metrics.RecordRabbitMQError("consume_offer")
+		log.Error().Err(err).Msg("failed to start offer consumer")
+		return
+	}
+	log.Info().Msg("offer consumer started")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-msgs:
+			if !ok {
+				return
+			}
+			switch msg.RoutingKey {
+			case routingKeyOfferCreated:
+				m.handleOfferCreated(ctx, msg)
+			case routingKeyOfferDecided:
+				m.handleOfferDecided(ctx, msg)
+			case routingKeyOfferPurchased:
+				m.handleOfferPurchased(ctx, msg)
+			default:
+				_ = msg.Ack(false)
+			}
+		}
+	}
+}
+
+func (m *Manager) handleOfferCreated(ctx context.Context, msg amqp.Delivery) {
+	var event model.OfferCreatedEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("offer_created", "invalid_payload")
+		log.Error().Err(err).Msg("invalid offer.created payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOfferCreated))
+	if err != nil {
+		metrics.RecordNotification("offer_created", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate offer.created ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	title := "💬 Nouvelle offre reçue"
+	body := fmt.Sprintf("Un acheteur propose %.2f€ pour \"%s\" (prix affiché : %.2f€). Acceptez ou refusez depuis votre profil.", event.Price, event.ItemName, event.ListPrice)
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.SellerID,
+		Type:      model.TypeOfferReceived,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	emailBody := fmt.Sprintf(
+		"Bonjour,\n\nUn acheteur propose %.2f€ pour votre annonce \"%s\" (prix affiché : %.2f€).\n\nConnectez-vous à votre profil Collector.shop pour accepter ou refuser cette offre.\n\n— Collector.shop",
+		event.Price, event.ItemName, event.ListPrice,
+	)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.SellerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Msg("offer.created notification dispatched")
+	_ = msg.Ack(false)
+}
+
+func (m *Manager) handleOfferDecided(ctx context.Context, msg amqp.Delivery) {
+	var event model.OfferDecisionEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("offer_decided", "invalid_payload")
+		log.Error().Err(err).Msg("invalid offer.decided payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOfferDecided))
+	if err != nil {
+		metrics.RecordNotification("offer_decided", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate offer.decided ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	notifType := model.TypeOfferRejected
+	title := "❌ Offre refusée"
+	emailBody := fmt.Sprintf("Bonjour,\n\nLe vendeur a refusé votre offre à %.2f€ sur \"%s\".\n\n— Collector.shop", event.Price, event.ItemName)
+	if event.Accepted {
+		notifType = model.TypeOfferAccepted
+		title = "✅ Offre acceptée — vous pouvez payer"
+		emailBody = fmt.Sprintf("Bonjour,\n\nLe vendeur a accepté votre offre à %.2f€ sur \"%s\". Connectez-vous à votre profil Collector.shop pour finaliser le paiement à ce prix.\n\n— Collector.shop", event.Price, event.ItemName)
+	}
+	body := fmt.Sprintf("Votre offre à %.2f€ sur \"%s\" a été %s par le vendeur.", event.Price, event.ItemName, map[bool]string{true: "acceptée", false: "refusée"}[event.Accepted])
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.BuyerID,
+		Type:      notifType,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.BuyerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Bool("accepted", event.Accepted).Msg("offer.decided notification dispatched")
+	_ = msg.Ack(false)
+}
+
+func (m *Manager) handleOfferPurchased(ctx context.Context, msg amqp.Delivery) {
+	var event model.OfferPurchasedEvent
+	if err := json.Unmarshal(msg.Body, &event); err != nil {
+		metrics.RecordNotification("offer_purchased", "invalid_payload")
+		log.Error().Err(err).Msg("invalid offer.purchased payload")
+		_ = msg.Nack(false, false)
+		return
+	}
+
+	firstSeen, err := m.repo.MarkProcessed(ctx, messageIDOf(msg, routingKeyOfferPurchased))
+	if err != nil {
+		metrics.RecordNotification("offer_purchased", "idempotence_error")
+		log.Error().Err(err).Msg(msgIdempotenceCheckFailed)
+		_ = msg.Nack(false, true)
+		return
+	}
+	if !firstSeen {
+		log.Info().Msg("duplicate offer.purchased ignored")
+		_ = msg.Ack(false)
+		return
+	}
+
+	title := "💰 Vente finalisée"
+	body := fmt.Sprintf("\"%s\" a été vendu au prix négocié de %.2f€.", event.ItemName, event.Price)
+
+	notif := &model.Notification{
+		ID:        uuid.New(),
+		UserID:    event.SellerID,
+		Type:      model.TypeOfferPurchased,
+		Title:     title,
+		Body:      body,
+		ItemID:    &event.ItemID,
+		Read:      false,
+		CreatedAt: time.Now(),
+	}
+
+	emailBody := fmt.Sprintf(
+		"Bonjour,\n\nVotre annonce \"%s\" a été vendue au prix négocié de %.2f€. Retrouvez le détail dans votre profil Collector.shop.\n\n— Collector.shop",
+		event.ItemName, event.Price,
+	)
+	m.notifyAndEmail(ctx, notif, idconv.FromUUID(event.SellerID), title, emailBody)
+
+	log.Info().Str("item_id", event.ItemID.String()).Msg("offer.purchased notification dispatched")
 	_ = msg.Ack(false)
 }

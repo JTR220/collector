@@ -1,6 +1,8 @@
 package main
 
 import (
+	"auth-service/cascade"
+	"auth-service/metrics"
 	"auth-service/repository"
 	"auth-service/routes"
 	"log"
@@ -22,6 +24,15 @@ func main() {
 	}
 
 	repository.InitDB()
+
+	// Cascade d'anonymisation (droit a l'effacement) vers les services
+	// detenant une copie denormalisee du nom : URLs vides ignorees (service
+	// non configure, ex. environnement de test).
+	cascade.Init(os.Getenv("INTERNAL_SECRET"),
+		os.Getenv("CATALOG_SERVICE_URL"), os.Getenv("NOTIFICATION_SERVICE_URL"))
+
+	go metrics.Serve(":9100")
+
 	router := routes.InitRouter()
 	if err := router.Run(); err != nil {
 		log.Fatalf("Le serveur n'a pas pu demarrer : %v", err)

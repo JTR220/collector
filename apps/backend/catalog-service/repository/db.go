@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -12,6 +13,23 @@ import (
 )
 
 var DB *gorm.DB
+
+// Identifiants et libelles du seed de demo, reutilises a plusieurs endroits
+// (definition des pieces vedettes, affectation aux comptes demo, commandes
+// de demo) : extraits en constantes pour eviter la duplication de litteraux.
+const (
+	slugPKM001 = "PKM-001"
+	slugGBC014 = "GBC-014"
+	slugCMX007 = "CMX-007"
+	slugVNL022 = "VNL-022"
+	slugFIG101 = "FIG-101"
+	slugWAT045 = "WAT-045"
+
+	categoryDesignerToy = "Designer Toy"
+
+	rarityNearMint = "Near Mint"
+	gradeCGC96     = "CGC 9.6"
+)
 
 func InitDB() {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
@@ -38,7 +56,8 @@ func InitDB() {
 
 	err = DB.AutoMigrate(
 		&models.Categorie{}, &models.Article{},
-		&models.WishlistItem{}, &models.Order{},
+		&models.WishlistItem{}, &models.Order{}, &models.Review{},
+		&models.Offer{},
 	)
 	if err != nil {
 		log.Fatal("Echec lors de la creation des tables : ", err)
@@ -47,6 +66,9 @@ func InitDB() {
 
 func SeedData() {
 	defer backfillArticleImages()
+	defer backfillDemoOrders()
+	defer backfillCollectorVault()
+	defer backfillSellerAssignments()
 
 	// Categories idempotentes (FirstOrCreate par nom) : le seed peut tourner
 	// plusieurs fois sans doublon ni suppression de donnees existantes.
@@ -55,7 +77,7 @@ func SeedData() {
 		{Name: "Console", Description: "Consoles de jeu vintage et éditions scellées"},
 		{Name: "Comics", Description: "Bandes dessinées et comics gradés CGC / CBCS"},
 		{Name: "Vinyle", Description: "Disques vinyles 1ère presse et éditions rares"},
-		{Name: "Designer Toy", Description: "Art toys et figurines en édition limitée"},
+		{Name: categoryDesignerToy, Description: "Art toys et figurines en édition limitée"},
 		{Name: "Horlogerie", Description: "Montres vintage et customisées"},
 	}
 
@@ -79,7 +101,7 @@ func SeedData() {
 	// Les 6 pieces vedettes ne sont inserees qu'une fois (au premier boot).
 	var baseCount int64
 	DB.Model(&models.Article{}).Where("slug IN ?",
-		[]string{"PKM-001", "GBC-014", "CMX-007", "VNL-022", "FIG-101", "WAT-045"}).Count(&baseCount)
+		[]string{slugPKM001, slugGBC014, slugCMX007, slugVNL022, slugFIG101, slugWAT045}).Count(&baseCount)
 	if baseCount > 0 {
 		topUpCatalog(catID)
 		log.Println("Pieces vedettes deja presentes : top-up catalogue etendu applique")
@@ -88,7 +110,7 @@ func SeedData() {
 
 	articles := []models.Article{
 		{
-			Slug:         "PKM-001",
+			Slug:         slugPKM001,
 			Name:         "Charizard",
 			Description:  "Carte Pokémon Charizard holographique en excellent état, conservée sous sleeve premium depuis l'achat.",
 			Series:       "Base Set, 1ère édition",
@@ -112,7 +134,7 @@ func SeedData() {
 			CategoryID:   catID("TCG"),
 		},
 		{
-			Slug:         "GBC-014",
+			Slug:         slugGBC014,
 			Name:         "Game Boy Color",
 			Description:  "Game Boy Color édition Pikachu NTSC, boîte d'origine scellée en usine. Jamais ouverte.",
 			Series:       "Édition Pikachu, scellé",
@@ -136,14 +158,14 @@ func SeedData() {
 			CategoryID:   catID("Console"),
 		},
 		{
-			Slug:         "CMX-007",
+			Slug:         slugCMX007,
 			Name:         "Action Comics #1",
 			Description:  "Reprint commémoratif 1988 en très bon état, gradé par CGC. Couverture nette, dos sans plis.",
 			Series:       "DC, reprint 1988",
 			Year:         1988,
-			Rarity:       "Near Mint",
+			Rarity:       rarityNearMint,
 			RarityScore:  4,
-			Grade:        "CGC 9.6",
+			Grade:        gradeCGC96,
 			Prix:         640,
 			FraisPort:    14,
 			Seller:       "panel_press",
@@ -160,7 +182,7 @@ func SeedData() {
 			CategoryID:   catID("Comics"),
 		},
 		{
-			Slug:         "VNL-022",
+			Slug:         slugVNL022,
 			Name:         "Daft Punk — Discovery",
 			Description:  "Vinyle 33t double album 1ère presse 2001, pochette sans déchirure, disques sans rayures visibles.",
 			Series:       "Vinyle, 1ère presse 2001",
@@ -184,7 +206,7 @@ func SeedData() {
 			CategoryID:   catID("Vinyle"),
 		},
 		{
-			Slug:         "FIG-101",
+			Slug:         slugFIG101,
 			Name:         "Bearbrick 1000%",
 			Description:  "Bearbrick 1000% Andy Warhol edition 2022, boîte intacte avec certificat d'authenticité original.",
 			Series:       "Andy Warhol, 2022",
@@ -205,10 +227,10 @@ func SeedData() {
 			SeatsLeft:    0,
 			SeatsTotal:   5,
 			ResellPrice:  1800,
-			CategoryID:   catID("Designer Toy"),
+			CategoryID:   catID(categoryDesignerToy),
 		},
 		{
-			Slug:         "WAT-045",
+			Slug:         slugWAT045,
 			Name:         "Casio F-91W",
 			Description:  "Casio F-91W customisé bracelet NATO bleu nuit, boîtier poncé mat. Mouvement original garanti.",
 			Series:       "Mod custom NATO bleu",
@@ -233,9 +255,12 @@ func SeedData() {
 		},
 	}
 
-	// Photos Unsplash sur les 6 pieces vedettes (cyclage du pool par defaut).
+	// Photos Unsplash sur les 6 pieces vedettes (cyclage du pool par defaut) :
+	// galerie complete, pas juste la couverture.
 	for i := range articles {
-		articles[i].ImageURL = unsplashURL("", i)
+		gallery := unsplashURLs("_default", i)
+		articles[i].ImageURL = gallery[0]
+		articles[i].Images = gallery
 		if err := DB.Create(&articles[i]).Error; err != nil {
 			log.Printf("Erreur creation article %s: %v", articles[i].Slug, err)
 			return
@@ -271,13 +296,13 @@ func topUpCatalog(catID func(string) uint) int {
 // unsplashPool : identifiants de photos Unsplash (CDN images.unsplash.com)
 // verifies 200, regroupes par categorie. Voir unsplashURL().
 var unsplashPool = map[string][]string{
-	"TCG":          {"1613771404784-3a5686aa2be3", "1610890716171-6b1bb98ffd09", "1526779259212-939e64788e3c", "1611605698335-8b1569810432"},
-	"Console":      {"1606663889134-b1dedb5ed8b7", "1531525645387-7f14be1bdbbd", "1486401899868-0e435ed85128", "1550745165-9bc0b252726f"},
-	"Comics":       {"1608889175123-8ee362201f81", "1612036782180-6f0b6cd846fe", "1601645191163-3fc0d5d64e35"},
-	"Vinyle":       {"1493225457124-a3eb161ffa5f", "1458560871784-56d23406c091", "1571330735066-03aaa9429d89"},
-	"Designer Toy": {"1566576912321-d58ddd7a6088", "1533105079780-92b9be482077", "1608889175123-8ee362201f81"},
-	"Horlogerie":   {"1524592094714-0f0654e20314", "1587836374828-4dbafa94cf0e", "1548169874-53e85f753f1e"},
-	"_default":     {"1493711662062-fa541adb3fc8", "1585504198199-20277593b94f", "1518709268805-4e9042af9f23", "1550009158-9ebf69173e03"},
+	"TCG":               {"1613771404784-3a5686aa2be3", "1610890716171-6b1bb98ffd09", "1526779259212-939e64788e3c", "1611605698335-8b1569810432"},
+	"Console":           {"1606663889134-b1dedb5ed8b7", "1531525645387-7f14be1bdbbd", "1486401899868-0e435ed85128", "1550745165-9bc0b252726f"},
+	"Comics":            {"1608889175123-8ee362201f81", "1612036782180-6f0b6cd846fe", "1601645191163-3fc0d5d64e35"},
+	"Vinyle":            {"1493225457124-a3eb161ffa5f", "1458560871784-56d23406c091", "1571330735066-03aaa9429d89"},
+	categoryDesignerToy: {"1566576912321-d58ddd7a6088", "1533105079780-92b9be482077", "1608889175123-8ee362201f81"},
+	"Horlogerie":        {"1524592094714-0f0654e20314", "1587836374828-4dbafa94cf0e", "1548169874-53e85f753f1e"},
+	"_default":          {"1493711662062-fa541adb3fc8", "1585504198199-20277593b94f", "1518709268805-4e9042af9f23", "1550009158-9ebf69173e03"},
 }
 
 // DefaultImageFor renvoie une photo Unsplash themee pour une categorie donnee,
@@ -290,6 +315,18 @@ func DefaultImageFor(categoryID uint) string {
 	return unsplashURL(cat.Name, int(categoryID))
 }
 
+// DefaultImagesFor renvoie une petite galerie de photos Unsplash themees
+// (jusqu'a tout le pool de la categorie), pour donner une vraie galerie
+// multi-photos aux annonces qui n'en ont pas encore uploade.
+func DefaultImagesFor(categoryID uint) []string {
+	var cat models.Categorie
+	name := ""
+	if err := DB.First(&cat, categoryID).Error; err == nil {
+		name = cat.Name
+	}
+	return unsplashURLs(name, int(categoryID))
+}
+
 // unsplashURL renvoie une URL de photo Unsplash themee pour la categorie donnee,
 // choisie de facon deterministe (cyclage sur l'index) pour varier les visuels.
 func unsplashURL(category string, i int) string {
@@ -299,6 +336,22 @@ func unsplashURL(category string, i int) string {
 	}
 	id := pool[i%len(pool)]
 	return fmt.Sprintf("https://images.unsplash.com/photo-%s?auto=format&fit=crop&w=600&q=70", id)
+}
+
+// unsplashURLs renvoie toutes les photos du pool d'une categorie (dans
+// l'ordre, a partir de l'index i), pour constituer une galerie de demo
+// realiste plutot qu'une seule photo repetee.
+func unsplashURLs(category string, i int) []string {
+	pool := unsplashPool[category]
+	if len(pool) == 0 {
+		pool = unsplashPool["_default"]
+	}
+	urls := make([]string, len(pool))
+	for k := range pool {
+		id := pool[(i+k)%len(pool)]
+		urls[k] = fmt.Sprintf("https://images.unsplash.com/photo-%s?auto=format&fit=crop&w=900&q=70", id)
+	}
+	return urls
 }
 
 // generateCatalog produit un catalogue etoffe : plusieurs pieces par categorie,
@@ -328,11 +381,11 @@ func generateCatalog(catID func(string) uint) []models.Article {
 		},
 		"Comics": {
 			{"Amazing Fantasy #15", "Marvel, reprint gradé", "Key Issue", "CGC 9.4", 2002, 720, 14},
-			{"Batman #1 — Facsimile", "DC, édition anniversaire", "Near Mint", "CGC 9.8", 2019, 180, 12},
-			{"X-Men #1 (1991)", "Marvel, Jim Lee cover", "Near Mint", "CGC 9.6", 1991, 260, 12},
-			{"Spawn #1", "Image Comics, 1992", "Near Mint", "CGC 9.8", 1992, 210, 12},
+			{"Batman #1 — Facsimile", "DC, édition anniversaire", rarityNearMint, "CGC 9.8", 2019, 180, 12},
+			{"X-Men #1 (1991)", "Marvel, Jim Lee cover", rarityNearMint, gradeCGC96, 1991, 260, 12},
+			{"Spawn #1", "Image Comics, 1992", rarityNearMint, "CGC 9.8", 1992, 210, 12},
 			{"Watchmen #1", "DC, 1re impression", "Very Fine", "CGC 9.0", 1986, 340, 13},
-			{"Saga #1 signé", "Image, signé B.K. Vaughan", "Signature", "CGC 9.6", 2012, 290, 12},
+			{"Saga #1 signé", "Image, signé B.K. Vaughan", "Signature", gradeCGC96, 2012, 290, 12},
 		},
 		"Vinyle": {
 			{"Pink Floyd — Dark Side", "Harvest, 1re presse UK", "Rare", "VG+", 1973, 420, 14},
@@ -342,7 +395,7 @@ func generateCatalog(catID func(string) uint) []models.Article {
 			{"Radiohead — OK Computer", "Parlophone, 2xLP", "Collector", "NM", 1997, 160, 12},
 			{"Kendrick Lamar — DAMN.", "TDE, presse rouge", "Limited", "M", 2017, 85, 10},
 		},
-		"Designer Toy": {
+		categoryDesignerToy: {
 			{"KAWS Companion — Grey", "OriginalFake, 2016", "Limited", "MIB", 2016, 980, 30},
 			{"Bearbrick 400% Basquiat", "Medicom, série #1", "Limited", "MIB", 2019, 320, 22},
 			{"Funko Pop Gold Batman", "18\" édition dorée", "Chase", "Mint", 2021, 140, 18},
@@ -361,14 +414,15 @@ func generateCatalog(catID func(string) uint) []models.Article {
 	}
 
 	glyphs := map[string]string{
-		"TCG": "卡", "Console": "電", "Comics": "S", "Vinyle": "♪", "Designer Toy": "★", "Horlogerie": "◷",
+		"TCG": "卡", "Console": "電", "Comics": "S", "Vinyle": "♪", categoryDesignerToy: "★", "Horlogerie": "◷",
 	}
 
 	var out []models.Article
 	seq := 200
-	for _, cat := range []string{"TCG", "Console", "Comics", "Vinyle", "Designer Toy", "Horlogerie"} {
+	for _, cat := range []string{"TCG", "Console", "Comics", "Vinyle", categoryDesignerToy, "Horlogerie"} {
 		for i, it := range catalog[cat] {
 			seq++
+			gallery := unsplashURLs(cat, i)
 			out = append(out, models.Article{
 				Slug:        fmt.Sprintf("CAT-%03d", seq),
 				Name:        it.name,
@@ -381,7 +435,8 @@ func generateCatalog(catID func(string) uint) []models.Article {
 				FraisPort:   it.port,
 				Seller:      "collector_vault",
 				SellerScore: 4.8,
-				ImageURL:    unsplashURL(cat, i),
+				ImageURL:    gallery[0],
+				Images:      gallery,
 				SaleType:    "drop",
 				Glyph:       glyphs[cat],
 				CategoryID:  catID(cat),
@@ -389,6 +444,125 @@ func generateCatalog(catID func(string) uint) []models.Article {
 		}
 	}
 	return out
+}
+
+// backfillSellerAssignments relie quelques pieces vedettes aux comptes de
+// demo (auth-service, seed dans l'ordre admin=1, test=2, vendeur=3,
+// acheteur=4 sur une base fraiche) afin de pouvoir tester le flux de
+// notifications/messagerie de bout en bout : "Vendeur Demo" possede 3
+// pieces, "Testeur" en possede 3 autres, sur lesquelles backfillDemoOrders
+// et le seed cote notification-service (SeedDemoData) viennent brancher des
+// commandes et des messages. Idempotent (ne touche que les pieces encore
+// sans vendeur).
+func backfillSellerAssignments() {
+	const (
+		testDemoID    = 2
+		vendeurDemoID = 3
+	)
+	assignments := []struct {
+		ownerID uint
+		slugs   []string
+	}{
+		{vendeurDemoID, []string{slugPKM001, slugGBC014, slugCMX007}},
+		{testDemoID, []string{slugVNL022, slugFIG101, slugWAT045}},
+	}
+
+	for _, a := range assignments {
+		res := DB.Model(&models.Article{}).
+			Where("slug IN ? AND seller_id = 0", a.slugs).
+			Update("seller_id", a.ownerID)
+		if res.Error != nil {
+			log.Printf("Erreur affectation compte demo (ID %d) : %v", a.ownerID, res.Error)
+			continue
+		}
+		if res.RowsAffected > 0 {
+			log.Printf("Compte demo (ID %d) assigne a %d piece(s)", a.ownerID, res.RowsAffected)
+		}
+	}
+}
+
+// backfillCollectorVault relie tout le catalogue etendu (generateCatalog,
+// Seller = "collector_vault") au compte de demo "Collector Vault"
+// (auth-service, seed en dernier des comptes de demo : ID 5 sur une base
+// fraiche, voir seedUsers) afin de pouvoir se connecter et gerer ces
+// annonces depuis le profil. Idempotent (ne touche que les pieces encore
+// sans vendeur).
+func backfillCollectorVault() {
+	const collectorVaultID = 5
+
+	res := DB.Model(&models.Article{}).
+		Where("seller = ? AND seller_id = 0", "collector_vault").
+		Update("seller_id", collectorVaultID)
+	if res.Error != nil {
+		log.Printf("Erreur affectation collector_vault : %v", res.Error)
+		return
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("Compte collector_vault (ID %d) assigne a %d piece(s)", collectorVaultID, res.RowsAffected)
+	}
+}
+
+// backfillDemoOrders cree des commandes de demo sur les pieces de "Testeur"
+// (ID 2, voir backfillSellerAssignments) pour illustrer le flux notifications
+// sans avoir a rejouer l'achat a la main depuis l'UI :
+//   - VNL-022 : commande de "Vendeur Demo" deja acceptee (paid) -> demontre
+//     qu'une piece vendue disparait du catalogue public (GetAllArticles).
+//   - FIG-101 : commande de "Vendeur Demo" encore en attente -> Testeur a
+//     une notification ORDER_PENDING a traiter dans son profil.
+//   - WAT-045 reste volontairement disponible (aucune commande) : elle sert
+//     de support a la negociation par message (notification-service).
+//
+// Idempotent : ne cree la commande que si aucune n'existe deja pour ce
+// couple (article, acheteur). Pas de publication d'evenement AMQP ici : les
+// notifications correspondantes sont seedees directement cote
+// notification-service (SeedDemoData), pas rejouees via le bus.
+func backfillDemoOrders() {
+	const (
+		testDemoID    = 2
+		vendeurDemoID = 3
+	)
+	demoOrders := []struct {
+		slug   string
+		status string
+	}{
+		{slugVNL022, models.OrderStatusPaid},
+		{slugFIG101, models.OrderStatusPending},
+	}
+
+	for _, d := range demoOrders {
+		var article models.Article
+		if err := DB.Where("slug = ?", d.slug).First(&article).Error; err != nil {
+			continue
+		}
+
+		var count int64
+		DB.Model(&models.Order{}).
+			Where("article_id = ? AND buyer_id = ?", article.ID, vendeurDemoID).
+			Count(&count)
+		if count > 0 {
+			continue
+		}
+
+		order := models.Order{
+			BuyerID:   vendeurDemoID,
+			SellerID:  testDemoID,
+			ArticleID: article.ID,
+			Price:     article.Prix,
+			FraisPort: article.FraisPort,
+			Status:    d.status,
+		}
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&models.Article{}).Where("id = ?", article.ID).Update("sold", true).Error; err != nil {
+				return err
+			}
+			return tx.Create(&order).Error
+		})
+		if err != nil {
+			log.Printf("Erreur commande demo %s: %v", d.slug, err)
+			continue
+		}
+		log.Printf("Commande demo creee : %s (%s)", d.slug, d.status)
+	}
 }
 
 // backfillArticleImages donne aux articles sans photo une image Unsplash themee
@@ -407,5 +581,23 @@ func backfillArticleImages() {
 	}
 	if len(articles) > 0 {
 		log.Printf("Backfill images : %d articles avec photo Unsplash", len(articles))
+	}
+
+	// Galerie manquante (articles crees avant l'ajout du champ Images, ou dont
+	// la seule photo est une URL externe sans vraie galerie) : on complete avec
+	// une galerie themee par categorie, sans toucher a la couverture existante.
+	var noGallery []models.Article
+	DB.Preload("Category").
+		Where("images IS NULL OR images = '' OR images = '[]' OR images = 'null'").
+		Find(&noGallery)
+	for i := range noGallery {
+		gallery := unsplashURLs(noGallery[i].Category.Name, int(noGallery[i].ID))
+		if noGallery[i].ImageURL != "" && !strings.HasPrefix(noGallery[i].ImageURL, "/uploads") {
+			gallery[0] = noGallery[i].ImageURL
+		}
+		DB.Model(&noGallery[i]).Update("images", models.StringSlice(gallery))
+	}
+	if len(noGallery) > 0 {
+		log.Printf("Backfill galerie : %d articles avec galerie Unsplash", len(noGallery))
 	}
 }

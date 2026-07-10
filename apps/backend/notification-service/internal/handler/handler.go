@@ -18,10 +18,14 @@ import (
 	"github.com/JTR220/collector/notification-service/internal/authclient"
 	"github.com/JTR220/collector/notification-service/internal/hub"
 	"github.com/JTR220/collector/notification-service/internal/idconv"
+	"github.com/JTR220/collector/notification-service/internal/metrics"
 	"github.com/JTR220/collector/notification-service/internal/model"
+	"github.com/JTR220/collector/notification-service/internal/pii"
 	"github.com/JTR220/collector/notification-service/internal/repository"
 	"github.com/JTR220/collector/notification-service/internal/response"
 )
+
+const errInternalServer = "internal server error"
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -47,18 +51,35 @@ func checkWSOrigin(r *http.Request) bool {
 }
 
 type Handler struct {
-	hub       *hub.Hub
-	repo      *repository.NotificationRepository
-	jwtSecret []byte
-	auth      *authclient.Client
+	hub            *hub.Hub
+	repo           *repository.NotificationRepository
+	jwtSecret      []byte
+	auth           *authclient.Client
+	internalSecret string
 }
 
-func New(h *hub.Hub, repo *repository.NotificationRepository, jwtSecret string, auth *authclient.Client) *Handler {
+func New(h *hub.Hub, repo *repository.NotificationRepository, jwtSecret string, auth *authclient.Client, internalSecret string) *Handler {
 	return &Handler{
-		hub:       h,
-		repo:      repo,
-		jwtSecret: []byte(jwtSecret),
-		auth:      auth,
+		hub:            h,
+		repo:           repo,
+		jwtSecret:      []byte(jwtSecret),
+		auth:           auth,
+		internalSecret: internalSecret,
+	}
+}
+
+// InternalOnly protege les endpoints d'appel inter-services (cascade
+// d'anonymisation declenchee par auth-service a la suppression d'un compte)
+// via un secret partage transmis en en-tete X-Internal-Secret. Meme patron
+// que auth-service/middlewares.InternalOnly : sans secret configure, l'acces
+// est refuse par defaut.
+func (h *Handler) InternalOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if h.internalSecret == "" || c.GetHeader("X-Internal-Secret") != h.internalSecret {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "acces reserve aux services internes"})
+			return
+		}
+		c.Next()
 	}
 }
 
@@ -85,6 +106,14 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 			auth.PUT("/conversations/:id/read", h.MarkConversationRead)
 		}
 	}
+
+	// Endpoints internes (secret partage) : cascade d'anonymisation declenchee
+	// par auth-service a la suppression d'un compte.
+	internal := r.Group("/internal")
+	internal.Use(h.InternalOnly())
+	{
+		internal.PATCH("/users/:id/anonymize", h.AnonymizeUser)
+	}
 }
 
 // Health godoc
@@ -102,14 +131,17 @@ func (h *Handler) Health(c *gin.Context) {
 
 // WebSocket godoc
 // @Summary     WebSocket endpoint for real-time notifications
-// @Description Connect with ?token=<jwt> — receives JSON notification events
+// @Description Authentifie par le cookie httpOnly de session — receives JSON notification events
 // @Tags        websocket
 // @Router      /ws [get]
 func (h *Handler) WebSocket(c *gin.Context) {
-	// Extract JWT from query param (standard for WS connections)
-	tokenStr := c.Query("token")
-	if tokenStr == "" {
-		response.Error(c, http.StatusUnauthorized, "missing token")
+	// La requete d'upgrade WS est une requete HTTP normale : le navigateur y
+	// joint automatiquement le cookie de session (meme domaine/sous-domaine),
+	// pas besoin de le lire cote JS pour le poser en ?token= (impossible de
+	// toute facon, le cookie est httpOnly).
+	tokenStr, err := c.Cookie(AuthCookieName)
+	if err != nil || tokenStr == "" {
+		response.Error(c, http.StatusUnauthorized, "missing session cookie")
 		return
 	}
 
@@ -157,7 +189,7 @@ func (h *Handler) GetNotifications(c *gin.Context) {
 	notifs, err := h.repo.GetByUser(c.Request.Context(), userID, limit)
 	if err != nil {
 		log.Error().Err(err).Msg("GetNotifications failed")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 
@@ -184,7 +216,7 @@ func (h *Handler) MarkRead(c *gin.Context) {
 
 	found, err := h.repo.MarkRead(c.Request.Context(), notifID, userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 	if !found {
@@ -204,7 +236,7 @@ func (h *Handler) MarkAllRead(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
 	if err := h.repo.MarkAllRead(c.Request.Context(), userID); err != nil {
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "all notifications marked as read"})
@@ -221,7 +253,7 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 	count, err := h.repo.UnreadCount(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"unread_count": count})
@@ -229,14 +261,20 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 
 // ── JWT Middleware ────────────────────────────────────────────────────────────
 
+// AuthCookieName est le cookie httpOnly de session pose par auth-service
+// (voir auth-service/middlewares.AuthCookieName — meme nom, doit rester en
+// phase).
+const AuthCookieName = "collector_token"
+
 func (h *Handler) JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-			response.AbortError(c, http.StatusUnauthorized, "missing or invalid Authorization header")
+		// Seul mecanisme d'authentification : le cookie httpOnly de session
+		// (jamais de fallback Authorization Bearer).
+		tokenStr, err := c.Cookie(AuthCookieName)
+		if err != nil || tokenStr == "" {
+			response.AbortError(c, http.StatusUnauthorized, "missing session cookie")
 			return
 		}
-		tokenStr := authHeader[7:]
 		userID, name, err := h.extractUserFromToken(tokenStr)
 		if err != nil {
 			response.AbortError(c, http.StatusUnauthorized, "invalid token")
@@ -330,6 +368,15 @@ func (h *Handler) SendMessage(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "message trop long (2000 caracteres max)")
 		return
 	}
+	// Coordonnees personnelles interdites dans la messagerie : les echanges et
+	// paiements passent par la plateforme (commande, validation vendeur), pas
+	// par un contact direct hors service qui contourne cette garantie.
+	if reason := pii.Detect(body); reason != pii.ReasonNone {
+		metrics.RecordMessage("rejected_contact_info")
+		response.Error(c, http.StatusBadRequest,
+			"les coordonnees personnelles (email, telephone) ne sont pas autorisees dans les messages : les echanges et le paiement se font via la plateforme")
+		return
+	}
 
 	recipientID, err := uuid.Parse(input.RecipientID)
 	if err != nil {
@@ -379,6 +426,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	}
 
 	if err := h.repo.SaveMessage(c.Request.Context(), msg); err != nil {
+		metrics.RecordMessage("error")
 		log.Error().Err(err).Msg("failed to persist message")
 		response.Error(c, http.StatusInternalServerError, "impossible d'envoyer le message")
 		return
@@ -389,6 +437,7 @@ func (h *Handler) SendMessage(c *gin.Context) {
 	h.hub.SendToUser(recipientID, payload)
 	h.hub.SendToUser(senderID, payload)
 
+	metrics.RecordMessage("success")
 	c.JSON(http.StatusCreated, gin.H{"message": msg})
 }
 
@@ -402,7 +451,7 @@ func (h *Handler) GetConversations(c *gin.Context) {
 	convs, err := h.repo.GetConversations(c.Request.Context(), userID)
 	if err != nil {
 		log.Error().Err(err).Msg("GetConversations failed")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"conversations": convs})
@@ -425,7 +474,7 @@ func (h *Handler) GetConversationMessages(c *gin.Context) {
 	msgs, err := h.repo.GetMessages(c.Request.Context(), convID, userID, 200)
 	if err != nil {
 		log.Error().Err(err).Msg("GetConversationMessages failed")
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"messages": msgs})
@@ -446,8 +495,34 @@ func (h *Handler) MarkConversationRead(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
 	if err := h.repo.MarkConversationRead(c.Request.Context(), convID, userID); err != nil {
-		response.Error(c, http.StatusInternalServerError, "internal server error")
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
+}
+
+// anonymizedName remplace le nom d'un utilisateur supprime dans les copies
+// denormalisees detenues par ce service (messages).
+const anonymizedName = "Utilisateur supprime"
+
+// AnonymizeUser anonymise les copies denormalisees du nom d'un utilisateur
+// (Message.SenderName/RecipientName) suite a la suppression de son compte
+// cote auth-service (droit a l'effacement, art. 17 RGPD). Reserve aux appels
+// inter-services (middleware InternalOnly, secret partage) : declenche par
+// auth-service juste apres la suppression locale du compte. L'ID recu est
+// l'identifiant numerique auth-service, converti vers l'UUID deterministe
+// utilise par ce service (voir idconv).
+func (h *Handler) AnonymizeUser(c *gin.Context) {
+	numericID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "identifiant invalide")
+		return
+	}
+	userID := idconv.ToUUID(uint(numericID))
+
+	if err := h.repo.AnonymizeUser(c.Request.Context(), userID, anonymizedName); err != nil {
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "donnees anonymisees"})
 }

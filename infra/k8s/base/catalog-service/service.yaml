@@ -11,3 +11,8 @@ spec:
     - name: http
       port: 80
       targetPort: http
+    # Non exposee par l'ingress (qui ne reference que le port "http" par nom) :
+    # accessible uniquement en interne au cluster (scrape Prometheus).
+    - name: metrics
+      port: 9100
+      targetPort: metrics

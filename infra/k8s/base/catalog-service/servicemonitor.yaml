@@ -1,0 +1,17 @@
+# Etape 15 (suite) : decouverte par le Prometheus Operator (kube-prometheus-stack,
+# voir infra/argocd/apps/monitoring.yaml) du endpoint /metrics expose par le
+# service (prometheus/client_golang, apps/backend/catalog-service/metrics).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: catalog-service
+  labels:
+    app: catalog-service
+spec:
+  selector:
+    matchLabels:
+      app: catalog-service
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

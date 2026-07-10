@@ -3,7 +3,7 @@
 
 	let {
 		values = [],
-		color = '#86b3a4',
+		color = '#1e3b2c',
 		w = 86,
 		h = 26,
 		dot = true

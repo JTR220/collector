@@ -21,12 +21,13 @@
 <style>
 	.g-avatar {
 		flex-shrink: 0;
-		border: 1px solid rgba(236, 229, 218, 0.16);
-		background: rgba(255, 255, 255, 0.05);
-		color: #86b3a4;
+		border: none;
+		background: var(--c-ink);
+		color: var(--c-bg);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-family: 'Newsreader', Georgia, serif;
+		font-family: var(--f-body);
+		font-weight: 600;
 	}
 </style>

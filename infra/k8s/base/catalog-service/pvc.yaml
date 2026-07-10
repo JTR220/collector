@@ -1,0 +1,13 @@
+# Photos d'articles uploadées par les vendeurs (POST /article/:id/image).
+# ReadWriteOnce : compatible avec catalog-service en 1 replica (deployment.yaml).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-uploads
+  labels:
+    app: catalog-service
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi

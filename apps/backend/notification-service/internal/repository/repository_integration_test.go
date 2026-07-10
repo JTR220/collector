@@ -140,3 +140,64 @@ func TestIntegration_GetMessagesReturnsEmptyForNonParticipant(t *testing.T) {
 		t.Fatalf("le destinataire devrait voir 1 message, obtenu %d", len(msgs))
 	}
 }
+
+// ── RGPD : la purge de retention supprime les notifications/messages perimes, pas les recents ──
+
+func TestIntegration_PurgeOlderThanDeletesExpiredRowsOnly(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+
+	alice, bob := uuid.New(), uuid.New()
+
+	old := newMessage(uuid.New(), alice, bob, "message ancien")
+	old.CreatedAt = time.Now().AddDate(-2, 0, 0)
+	if err := repo.SaveMessage(ctx, old); err != nil {
+		t.Fatalf("SaveMessage (ancien) : %v", err)
+	}
+	recent := newMessage(uuid.New(), alice, bob, "message recent")
+	if err := repo.SaveMessage(ctx, recent); err != nil {
+		t.Fatalf("SaveMessage (recent) : %v", err)
+	}
+
+	oldNotif := &model.Notification{
+		ID: uuid.New(), UserID: bob, Type: model.TypeNewItem,
+		Title: "ancien", Body: "ancien", CreatedAt: time.Now().AddDate(-2, 0, 0),
+	}
+	if err := repo.Save(ctx, oldNotif); err != nil {
+		t.Fatalf("Save (notification ancienne) : %v", err)
+	}
+	recentNotif := &model.Notification{
+		ID: uuid.New(), UserID: bob, Type: model.TypeNewItem,
+		Title: "recent", Body: "recent", CreatedAt: time.Now(),
+	}
+	if err := repo.Save(ctx, recentNotif); err != nil {
+		t.Fatalf("Save (notification recente) : %v", err)
+	}
+
+	notifsDeleted, messagesDeleted, err := repo.PurgeOlderThan(ctx, time.Now().AddDate(-1, 0, 0))
+	if err != nil {
+		t.Fatalf("PurgeOlderThan : %v", err)
+	}
+	if notifsDeleted != 1 {
+		t.Errorf("notifications supprimees attendu 1, obtenu %d", notifsDeleted)
+	}
+	if messagesDeleted != 1 {
+		t.Errorf("messages supprimes attendu 1, obtenu %d", messagesDeleted)
+	}
+
+	msgs, err := repo.GetMessages(ctx, recent.ConversationID, bob, 50)
+	if err != nil {
+		t.Fatalf("GetMessages : %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("le message recent devrait subsister, obtenu %d messages", len(msgs))
+	}
+
+	notifs, err := repo.GetByUser(ctx, bob, 50)
+	if err != nil {
+		t.Fatalf("GetByUser : %v", err)
+	}
+	if len(notifs) != 1 {
+		t.Errorf("la notification recente devrait subsister, obtenu %d", len(notifs))
+	}
+}

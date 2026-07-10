@@ -5,8 +5,13 @@
 #   kubectl port-forward -n monitoring svc/monitoring-grafana 3001:80
 #   (login admin / mot de passe : secret monitoring-grafana)
 #
-# Prochaine étape applicative : exposer /metrics dans les services Go
-# (prometheus/client_golang) + ServiceMonitor par service.
+# /metrics expose dans les 4 services Go (prometheus/client_golang) + un
+# ServiceMonitor par service (infra/k8s/base/*/servicemonitor.yaml) : ce
+# Prometheus les decouvre automatiquement (serviceMonitorSelectorNilUsesHelmValues
+# ci-dessous). Un seul cluster sert staging ET prod (namespaces
+# collector-staging / collector-prod) : le dashboard fourni
+# (infra/k8s/base/monitoring/grafana-dashboard-configmap.yaml) filtre par
+# label "namespace", ajoute automatiquement par l'Operator sur chaque cible.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -30,6 +35,15 @@ spec:
             serviceMonitorSelectorNilUsesHelmValues: false
         grafana:
           defaultDashboardsTimezone: Europe/Paris
+          sidecar:
+            dashboards:
+              enabled: true
+              # le ConfigMap du dashboard vit dans collector-staging/collector-prod
+              # (a cote de l'app, via infra/k8s/base), pas dans le namespace
+              # "monitoring" : necessaire pour que le sidecar le trouve.
+              searchNamespace: ALL
+              label: grafana_dashboard
+              labelValue: "1"
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

@@ -22,19 +22,24 @@ function createNotifications() {
 		subscribe: store.subscribe,
 
 		// Hydrate en REST puis ouvre le WebSocket. Appele au login / au mount.
-		async start(token: string) {
+		async start() {
 			this.stop();
 			try {
 				const [{ notifications }, unreadCount] = await Promise.all([
-					fetchNotifications(token),
-					fetchUnreadCount(token)
+					fetchNotifications(),
+					fetchUnreadCount()
 				]);
 				store.set({ items: notifications, unreadCount });
 			} catch {
 				// services notifications indisponibles : on garde l'etat vide
 			}
 
-			socket = connectNotifications(token, (msg) => {
+			socket = connectNotifications((msg) => {
+				// NEW_MESSAGE est un evenement de messagerie (deja gere par stores/messages.ts
+				// via une connexion dediee) : l'ignorer ici, sinon l'expediteur d'un message
+				// voit apparaitre une "notification" pour son propre envoi.
+				if (msg.event === 'NEW_MESSAGE') return;
+
 				const data = msg.data ?? {};
 				const incoming: NotificationAPI = {
 					id: String(data.notification_id ?? crypto.randomUUID()),
@@ -63,7 +68,7 @@ function createNotifications() {
 			store.set({ items: [], unreadCount: 0 });
 		},
 
-		async markRead(token: string, id: string) {
+		async markRead(id: string) {
 			const state = get(store);
 			const target = state.items.find((n) => n.id === id);
 			if (!target || target.read) return;
@@ -72,19 +77,19 @@ function createNotifications() {
 				unreadCount: Math.max(0, s.unreadCount - 1)
 			}));
 			try {
-				await markRead(token, id);
+				await markRead(id);
 			} catch {
 				// echec silencieux : l'etat local reste optimiste
 			}
 		},
 
-		async markAllRead(token: string) {
+		async markAllRead() {
 			store.update((s) => ({
 				items: s.items.map((n) => ({ ...n, read: true })),
 				unreadCount: 0
 			}));
 			try {
-				await markAllRead(token);
+				await markAllRead();
 			} catch {
 				// echec silencieux
 			}

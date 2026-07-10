@@ -59,6 +59,15 @@ func seedUsers() {
 	}{
 		{"Administrateur", "admin@collector.shop", "admin123", "admin"},
 		{"Testeur", "test@collector.shop", "test123", "user"},
+		// Comptes vendeur/acheteur : possedent/achetent de vraies pieces du
+		// catalogue (cf catalog-service SeedData) pour tester le flux de
+		// notifications (commande creee/acceptee, alerte prix) de bout en bout.
+		{"Vendeur Demo", "vendeur@collector.shop", "vendeur123", "user"},
+		{"Acheteur Demo", "acheteur@collector.shop", "acheteur123", "user"},
+		// Compte du vendeur "collector_vault" (catalog-service : catalogue
+		// etendu genere par generateCatalog, Seller = "collector_vault") afin
+		// de pouvoir se connecter et gerer ces annonces depuis le profil.
+		{"Collector Vault", "vault@collector.shop", "vault123", "user"},
 	}
 
 	for _, c := range comptes {
@@ -81,5 +90,9 @@ func seedUsers() {
 			log.Println("Seed utilisateur ignore (create) :", err)
 		}
 	}
-	log.Println("Seed comptes : admin@collector.shop / admin123 · test@collector.shop / test123")
+	// Les mots de passe des comptes de demo ne sont jamais journalises (meme
+	// en dev) : ce log tourne aussi en staging, et un mot de passe en clair
+	// dans les logs applicatifs est une donnee sensible au sens RGPD. La
+	// liste des identifiants de demo reste affichee cote front (page login).
+	log.Println("Comptes de demonstration seedes : admin, test, vault, vendeur, acheteur (@collector.shop)")
 }

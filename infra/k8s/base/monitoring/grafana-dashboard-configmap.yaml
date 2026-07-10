@@ -1,0 +1,201 @@
+# Etape 15 (suite) : dashboard auto-decouvert par le sidecar Grafana du chart
+# kube-prometheus-stack (grafana.sidecar.dashboards, voir
+# infra/argocd/apps/monitoring.yaml) grace au label "grafana_dashboard".
+# Un seul Grafana sert staging ET prod (meme cluster) : la variable $namespace
+# du dashboard distingue les deux (label "namespace" ajoute automatiquement
+# par le Prometheus Operator sur chaque cible decouverte via ServiceMonitor).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-grafana-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  collector-overview.json: |
+    {
+      "title": "Collector - Overview",
+      "uid": "collector-k8s-overview",
+      "editable": true,
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "$datasource" },
+            "query": "label_values(collector_http_requests_total, namespace)",
+            "includeAll": true,
+            "multi": true,
+            "refresh": 2
+          },
+          {
+            "name": "service",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "$datasource" },
+            "query": "label_values(collector_http_requests_total{namespace=~\"$namespace\"}, service)",
+            "includeAll": true,
+            "multi": true,
+            "refresh": 2
+          },
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "HTTP request rate (req/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_http_requests_total{namespace=~\"$namespace\", service=~\"$service\"}[5m])) by (namespace, service)",
+              "legendFormat": "{{namespace}} / {{service}}"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "HTTP error rate (5xx, req/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_http_requests_total{namespace=~\"$namespace\", service=~\"$service\", status=~\"5..\"}[5m])) by (namespace, service)",
+              "legendFormat": "{{namespace}} / {{service}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "p95 latency by service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(collector_http_request_duration_seconds_bucket{namespace=~\"$namespace\", service=~\"$service\"}[5m])) by (le, namespace, service))",
+              "legendFormat": "{{namespace}} / {{service}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "In-flight requests",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "collector_http_in_flight_requests{namespace=~\"$namespace\", service=~\"$service\"}",
+              "legendFormat": "{{namespace}} / {{service}}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Pod restarts (last hour)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", namespace=~\"collector-.*\"}[1h])) by (namespace, pod)",
+              "legendFormat": "{{namespace}} / {{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Auth: login attempts by result",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_auth_login_attempts_total{namespace=~\"$namespace\"}[5m])) by (namespace, result)",
+              "legendFormat": "{{namespace}} / {{result}}"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Auth: JWT rejections by reason",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_auth_jwt_rejections_total{namespace=~\"$namespace\"}[5m])) by (namespace, reason)",
+              "legendFormat": "{{namespace}} / {{reason}}"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Catalog: orders created by result",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_catalog_orders_created_total{namespace=~\"$namespace\"}[5m])) by (namespace, result)",
+              "legendFormat": "{{namespace}} / {{result}}"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Price tracker: fraud alerts",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_price_fraud_alerts_total{namespace=~\"$namespace\"}[5m])) by (namespace, reason)",
+              "legendFormat": "{{namespace}} / {{reason}}"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Notification: WebSocket active connections",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "collector_websocket_active_connections{namespace=~\"$namespace\"}",
+              "legendFormat": "{{namespace}}"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "RabbitMQ errors (notification + price-tracker)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "targets": [
+            {
+              "expr": "sum(rate(collector_notification_rabbitmq_errors_total{namespace=~\"$namespace\"}[5m])) by (namespace, operation)",
+              "legendFormat": "notification {{namespace}} / {{operation}}"
+            },
+            {
+              "expr": "sum(rate(collector_price_rabbitmq_errors_total{namespace=~\"$namespace\"}[5m])) by (namespace, operation)",
+              "legendFormat": "price-tracker {{namespace}} / {{operation}}"
+            }
+          ]
+        }
+      ]
+    }

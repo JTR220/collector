@@ -1,16 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth, isAuthenticated } from '$lib/stores/auth';
 	import {
 		fetchCategories,
+		fetchArticle,
 		createArticle,
+		updateArticle,
+		uploadArticleImage,
 		type CategoryAPI,
 		type NewArticleInput
 	} from '$lib/api/catalog';
 	import GPanel from '$lib/components/galerie/GPanel.svelte';
 	import GSelect from '$lib/components/galerie/GSelect.svelte';
 	import Kicker from '$lib/components/galerie/Kicker.svelte';
+
+	const editId = $derived($page.url.searchParams.get('edit'));
 
 	let categories = $state<CategoryAPI[]>([]);
 	let loading = $state(true);
@@ -28,23 +34,62 @@
 	let rarity = $state('');
 	let grade = $state('');
 	let imageUrl = $state('');
+	let photoFiles = $state<File[]>([]);
+	let photoError = $state('');
+
+	const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+	const MAX_PHOTOS = 8;
+
+	function onPhotoChange(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const files = Array.from(input.files ?? []);
+		photoError = '';
+		const oversized = files.some((f) => f.size > MAX_PHOTO_SIZE);
+		if (oversized) {
+			photoError = 'Un ou plusieurs fichiers dépassent 5 Mo.';
+			photoFiles = [];
+			input.value = '';
+			return;
+		}
+		if (files.length > MAX_PHOTOS) {
+			photoError = `${MAX_PHOTOS} photos maximum.`;
+			photoFiles = files.slice(0, MAX_PHOTOS);
+			return;
+		}
+		photoFiles = files;
+	}
 
 	onMount(async () => {
-		if (!$isAuthenticated || !$auth.token) {
+		if (!$isAuthenticated || !$auth.user) {
 			goto('/login');
 			return;
 		}
 		try {
 			categories = await fetchCategories();
+			if (editId) {
+				const a = await fetchArticle(editId);
+				name = a.name;
+				categoryId = String(a.categoryId);
+				prix = String(a.prix);
+				fraisPort = String(a.fraisPort);
+				description = a.description;
+				series = a.series ?? '';
+				year = a.year ? String(a.year) : '';
+				rarity = a.rarity ?? '';
+				grade = a.grade ?? '';
+				imageUrl = a.imageUrl ?? '';
+			}
 		} catch {
-			error = 'Impossible de charger les catégories. Le catalog-service est-il démarré ?';
+			error = editId
+				? 'Impossible de charger cette annonce.'
+				: 'Impossible de charger les catégories. Le catalog-service est-il démarré ?';
 		} finally {
 			loading = false;
 		}
 	});
 
 	async function submit() {
-		if (!$auth.token) return;
+		if (!$auth.user) return;
 		if (!categoryId) {
 			error = 'Choisissez une catégorie.';
 			return;
@@ -52,6 +97,21 @@
 		submitting = true;
 		error = '';
 		try {
+			if (editId) {
+				await updateArticle(Number(editId), {
+					name: name.trim(),
+					description: description.trim(),
+					prix: Number(prix),
+					fraisPort: Number(fraisPort),
+					categoryId: Number(categoryId),
+					imageUrl: imageUrl.trim() || undefined
+				});
+				for (const file of photoFiles) {
+					await uploadArticleImage(Number(editId), file);
+				}
+				goto(`/lot/${editId}`);
+				return;
+			}
 			const input: NewArticleInput = {
 				name: name.trim(),
 				description: description.trim(),
@@ -64,23 +124,27 @@
 				grade: grade.trim() || undefined,
 				imageUrl: imageUrl.trim() || undefined
 			};
-			const created = await createArticle($auth.token, input);
+			const created = await createArticle(input);
+			for (const file of photoFiles) {
+				await uploadArticleImage(created.ID, file);
+			}
 			goto(`/lot/${created.ID}`);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Mise en vente impossible.';
+			error = e instanceof Error ? e.message : 'Opération impossible.';
 			submitting = false;
 		}
 	}
 </script>
 
-<svelte:head><title>Vendre · Collector.shop</title></svelte:head>
+<svelte:head><title>{editId ? 'Modifier' : 'Vendre'} · Collector.shop</title></svelte:head>
 
 <section class="head">
-	<Kicker>Mettre en vente</Kicker>
-	<h1 class="title">Vendez votre pièce</h1>
+	<Kicker>{editId ? "Modifier l'annonce" : 'Mettre en vente'}</Kicker>
+	<h1 class="title">{editId ? 'Modifiez votre annonce' : 'Vendez votre pièce'}</h1>
 	<p class="sub">
-		Renseignez la fiche : elle sera publiée à votre nom sur le marché, en vente directe. Vous
-		pourrez la retirer à tout moment depuis votre profil.
+		{editId
+			? 'Le titre, la description, le prix, les frais de port, la catégorie et la photo sont modifiables. Série, année, rareté et grade restent fixés à la création.'
+			: 'Renseignez la fiche : elle sera publiée à votre nom sur le marché, en vente directe. Vous pourrez la retirer à tout moment depuis votre profil.'}
 	</p>
 </section>
 
@@ -154,39 +218,76 @@
 		</GPanel>
 
 		<GPanel>
-			<Kicker>Détails (optionnel)</Kicker>
+			<Kicker
+				>{editId
+					? 'Détails (série/année/rareté/grade fixés à la création)'
+					: 'Détails (optionnel)'}</Kicker
+			>
 			<div class="fields">
 				<label class="field">
 					<span class="lbl">Série / édition</span>
-					<input class="in" bind:value={series} placeholder="Base Set, 1re édition" />
+					<input
+						class="in"
+						bind:value={series}
+						placeholder="Base Set, 1re édition"
+						disabled={!!editId}
+					/>
 				</label>
 				<label class="field">
 					<span class="lbl">Année</span>
-					<input class="in" type="number" bind:value={year} placeholder="1999" />
+					<input
+						class="in"
+						type="number"
+						bind:value={year}
+						placeholder="1999"
+						disabled={!!editId}
+					/>
 				</label>
 				<label class="field">
 					<span class="lbl">Rareté</span>
-					<input class="in" bind:value={rarity} placeholder="Holo Rare" />
+					<input class="in" bind:value={rarity} placeholder="Holo Rare" disabled={!!editId} />
 				</label>
 				<label class="field">
 					<span class="lbl">Grade</span>
-					<input class="in" bind:value={grade} placeholder="PSA 9" />
+					<input class="in" bind:value={grade} placeholder="PSA 9" disabled={!!editId} />
 				</label>
 				<label class="field span-2">
-					<span class="lbl">URL de la photo (https uniquement)</span>
+					<span class="lbl">Photos (jusqu'à {MAX_PHOTOS}, 5 Mo max chacune)</span>
+					<input
+						class="in in-file"
+						type="file"
+						multiple
+						accept="image/jpeg,image/png,image/webp,image/gif"
+						onchange={onPhotoChange}
+					/>
+					{#if photoFiles.length > 0}
+						<span class="photo-picked"
+							>{photoFiles.length} photo{photoFiles.length > 1 ? 's' : ''} sélectionnée{photoFiles.length >
+							1
+								? 's'
+								: ''} : {photoFiles.map((f) => f.name).join(', ')}</span
+						>
+					{/if}
+					{#if photoError}<span class="photo-err">{photoError}</span>{/if}
+				</label>
+				<label class="field span-2">
+					<span class="lbl">…ou URL de la photo de couverture (https uniquement)</span>
 					<input
 						class="in"
 						type="url"
 						bind:value={imageUrl}
-						placeholder="https://…  (laissez vide pour une photo par défaut)"
+						disabled={photoFiles.length > 0}
+						placeholder={editId
+							? 'https://…  (laissez vide pour garder la photo actuelle)'
+							: 'https://…  (laissez vide pour une photo par défaut)'}
 					/>
 				</label>
 			</div>
 
 			<div class="actions">
-				<a class="btn-ghost" href="/">Annuler</a>
+				<a class="btn-ghost" href={editId ? `/lot/${editId}` : '/'}>Annuler</a>
 				<button class="btn" type="submit" disabled={submitting}>
-					{submitting ? 'Publication…' : 'Mettre en vente'}
+					{submitting ? 'Enregistrement…' : editId ? 'Enregistrer' : 'Mettre en vente'}
 				</button>
 			</div>
 		</GPanel>
@@ -198,16 +299,16 @@
 		padding: 20px 0 18px;
 	}
 	.title {
-		font-family: 'Newsreader', Georgia, serif;
-		font-weight: 500;
-		font-size: clamp(28px, 4vw, 40px);
-		color: #ece5da;
+		font-family: var(--f-serif);
+		font-weight: 600;
+		font-size: clamp(26px, 4vw, 36px);
+		color: var(--c-text);
 		margin: 8px 0 10px;
 	}
 	.sub {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 14px;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 		line-height: 1.55;
 		max-width: 560px;
 		margin: 0;
@@ -215,18 +316,18 @@
 	.state {
 		text-align: center;
 		padding: 60px 0;
-		font-family: 'IBM Plex Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: #a39a8c;
-		letter-spacing: 0.16em;
+		font-family: var(--f-serif);
+		font-style: italic;
+		font-size: 15px;
+		color: var(--c-text-muted);
 	}
 	.msg-error {
 		padding: 11px 15px;
 		border-radius: 7px;
-		border: 1px solid rgba(215, 156, 134, 0.3);
-		background: rgba(215, 156, 134, 0.06);
-		color: #d79c86;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		border: 1px solid rgba(176, 67, 42, 0.3);
+		background: #fbe9e3;
+		color: var(--c-error);
+		font-family: var(--f-body);
 		font-size: 13px;
 		margin-bottom: 16px;
 	}
@@ -256,32 +357,47 @@
 		grid-column: 1 / -1;
 	}
 	.lbl {
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 11.5px;
 		letter-spacing: 0.04em;
-		color: #a39a8c;
+		color: var(--c-text-muted);
 	}
 	.in {
 		width: 100%;
 		box-sizing: border-box;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid rgba(236, 229, 218, 0.12);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		border-radius: 7px;
 		padding: 10px 12px;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		color: var(--c-text);
+		font-family: var(--f-body);
 		font-size: 14px;
 		outline: none;
-		transition:
-			border-color 150ms,
-			box-shadow 150ms;
+		transition: border-color 150ms;
 	}
 	.in::placeholder {
-		color: rgba(236, 229, 218, 0.25);
+		color: var(--c-text-muted);
 	}
 	.in:focus {
-		border-color: rgba(134, 179, 164, 0.5);
-		box-shadow: 0 0 0 3px rgba(134, 179, 164, 0.08);
+		border-color: var(--c-ink);
+	}
+	.in:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.in-file {
+		padding: 8px 10px;
+		font-size: 13px;
+	}
+	.photo-picked {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-ink);
+	}
+	.photo-err {
+		font-family: var(--f-body);
+		font-size: 12px;
+		color: var(--c-error);
 	}
 	.area {
 		min-height: 92px;
@@ -296,25 +412,25 @@
 	.btn-ghost {
 		display: inline-flex;
 		align-items: center;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		font-family: var(--f-body);
 		font-size: 13px;
 		padding: 11px 20px;
 		border-radius: 8px;
-		border: 1px solid rgba(236, 229, 218, 0.12);
-		color: #a39a8c;
+		border: 1px solid var(--c-border);
+		color: var(--c-text-tertiary);
 		text-decoration: none;
 	}
 	.btn-ghost:hover {
-		color: #ece5da;
-		border-color: rgba(236, 229, 218, 0.24);
+		color: var(--c-ink);
+		border-color: var(--c-ink);
 	}
 	.btn {
 		padding: 11px 24px;
 		border-radius: 8px;
 		border: none;
-		background: #86b3a4;
-		color: #191714;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
+		background: var(--c-accent);
+		color: #fff;
+		font-family: var(--f-body);
 		font-size: 13px;
 		font-weight: 700;
 		cursor: pointer;

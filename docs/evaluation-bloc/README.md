@@ -20,12 +20,23 @@ complète — sans le dupliquer — ce qui existe déjà :
 | [03-indicateurs-qualite.md](03-indicateurs-qualite.md) | 4 indicateurs qualité ISO 25010 vs dette technique (1 pt) |
 | [04-cartographie-competences-formation.md](04-cartographie-competences-formation.md) | Compétences + action de formation (1 pt) |
 | [05-plan-remediation-securite.md](05-plan-remediation-securite.md) | Plan de remédiation priorisé (2 pts) |
+| [06-preparation-soutenance-jury.md](06-preparation-soutenance-jury.md) | Support de révision oral : architecture, sécurité, tests, GitOps, questions jury |
+
+## Schémas visuels
+
+Rendus prêts pour la soutenance dans
+[`../dossier-projet/schemas/`](../dossier-projet/schemas/) (architecture
+système, pipeline CI/CD GitOps, cycle de vie DevSecOps, flux métier) — sources
+Mermaid + PNG/SVG générés.
+
+## Test de montée en charge
+
+Script prêt dans [`loadtest/`](loadtest/) (`run-siege.sh` + `README.md`) :
+cible les endpoints publics de lecture du catalogue (`/health`, `/article`,
+`/category`, `/article/:id`), utilisable en local, staging ou prod.
 
 ## Ce qui reste hors de ce dossier (à faire en dehors du code)
 
-- **Démo de montée en charge** (Siege/JMeter) — dépend d'un cluster staging
-  joignable en HTTPS au moment de la soutenance, à rejouer avant la date.
-- **Schémas d'architecture** — la matière existe (services, flux CI/CD décrit
-  textuellement dans `docs/DEVSECOPS.md`), mais aucune évaluation ne porte sur
-  la forme d'un support de présentation ; à mettre en image le jour J si utile
-  à l'oral.
+- **Exécuter le test de charge et garder une trace du résultat** (le script
+  existe, il reste à le lancer contre le cluster staging joignable en HTTPS
+  au moment de la soutenance, et à noter les chiffres obtenus).

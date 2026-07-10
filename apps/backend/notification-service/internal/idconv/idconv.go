@@ -21,3 +21,10 @@ func FromUUID(id uuid.UUID) uint {
 	_, _ = fmt.Sscanf(s[len(s)-12:], "%x", &n)
 	return uint(n)
 }
+
+// ToUUID applique le mapping deterministe direct ID numerique -> UUID,
+// symetrique de FromUUID et identique a events.ToEventUUID cote
+// catalog-service (les deux doivent rester en phase).
+func ToUUID(id uint) uuid.UUID {
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-0000-0000-%012x", id))
+}

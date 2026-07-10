@@ -29,6 +29,11 @@ spec:
           ports:
             - name: http
               containerPort: 8082
+            # /metrics : jamais route par l'ingress public (qui ne proxy que
+            # le port "http" du Service ci-dessous) ; scrape interne uniquement
+            # (ServiceMonitor -> voir servicemonitor.yaml).
+            - name: metrics
+              containerPort: 9100
           envFrom:
             # fournit FRONTEND_ORIGIN (lu par le middleware CORS)
             - configMapRef:

@@ -2,7 +2,7 @@
 	let {
 		value = 0,
 		height = 4,
-		color = '#86b3a4'
+		color = '#1e3b2c'
 	}: { value?: number; height?: number; color?: string } = $props();
 	const w = $derived(Math.max(0, Math.min(100, value)));
 </script>
@@ -13,13 +13,13 @@
 
 <style>
 	.track {
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(236, 229, 218, 0.1);
+		background: var(--c-bg);
+		border: 1px solid var(--c-border);
 		overflow: hidden;
 	}
 	.fill {
 		height: 100%;
-		opacity: 0.6;
+		opacity: 0.85;
 		transition: width 300ms ease;
 	}
 </style>

@@ -1,9 +1,9 @@
 package middlewares
 
 import (
+	"auth-service/metrics"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -13,12 +13,11 @@ import (
 // invisible pour le JavaScript de la page (protection contre le vol par XSS).
 const AuthCookieName = "collector_token"
 
-// TokenFromRequest extrait le JWT de la requete : en-tete Authorization
-// (clients API, WebSocket) en priorite, sinon cookie httpOnly (navigateur).
+// TokenFromRequest extrait le JWT du cookie httpOnly de session. Seul
+// mecanisme d'authentification navigateur : pas de fallback Authorization
+// Bearer (le JWT ne doit plus jamais transiter par du code JS-accessible,
+// que ce soit un header pose manuellement ou du localStorage).
 func TokenFromRequest(c *gin.Context) string {
-	if h := c.GetHeader("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		return strings.TrimPrefix(h, "Bearer ")
-	}
 	if v, err := c.Cookie(AuthCookieName); err == nil {
 		return v
 	}
@@ -32,12 +31,14 @@ func AuthRequired() gin.HandlerFunc {
 		// deja le demarrage dans ce cas).
 		secret := JWTSecret()
 		if secret == "" {
+			metrics.RecordJWTRejection("missing_secret")
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "Configuration serveur incomplete"})
 			return
 		}
 
 		tokenString := TokenFromRequest(c)
 		if tokenString == "" {
+			metrics.RecordJWTRejection("missing_token")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token requis"})
 			return
 		}
@@ -50,6 +51,7 @@ func AuthRequired() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
+			metrics.RecordJWTRejection("invalid_token")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token invalide ou expire"})
 			return
 		}
@@ -70,6 +72,18 @@ func AuthRequired() gin.HandlerFunc {
 // .env en local, docker-compose ou Sealed Secret k8s ailleurs).
 func JWTSecret() string {
 	return os.Getenv("JWT_SECRET")
+}
+
+// AdminRequired doit etre chaine apres AuthRequired : il refuse toute requete
+// dont le claim "role" n'est pas "admin" (moderation des comptes).
+func AdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if role, _ := c.Get("role"); role != "admin" {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Acces reserve aux administrateurs"})
+			return
+		}
+		c.Next()
+	}
 }
 
 // InternalOnly protege les endpoints d'appel inter-services (ex: resolution

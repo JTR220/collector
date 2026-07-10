@@ -29,8 +29,8 @@ export type ConversationAPI = {
 	unread_count: number;
 };
 
-const request = <T>(path: string, token: string, init?: RequestInit) =>
-	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: `notification-service ${path}` });
+const request = <T>(path: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { init, errorPrefix: `notification-service ${path}` });
 
 export type SendMessageInput = {
 	recipientId: string;
@@ -39,8 +39,8 @@ export type SendMessageInput = {
 	articleName?: string;
 };
 
-export async function sendMessage(token: string, input: SendMessageInput): Promise<MessageAPI> {
-	const data = await request<{ message: MessageAPI }>('/api/v1/messages', token, {
+export async function sendMessage(input: SendMessageInput): Promise<MessageAPI> {
+	const data = await request<{ message: MessageAPI }>('/api/v1/messages', {
 		method: 'POST',
 		body: JSON.stringify({
 			recipient_id: input.recipientId,
@@ -52,27 +52,20 @@ export async function sendMessage(token: string, input: SendMessageInput): Promi
 	return data.message;
 }
 
-export async function fetchConversations(token: string): Promise<ConversationAPI[]> {
-	const data = await request<{ conversations: ConversationAPI[] | null }>(
-		'/api/v1/conversations',
-		token
-	);
+export async function fetchConversations(): Promise<ConversationAPI[]> {
+	const data = await request<{ conversations: ConversationAPI[] | null }>('/api/v1/conversations');
 	return data.conversations ?? [];
 }
 
-export async function fetchConversationMessages(
-	token: string,
-	conversationId: string
-): Promise<MessageAPI[]> {
+export async function fetchConversationMessages(conversationId: string): Promise<MessageAPI[]> {
 	const data = await request<{ messages: MessageAPI[] | null }>(
-		`/api/v1/conversations/${conversationId}/messages`,
-		token
+		`/api/v1/conversations/${conversationId}/messages`
 	);
 	return data.messages ?? [];
 }
 
-export async function markConversationRead(token: string, conversationId: string): Promise<void> {
-	await request(`/api/v1/conversations/${conversationId}/read`, token, { method: 'PUT' });
+export async function markConversationRead(conversationId: string): Promise<void> {
+	await request(`/api/v1/conversations/${conversationId}/read`, { method: 'PUT' });
 }
 
 /** Convertit un id numerique (auth-service) en UUID deterministe partagé par tous les services. */
@@ -87,13 +80,11 @@ export type MessageSocket = { close: () => void };
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
 
-export function connectMessages(
-	token: string,
-	onMessage: (msg: MessageAPI) => void
-): MessageSocket {
+// Authentifie par le cookie httpOnly de session (voir connectNotifications).
+export function connectMessages(onMessage: (msg: MessageAPI) => void): MessageSocket {
 	if (!browser) return { close: () => {} };
 
-	const wsUrl = BASE_URL.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(token)}`;
+	const wsUrl = BASE_URL.replace(/^http/, 'ws') + '/ws';
 	let socket: WebSocket | null = null;
 	let backoff = INITIAL_BACKOFF_MS;
 	let closed = false;

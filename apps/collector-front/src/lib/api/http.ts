@@ -1,20 +1,22 @@
 /**
  * Helper HTTP partagé par tous les clients API (catalog, market, wishlist,
- * notifications, price-tracker) : en-têtes JSON + Bearer, parsing de la
- * réponse et remontée du message d'erreur renvoyé par le backend.
+ * notifications, price-tracker) : en-têtes JSON, parsing de la réponse et
+ * remontée du message d'erreur renvoyé par le backend. L'authentification
+ * passe par le cookie httpOnly de session (credentials:'include'), jamais
+ * par un token manipulé en JS — voir lib/stores/auth.ts.
  */
 export async function apiRequest<T>(
 	baseUrl: string,
 	path: string,
-	options: { token?: string; init?: RequestInit; errorPrefix?: string } = {}
+	options: { init?: RequestInit; errorPrefix?: string } = {}
 ): Promise<T> {
-	const { token, init, errorPrefix = 'API' } = options;
+	const { init, errorPrefix = 'API' } = options;
 
 	const res = await fetch(`${baseUrl}${path}`, {
 		...init,
+		credentials: 'include',
 		headers: {
 			...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
 			...init?.headers
 		}
 	});

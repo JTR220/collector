@@ -25,8 +25,8 @@ export type FraudAlertAPI = {
 	created_at: string;
 };
 
-const request = <T>(path: string, init?: RequestInit, token?: string) =>
-	apiRequest<T>(BASE_URL, path, { token, init, errorPrefix: `price-tracker ${path}` });
+const request = <T>(path: string, init?: RequestInit) =>
+	apiRequest<T>(BASE_URL, path, { init, errorPrefix: `price-tracker ${path}` });
 
 // Historique de prix : route publique (fiche lot visible sans connexion).
 export async function fetchPriceHistory(articleId: number): Promise<PriceHistoryEntry[]> {
@@ -36,17 +36,15 @@ export async function fetchPriceHistory(articleId: number): Promise<PriceHistory
 	return data.history ?? [];
 }
 
-// Alertes de fraude : reservees au dashboard admin, token requis.
-export async function fetchAlerts(token: string, unresolved = false): Promise<FraudAlertAPI[]> {
+// Alertes de fraude : reservees au dashboard admin (cookie de session requis).
+export async function fetchAlerts(unresolved = false): Promise<FraudAlertAPI[]> {
 	const qs = unresolved ? '?unresolved=true' : '';
 	const data = await request<{ count: number; alerts: FraudAlertAPI[] | null }>(
-		`/api/v1/alerts${qs}`,
-		undefined,
-		token
+		`/api/v1/alerts${qs}`
 	);
 	return data.alerts ?? [];
 }
 
-export async function resolveAlert(token: string, id: string): Promise<void> {
-	await request(`/api/v1/alerts/${id}/resolve`, { method: 'PUT' }, token);
+export async function resolveAlert(id: string): Promise<void> {
+	await request(`/api/v1/alerts/${id}/resolve`, { method: 'PUT' });
 }

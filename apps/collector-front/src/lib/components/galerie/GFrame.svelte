@@ -10,10 +10,9 @@
 	.g-frame {
 		width: 100%;
 		min-height: 100vh;
-		background: #191714;
-		color: #ece5da;
-		font-family: 'Hanken Grotesk', system-ui, sans-serif;
-		padding: 26px 38px 40px;
+		background: var(--c-bg);
+		color: var(--c-text);
+		font-family: var(--f-body);
 		overflow-x: hidden;
 		box-sizing: border-box;
 	}

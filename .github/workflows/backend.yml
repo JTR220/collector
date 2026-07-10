@@ -12,11 +12,13 @@ on:
     paths:
       - "apps/backend/**"
       - ".github/workflows/backend.yml"
+  # Pas de filtre paths ici : ce sont les required status checks de la
+  # protection de branche main. Avec un filtre, une PR qui ne touche pas
+  # apps/backend/** ne declenche jamais ce workflow -> GitHub attend un
+  # rapport de statut qui n'arrive jamais ("Waiting for status to be
+  # reported" indefiniment, merge bloque).
   pull_request:
     branches: [main]
-    paths:
-      - "apps/backend/**"
-      - ".github/workflows/backend.yml"
 
 permissions:
   contents: read
@@ -50,9 +52,10 @@ jobs:
         working-directory: apps/backend/${{ matrix.service }}
 
     # Postgres ephemere pour les tests d'integration de notification-service
-    # (requetes Postgres-specifiques : gen_random_uuid(), UUID, DISTINCT ON —
-    # non simulables en sqlite). Inoffensif pour les autres services de la
-    # matrice, qui ne lisent pas TEST_DATABASE_DSN.
+    # et price-tracker-service (requetes Postgres-specifiques : gen_random_uuid(),
+    # UUID, DISTINCT ON — non simulables en sqlite). Isole par job de matrice
+    # (chaque service a son propre conteneur postgres) : inoffensif pour
+    # auth-service/catalog-service, qui ne lisent pas TEST_DATABASE_DSN.
     services:
       postgres:
         image: postgres:17-alpine
@@ -72,7 +75,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: apps/backend/${{ matrix.service }}/go.mod
           cache: true
@@ -98,7 +101,11 @@ jobs:
       - name: Run Tests (avec détecteur de data races)
         # TEST_DATABASE_DSN n'est consomme que par les tests d'integration de
         # notification-service (repository_integration_test.go,
-        # handler_integration_test.go) ; les autres services l'ignorent.
+        # handler_integration_test.go) et price-tracker-service
+        # (repository_integration_test.go) ; les autres services l'ignorent.
+        # Le nom "notification_test" est un heritage historique : chaque job
+        # de la matrice a son propre conteneur postgres isole, donc la base
+        # est vide et propre quel que soit le service qui la peuple ensuite.
         env:
           TEST_DATABASE_DSN: postgres://postgres:postgres@localhost:5432/notification_test?sslmode=disable
         run: |
@@ -108,7 +115,7 @@ jobs:
             ./...
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-${{ matrix.service }}
@@ -192,7 +199,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: apps/backend/${{ matrix.service }}/go.mod
 
@@ -233,7 +240,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: apps/backend/${{ matrix.service }}/go.mod
 
@@ -371,7 +378,7 @@ jobs:
           mkdir -p /tmp/digests
           echo "${IMAGE}@${{ steps.push.outputs.digest }}" > "/tmp/digests/${{ matrix.service }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: digest-${{ matrix.service }}
@@ -395,9 +402,16 @@ jobs:
       group: gitops-update-manifests # partagé avec la CI frontend pour éviter les push concurrents
 
     steps:
+      # Token dédié (PAT d'un compte Repository admin) au lieu du GITHUB_TOKEN
+      # par défaut : le ruleset sur main exige PR + 22 status checks, et la
+      # bypass list ("Repository admin", Always allow) ne couvre que les
+      # comptes ayant ce rôle — pas l'identité github-actions[bot] du token
+      # par défaut. Ce token permet donc au commit GitOps de bypasser le
+      # ruleset comme n'importe quel push admin.
       - uses: actions/checkout@v7
         with:
           ref: main
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -406,9 +420,7 @@ jobs:
           merge-multiple: true
 
       - name: Install kustomize
-        run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
+        uses: imranismail/setup-kustomize@v3
 
       - name: Pin new image digests in staging overlay
         working-directory: infra/k8s/overlays/staging
@@ -432,76 +444,3 @@ jobs:
           git commit -m "ci(gitops): deploy backend ${GITHUB_SHA::7} to staging"
           git pull --rebase origin main
           git push origin main
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # Promotion prod — ouvre une Pull Request vers la branche "master" (celle que
-  # suit collector-prod dans Argo CD) avec les digests fraîchement validés. Ne
-  # merge JAMAIS automatiquement : la revue + le clic "Merge" sur GitHub sont
-  # le premier garde-fou humain, le clic "Sync" dans Argo CD le second.
-  # ────────────────────────────────────────────────────────────────────────────
-  promote-prod:
-    name: GitOps — PR de promotion prod
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: update-manifests
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-      pull-requests: write
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: master
-          fetch-depth: 0
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: digest-*
-          path: /tmp/digests
-          merge-multiple: true
-
-      - name: Install kustomize
-        run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
-
-      - name: Pin new image digests in prod overlay
-        working-directory: infra/k8s/overlays/prod
-        run: |
-          for f in /tmp/digests/*; do
-            ref="$(cat "$f")"
-            name="${ref%@*}"
-            echo "→ ${ref}"
-            kustomize edit set image "${name}=${ref}"
-          done
-
-      - name: Commit, push & open PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add infra/k8s/overlays/prod/kustomization.yaml
-          if git diff --cached --quiet; then
-            echo "Digests déjà à jour en prod, rien à promouvoir."
-            exit 0
-          fi
-          BRANCH="promote-prod/backend"
-          git checkout -B "$BRANCH"
-          git commit -m "ci(gitops): promote backend ${GITHUB_SHA::7} to prod"
-          git push --force origin "$BRANCH"
-          # Une seule branche/PR de promotion backend, mise à jour à chaque
-          # push au lieu d'en créer une nouvelle par SHA (évite l'accumulation
-          # de branches promote-prod/backend-<sha>).
-          # "Allow GitHub Actions to create pull requests" peut être désactivé
-          # sur le repo : dans ce cas la branche est quand même poussée, il
-          # suffit d'ouvrir la PR à la main via le lien ci-dessous.
-          if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
-            gh pr create --base master --head "$BRANCH" \
-              --title "Promote backend to prod" \
-              --body "Digests validés par le pipeline CI (lint, tests, gosec, govulncheck, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après." \
-              || echo "::warning::PR non créée automatiquement (permissions GitHub Actions). Ouvre-la à la main : ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/${BRANCH}"
-          else
-            gh pr edit "$BRANCH" --body "Digests validés par le pipeline CI (lint, tests, gosec, govulncheck, scans Trivy, signature cosign) sur \`main\` @ ${GITHUB_SHA}. Merge = promotion vers master ; le sync Argo CD collector-prod reste manuel après."
-          fi
