@@ -1,0 +1,16 @@
+# Config gitleaks — étend les règles par défaut, ajoute une allowlist ciblée
+# pour les faux positifs connus. Voir .github/workflows/gitleaks.yml.
+
+[extend]
+useDefault = true
+
+[allowlist]
+  description = "Faux positifs connus"
+
+  # Manifests SealedSecret (Bitnami sealed-secrets) : le champ encryptedData
+  # contient un blob chiffré (asymétrique, clé publique du controller en
+  # cluster), pas un secret en clair. C'est justement le principe du format —
+  # sûr à committer. La haute entropie du base64 déclenche generic-api-key.
+  paths = [
+    '''infra/k8s/overlays/.*/sealed-.*-secrets\.yaml''',
+  ]
