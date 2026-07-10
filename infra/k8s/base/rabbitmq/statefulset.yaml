@@ -27,6 +27,30 @@ spec:
         fsGroup: 999
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # fsGroup peut rendre .erlang.cookie lisible par le groupe au premier
+        # montage du volume ; RabbitMQ refuse de demarrer si ce fichier n'est
+        # pas strictement 600 (owner only). On force les droits avant chaque
+        # demarrage plutot que de compter sur un etat correct herite du PVC.
+        - name: fix-cookie-perms
+          image: rabbitmq:3.13-alpine
+          command:
+            - sh
+            - -c
+            - |
+              if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then
+                chmod 600 /var/lib/rabbitmq/.erlang.cookie
+                chown 999:999 /var/lib/rabbitmq/.erlang.cookie
+              fi
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
       containers:
         - name: rabbitmq
           image: rabbitmq:3.13-alpine
