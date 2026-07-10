@@ -51,18 +51,35 @@ func checkWSOrigin(r *http.Request) bool {
 }
 
 type Handler struct {
-	hub       *hub.Hub
-	repo      *repository.NotificationRepository
-	jwtSecret []byte
-	auth      *authclient.Client
+	hub            *hub.Hub
+	repo           *repository.NotificationRepository
+	jwtSecret      []byte
+	auth           *authclient.Client
+	internalSecret string
 }
 
-func New(h *hub.Hub, repo *repository.NotificationRepository, jwtSecret string, auth *authclient.Client) *Handler {
+func New(h *hub.Hub, repo *repository.NotificationRepository, jwtSecret string, auth *authclient.Client, internalSecret string) *Handler {
 	return &Handler{
-		hub:       h,
-		repo:      repo,
-		jwtSecret: []byte(jwtSecret),
-		auth:      auth,
+		hub:            h,
+		repo:           repo,
+		jwtSecret:      []byte(jwtSecret),
+		auth:           auth,
+		internalSecret: internalSecret,
+	}
+}
+
+// InternalOnly protege les endpoints d'appel inter-services (cascade
+// d'anonymisation declenchee par auth-service a la suppression d'un compte)
+// via un secret partage transmis en en-tete X-Internal-Secret. Meme patron
+// que auth-service/middlewares.InternalOnly : sans secret configure, l'acces
+// est refuse par defaut.
+func (h *Handler) InternalOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if h.internalSecret == "" || c.GetHeader("X-Internal-Secret") != h.internalSecret {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "acces reserve aux services internes"})
+			return
+		}
+		c.Next()
 	}
 }
 
@@ -88,6 +105,14 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 			auth.GET("/conversations/:id/messages", h.GetConversationMessages)
 			auth.PUT("/conversations/:id/read", h.MarkConversationRead)
 		}
+	}
+
+	// Endpoints internes (secret partage) : cascade d'anonymisation declenchee
+	// par auth-service a la suppression d'un compte.
+	internal := r.Group("/internal")
+	internal.Use(h.InternalOnly())
+	{
+		internal.PATCH("/users/:id/anonymize", h.AnonymizeUser)
 	}
 }
 
@@ -474,4 +499,30 @@ func (h *Handler) MarkConversationRead(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "marked as read"})
+}
+
+// anonymizedName remplace le nom d'un utilisateur supprime dans les copies
+// denormalisees detenues par ce service (messages).
+const anonymizedName = "Utilisateur supprime"
+
+// AnonymizeUser anonymise les copies denormalisees du nom d'un utilisateur
+// (Message.SenderName/RecipientName) suite a la suppression de son compte
+// cote auth-service (droit a l'effacement, art. 17 RGPD). Reserve aux appels
+// inter-services (middleware InternalOnly, secret partage) : declenche par
+// auth-service juste apres la suppression locale du compte. L'ID recu est
+// l'identifiant numerique auth-service, converti vers l'UUID deterministe
+// utilise par ce service (voir idconv).
+func (h *Handler) AnonymizeUser(c *gin.Context) {
+	numericID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "identifiant invalide")
+		return
+	}
+	userID := idconv.ToUUID(uint(numericID))
+
+	if err := h.repo.AnonymizeUser(c.Request.Context(), userID, anonymizedName); err != nil {
+		response.Error(c, http.StatusInternalServerError, errInternalServer)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "donnees anonymisees"})
 }

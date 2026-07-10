@@ -159,6 +159,34 @@ func TestAcceptance_DuplicateEmailRejected(t *testing.T) {
 	}
 }
 
+// ── RGPD : suppression du compte (droit a l'effacement) -> reconnexion impossible ──
+
+func TestAcceptance_DeleteMeThenLoginFails(t *testing.T) {
+	setupAuthAcceptanceDB(t)
+	gin.SetMode(gin.TestMode)
+	router := routes.InitRouter()
+
+	jsonRequest(router, http.MethodPost, "/utilisateur",
+		`{"name":"Ada","email":"ada4@example.com","password":"motdepasse123"}`)
+	loginW := jsonRequest(router, http.MethodPost, "/login",
+		`{"email":"ada4@example.com","password":"motdepasse123"}`)
+	sessionCookie := loginCookie(t, loginW)
+
+	delReq := httptest.NewRequest(http.MethodDelete, "/me", nil)
+	delReq.AddCookie(sessionCookie)
+	delW := httptest.NewRecorder()
+	router.ServeHTTP(delW, delReq)
+	if delW.Code != http.StatusOK {
+		t.Fatalf("/me DELETE : status attendu 200, obtenu %d (%s)", delW.Code, delW.Body.String())
+	}
+
+	w := jsonRequest(router, http.MethodPost, "/login",
+		`{"email":"ada4@example.com","password":"motdepasse123"}`)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("reconnexion apres suppression : status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
 // ── Critère d'acceptation 4 : mauvais mot de passe -> connexion refusee ──
 
 func TestAcceptance_LoginWithWrongPasswordRejected(t *testing.T) {

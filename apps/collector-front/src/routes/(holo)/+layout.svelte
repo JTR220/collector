@@ -6,6 +6,7 @@
 	import { messages } from '$lib/stores/messages';
 	import GFrame from '$lib/components/galerie/GFrame.svelte';
 	import GHeader from '$lib/components/galerie/GHeader.svelte';
+	import GFooter from '$lib/components/galerie/GFooter.svelte';
 
 	let { children } = $props();
 
@@ -53,6 +54,7 @@
 	<main class="g-main">
 		{@render children()}
 	</main>
+	<GFooter />
 </GFrame>
 
 <style>

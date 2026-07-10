@@ -154,6 +154,44 @@ func TestAdminRequiredMissingRoleReturns403(t *testing.T) {
 	}
 }
 
+func performInternalRequest(t *testing.T, headerValue string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	r := gin.New()
+	r.GET("/internal", InternalOnly(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodGet, "/internal", nil)
+	if headerValue != "" {
+		req.Header.Set("X-Internal-Secret", headerValue)
+	}
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestInternalOnlyWithoutConfiguredSecretReturns403(t *testing.T) {
+	t.Setenv("INTERNAL_SECRET", "")
+	w := performInternalRequest(t, "peu-importe")
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestInternalOnlyWrongSecretReturns403(t *testing.T) {
+	t.Setenv("INTERNAL_SECRET", "le-bon-secret")
+	w := performInternalRequest(t, "un-mauvais-secret")
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestInternalOnlyCorrectSecretPasses(t *testing.T) {
+	t.Setenv("INTERNAL_SECRET", "le-bon-secret")
+	w := performInternalRequest(t, "le-bon-secret")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status attendu 200, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
 func TestAdminRequiredAdminPasses(t *testing.T) {
 	t.Setenv("JWT_SECRET", testSecret)
 	token := signToken(t, testSecret, jwt.MapClaims{

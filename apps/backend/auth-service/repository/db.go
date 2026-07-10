@@ -90,7 +90,9 @@ func seedUsers() {
 			log.Println("Seed utilisateur ignore (create) :", err)
 		}
 	}
-	log.Println("Seed comptes : admin@collector.shop / admin123 · test@collector.shop / test123 · " +
-		"vault@collector.shop / vault123 · " +
-		"vendeur@collector.shop / vendeur123 · acheteur@collector.shop / acheteur123")
+	// Les mots de passe des comptes de demo ne sont jamais journalises (meme
+	// en dev) : ce log tourne aussi en staging, et un mot de passe en clair
+	// dans les logs applicatifs est une donnee sensible au sens RGPD. La
+	// liste des identifiants de demo reste affichee cote front (page login).
+	log.Println("Comptes de demonstration seedes : admin, test, vault, vendeur, acheteur (@collector.shop)")
 }

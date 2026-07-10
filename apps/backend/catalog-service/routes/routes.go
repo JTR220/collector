@@ -113,5 +113,13 @@ func InitRouter() *gin.Engine {
 	// Creation de categories : reservee aux administrateurs (moderation du catalogue).
 	router.POST("/category", middlewares.AuthRequired(), middlewares.AdminRequired(), controllers.CreateCategory)
 
+	// Endpoints internes (secret partage) : cascade d'anonymisation declenchee
+	// par auth-service a la suppression d'un compte.
+	internal := router.Group("/internal")
+	internal.Use(middlewares.InternalOnly())
+	{
+		internal.PATCH("/users/:id/anonymize", controllers.AnonymizeUser)
+	}
+
 	return router
 }

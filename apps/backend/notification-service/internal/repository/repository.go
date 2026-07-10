@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/JTR220/collector/notification-service/internal/model"
 	"github.com/google/uuid"
@@ -229,6 +230,46 @@ func (r *NotificationRepository) MarkConversationRead(ctx context.Context, conve
 		conversationID, userID,
 	)
 	return err
+}
+
+// AnonymizeUser remplace le nom affiche d'un utilisateur (expediteur et
+// destinataire) dans tous les messages qu'il a envoyes ou recus, suite a la
+// suppression de son compte (droit a l'effacement, art. 17 RGPD).
+func (r *NotificationRepository) AnonymizeUser(ctx context.Context, userID uuid.UUID, placeholder string) error {
+	if _, err := r.db.ExecContext(ctx,
+		`UPDATE messages SET sender_name = $1 WHERE sender_id = $2`, placeholder, userID,
+	); err != nil {
+		return err
+	}
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE messages SET recipient_name = $1 WHERE recipient_id = $2`, placeholder, userID,
+	)
+	return err
+}
+
+// PurgeOlderThan supprime les notifications et messages anterieurs a
+// `before` (politique de retention / minimisation des donnees, art. 5.1.e
+// RGPD). Renvoie le nombre de lignes supprimees dans chaque table.
+func (r *NotificationRepository) PurgeOlderThan(ctx context.Context, before time.Time) (notifsDeleted, messagesDeleted int64, err error) {
+	res, err := r.db.ExecContext(ctx, `DELETE FROM notifications WHERE created_at < $1`, before)
+	if err != nil {
+		return 0, 0, err
+	}
+	notifsDeleted, err = res.RowsAffected()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	res, err = r.db.ExecContext(ctx, `DELETE FROM messages WHERE created_at < $1`, before)
+	if err != nil {
+		return notifsDeleted, 0, err
+	}
+	messagesDeleted, err = res.RowsAffected()
+	if err != nil {
+		return notifsDeleted, 0, err
+	}
+
+	return notifsDeleted, messagesDeleted, nil
 }
 
 func (r *NotificationRepository) UnreadMessagesCount(ctx context.Context, userID uuid.UUID) (int, error) {

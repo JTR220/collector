@@ -75,3 +75,19 @@ func AdminRequired() gin.HandlerFunc {
 func jwtSecret() string {
 	return os.Getenv("JWT_SECRET")
 }
+
+// InternalOnly protege les endpoints d'appel inter-services (ex: cascade
+// d'anonymisation declenchee par auth-service a la suppression d'un compte)
+// via un secret partage transmis en en-tete X-Internal-Secret. Meme patron
+// que auth-service/middlewares.InternalOnly (les deux doivent rester en
+// phase) : sans INTERNAL_SECRET configure, l'acces est refuse par defaut.
+func InternalOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		secret := os.Getenv("INTERNAL_SECRET")
+		if secret == "" || c.GetHeader("X-Internal-Secret") != secret {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Acces reserve aux services internes"})
+			return
+		}
+		c.Next()
+	}
+}

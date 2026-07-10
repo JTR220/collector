@@ -57,6 +57,10 @@ func InitRouter() *gin.Engine {
 	protected.Use(middlewares.AuthRequired())
 	{
 		protected.GET("/me", controllers.GetMe)
+		// Droits RGPD en self-service : rectification, portabilite, effacement.
+		protected.PATCH("/me", controllers.UpdateMe)
+		protected.GET("/me/export", controllers.ExportMe)
+		protected.DELETE("/me", controllers.DeleteMe)
 	}
 
 	// Endpoints internes (secret partage) : reserves aux appels inter-services.

@@ -35,7 +35,7 @@ func newMockRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock) {
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	repo := repository.New(sqlxDB)
 	r := gin.New()
-	h := New(hub.New(), repo, testJWTSecret, nil)
+	h := New(hub.New(), repo, testJWTSecret, nil, testInternalSecret)
 	h.RegisterRoutes(r)
 	return r, mock
 }

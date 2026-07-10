@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"auth-service/cascade"
 	"auth-service/config"
 	"auth-service/dto"
 	"auth-service/metrics"
@@ -10,6 +11,7 @@ import (
 	"auth-service/response"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -213,4 +215,116 @@ func GetMe(c *gin.Context) {
 		"email": user.Email,
 		"role":  user.Role,
 	})
+}
+
+// UpdateMe modifie le profil de l'utilisateur connecte (droit de
+// rectification, art. 16 RGPD). Le mot de passe n'est change que s'il est
+// fourni et non vide.
+func UpdateMe(c *gin.Context) {
+	userID := uint(c.GetFloat64("user_id"))
+
+	var input dto.UpdateProfileInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.Error(c, http.StatusBadRequest, "Donnees invalides : "+err.Error())
+		return
+	}
+
+	var user models.Utilisateur
+	if err := repository.DB.First(&user, userID).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
+		return
+	}
+
+	user.Name = input.Name
+	user.Email = input.Email
+
+	if input.Password != "" {
+		if len(input.Password) < passwordMinLen || len(input.Password) > passwordMaxLen {
+			response.Error(c, http.StatusBadRequest,
+				fmt.Sprintf("Le mot de passe doit faire entre %d et %d caracteres", passwordMinLen, passwordMaxLen))
+			return
+		}
+		hashed, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+		if err != nil {
+			response.Error(c, http.StatusInternalServerError, "Erreur interne")
+			return
+		}
+		user.Password = string(hashed)
+	}
+
+	if err := repository.DB.Save(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			response.Error(c, http.StatusConflict, "Un compte existe deja avec cet email")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "Impossible de mettre a jour le profil")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
+		"role":  user.Role,
+	})
+}
+
+// ExportMe renvoie l'integralite des donnees personnelles detenues par
+// auth-service pour l'utilisateur connecte (droit a la portabilite,
+// art. 20 RGPD), dans un format structure et lisible par machine.
+func ExportMe(c *gin.Context) {
+	userID := uint(c.GetFloat64("user_id"))
+
+	var user models.Utilisateur
+	if err := repository.DB.First(&user, userID).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
+		return
+	}
+
+	c.Header("Content-Disposition", "attachment; filename=\"mes-donnees-collector.json\"")
+	c.JSON(http.StatusOK, gin.H{
+		"exported_at": time.Now().UTC().Format(time.RFC3339),
+		"account": gin.H{
+			"id":         user.ID,
+			"name":       user.Name,
+			"email":      user.Email,
+			"role":       user.Role,
+			"suspended":  user.Suspended,
+			"created_at": user.CreatedAt,
+			"updated_at": user.UpdatedAt,
+		},
+	})
+}
+
+// DeleteMe supprime definitivement le compte de l'utilisateur connecte
+// (droit a l'effacement, art. 17 RGPD) : suppression physique (Unscoped)
+// des donnees d'identite detenues par auth-service, puis invalidation de la
+// session. Les copies denormalisees du nom (annonces, messages) detenues par
+// les autres services ne sont pas retroactivement effacees par cet appel —
+// limite connue, a traiter par un job d'anonymisation inter-services.
+func DeleteMe(c *gin.Context) {
+	userID := uint(c.GetFloat64("user_id"))
+
+	var user models.Utilisateur
+	if err := repository.DB.First(&user, userID).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Utilisateur introuvable")
+		return
+	}
+
+	if err := repository.DB.Unscoped().Delete(&user).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Impossible de supprimer le compte")
+		return
+	}
+
+	// Cascade best-effort vers les services detenant une copie denormalisee du
+	// nom (annonces, avis, messages) : un service indisponible ne doit jamais
+	// faire echouer la suppression, deja effective localement.
+	if cascade.Instance != nil {
+		for _, err := range cascade.Instance.AnonymizeUser(c.Request.Context(), user.ID) {
+			log.Println("cascade anonymisation echouee :", err)
+		}
+	}
+
+	setAuthCookie(c, "", -1)
+	c.JSON(http.StatusOK, gin.H{"message": "Compte et donnees personnelles supprimes"})
 }
