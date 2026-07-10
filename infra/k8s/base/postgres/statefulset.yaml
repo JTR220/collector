@@ -20,6 +20,8 @@ spec:
         # uid/gid de l'utilisateur postgres dans postgres:17-alpine
         fsGroup: 70
         runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
         seccompProfile:
           type: RuntimeDefault
       containers:
