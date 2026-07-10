@@ -403,9 +403,16 @@ jobs:
       group: gitops-update-manifests # partagé avec la CI backend pour éviter les push concurrents
 
     steps:
+      # Token dédié (PAT d'un compte Repository admin) au lieu du GITHUB_TOKEN
+      # par défaut : le ruleset sur main exige PR + 22 status checks, et la
+      # bypass list ("Repository admin", Always allow) ne couvre que les
+      # comptes ayant ce rôle — pas l'identité github-actions[bot] du token
+      # par défaut. Ce token permet donc au commit GitOps de bypasser le
+      # ruleset comme n'importe quel push admin.
       - uses: actions/checkout@v7
         with:
           ref: main
+          token: ${{ secrets.GITOPS_PUSH_TOKEN }}
 
       - uses: actions/download-artifact@v8
         with:
