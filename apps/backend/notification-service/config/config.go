@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -15,13 +16,30 @@ func envOr(key, def string) string {
 	return def
 }
 
+// envInt renvoie la variable d'environnement convertie en entier si elle est
+// definie et valide, sinon def.
+func envInt(key string, def int) int {
+	if v, err := strconv.Atoi(os.Getenv(key)); err == nil {
+		return v
+	}
+	return def
+}
+
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	RabbitMQ RabbitMQConfig
-	JWT      JWTConfig
-	SMTP     SMTPConfig
-	Internal InternalConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	RabbitMQ  RabbitMQConfig
+	JWT       JWTConfig
+	SMTP      SMTPConfig
+	Internal  InternalConfig
+	Retention RetentionConfig
+}
+
+// RetentionConfig porte la duree de conservation des notifications et
+// messages (minimisation des donnees, art. 5.1.e RGPD) avant purge
+// automatique par le worker de retention (voir cmd/main.go).
+type RetentionConfig struct {
+	Days int `mapstructure:"RETENTION_DAYS"`
 }
 
 type SMTPConfig struct {
@@ -70,6 +88,7 @@ func Load() *Config {
 	viper.SetDefault("SMTP_PORT", "1025")
 	viper.SetDefault("SMTP_FROM", "notifications@collector.shop")
 	viper.SetDefault("AUTH_SERVICE_URL", "http://localhost:8080")
+	viper.SetDefault("RETENTION_DAYS", 365)
 
 	viper.AutomaticEnv()
 
@@ -95,6 +114,7 @@ func Load() *Config {
 	cfg.SMTP.Password = envOr("SMTP_PASSWORD", cfg.SMTP.Password)
 	cfg.Internal.AuthServiceURL = envOr("AUTH_SERVICE_URL", cfg.Internal.AuthServiceURL)
 	cfg.Internal.Secret = envOr("INTERNAL_SECRET", cfg.Internal.Secret)
+	cfg.Retention.Days = envInt("RETENTION_DAYS", cfg.Retention.Days)
 
 	// Fail-fast : aucun secret par defaut dans le code. docker-compose ou le
 	// Sealed Secret k8s doivent fournir JWT_SECRET (il doit etre identique a

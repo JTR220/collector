@@ -13,6 +13,7 @@ import (
 )
 
 const testJWTSecret = "test-secret"
+const testInternalSecret = "test-internal-secret"
 
 func signToken(t *testing.T, claims jwt.MapClaims) string {
 	t.Helper()
@@ -29,7 +30,7 @@ func newTestRouter() *gin.Engine {
 	r := gin.New()
 	// repo=nil : les tests ci-dessous ne doivent jamais atteindre le repo
 	// (routes bloquees par le middleware avant d'atteindre le handler).
-	h := New(hub.New(), nil, testJWTSecret, nil)
+	h := New(hub.New(), nil, testJWTSecret, nil, testInternalSecret)
 	h.RegisterRoutes(r)
 	return r
 }
@@ -60,6 +61,40 @@ func TestNotificationsRequiresAuth(t *testing.T) {
 	w := doRequest(r, http.MethodGet, "/api/v1/notifications", "")
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status attendu 401, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func doInternalRequest(r *gin.Engine, method, path, secret string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(method, path, nil)
+	if secret != "" {
+		req.Header.Set("X-Internal-Secret", secret)
+	}
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestAnonymizeUserWithoutSecretReturns403(t *testing.T) {
+	r := newTestRouter()
+	w := doInternalRequest(r, http.MethodPatch, "/internal/users/7/anonymize", "")
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestAnonymizeUserWithWrongSecretReturns403(t *testing.T) {
+	r := newTestRouter()
+	w := doInternalRequest(r, http.MethodPatch, "/internal/users/7/anonymize", "mauvais-secret")
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status attendu 403, obtenu %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestAnonymizeUserRejectsNonNumericID(t *testing.T) {
+	r := newTestRouter()
+	w := doInternalRequest(r, http.MethodPatch, "/internal/users/abc/anonymize", testInternalSecret)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status attendu 400, obtenu %d (%s)", w.Code, w.Body.String())
 	}
 }
 

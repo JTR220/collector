@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { env } from '$env/dynamic/public';
 	import favicon from '$lib/assets/favicon.svg';
+	import GCookieConsent from '$lib/components/galerie/GCookieConsent.svelte';
 	import './layout.css';
 	let { children } = $props();
 	const isStaging = env.PUBLIC_ENV === 'staging';
@@ -12,6 +13,7 @@
 	<div class="staging-banner">STAGING — environnement de test, pas la production</div>
 {/if}
 {@render children()}
+<GCookieConsent />
 
 <style>
 	.staging-banner {

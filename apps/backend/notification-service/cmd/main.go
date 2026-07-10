@@ -91,7 +91,7 @@ func main() {
 	router.Use(corsMiddleware())
 	router.Use(metrics.Middleware())
 
-	h := handler.New(wsHub, repo, cfg.JWT.Secret, authCli)
+	h := handler.New(wsHub, repo, cfg.JWT.Secret, authCli, cfg.Internal.Secret)
 	h.RegisterRoutes(router)
 
 	srv := &http.Server{
@@ -116,6 +116,7 @@ func main() {
 	defer cancel()
 
 	go mgr.Start(ctx, cfg.RabbitMQ.URL)
+	go runRetentionWorker(ctx, repo, cfg.Retention.Days)
 
 	go func() {
 		log.Info().Str("port", cfg.Server.Port).Msg("HTTP server listening")
@@ -148,6 +149,37 @@ func main() {
 	}
 
 	log.Info().Msg("notification-service stopped")
+}
+
+// runRetentionWorker purge periodiquement les notifications et messages
+// au-dela de la duree de conservation configuree (RETENTION_DAYS, 365 jours
+// par defaut) : minimisation des donnees (art. 5.1.e RGPD). Une premiere
+// purge tourne au demarrage, puis toutes les 24h jusqu'a l'arret du service.
+func runRetentionWorker(ctx context.Context, repo *repository.NotificationRepository, retentionDays int) {
+	purge := func() {
+		cutoff := time.Now().AddDate(0, 0, -retentionDays)
+		notifs, messages, err := repo.PurgeOlderThan(ctx, cutoff)
+		if err != nil {
+			log.Error().Err(err).Msg("purge de retention echouee")
+			return
+		}
+		if notifs > 0 || messages > 0 {
+			log.Info().Int64("notifications", notifs).Int64("messages", messages).
+				Msg("purge de retention effectuee")
+		}
+	}
+
+	purge()
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			purge()
+		}
+	}
 }
 
 // corsMiddleware reprend la convention du catalog-service (FRONTEND_ORIGIN).

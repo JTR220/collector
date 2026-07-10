@@ -22,10 +22,12 @@ type Mailer interface {
 // NoopMailer journalise l'email au lieu de l'envoyer (SMTP_HOST absent).
 type NoopMailer struct{}
 
-func (NoopMailer) Send(to, subject, body string) {
+func (NoopMailer) Send(to, subject, _ string) {
 	metrics.RecordEmail("disabled")
-	log.Info().Str("to", to).Str("subject", subject).Msg("email non envoye (SMTP non configure) — voir body en debug")
-	log.Debug().Str("to", to).Str("body", body).Msg("contenu email")
+	// Le corps de l'email (donnee personnelle potentielle : nom, adresse de
+	// livraison...) n'est volontairement jamais journalise, y compris en
+	// Debug — seuls le destinataire et le sujet servent de trace de diagnostic.
+	log.Info().Str("to", to).Str("subject", subject).Msg("email non envoye (SMTP non configure)")
 }
 
 // SMTPConfig regroupe la configuration serveur SMTP (dev : MailHog, sans TLS
