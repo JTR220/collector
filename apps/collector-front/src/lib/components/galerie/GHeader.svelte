@@ -61,7 +61,20 @@
 
 	<div class="g-user">
 		<a href="/panier" class="g-cart" title="Panier" aria-label="Panier">
-			<span class="g-cart-ico" aria-hidden="true">🛒</span>
+			<svg
+				class="g-cart-ico"
+				aria-hidden="true"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<circle cx="9" cy="21" r="1" />
+				<circle cx="20" cy="21" r="1" />
+				<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+			</svg>
 			{#if $cartCount > 0}
 				<span class="g-nav-badge g-cart-badge">{$cartCount > 99 ? '99+' : $cartCount}</span>
 			{/if}
@@ -152,10 +165,16 @@
 		justify-content: center;
 		width: 22px;
 		height: 22px;
+		color: var(--c-text-tertiary);
 		text-decoration: none;
+		transition: color 120ms;
+	}
+	.g-cart:hover {
+		color: var(--c-ink);
 	}
 	.g-cart-ico {
-		font-size: 15px;
+		width: 20px;
+		height: 20px;
 	}
 	.g-cart-badge {
 		position: absolute;
