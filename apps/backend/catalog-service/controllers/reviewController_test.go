@@ -148,7 +148,9 @@ func TestGetSellerRatingNoReviews(t *testing.T) {
 		Average float64 `json:"average"`
 		Count   int64   `json:"count"`
 	}
-	json.Unmarshal(w.Body.Bytes(), &result)
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatalf("reponse JSON invalide : %v", err)
+	}
 	if result.Count != 0 || result.Average != 0 {
 		t.Errorf("attendu 0 avis / moyenne 0, obtenu %+v", result)
 	}
