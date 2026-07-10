@@ -182,7 +182,7 @@ type publishedOfferDecision struct {
 type publishedOfferPurchased struct {
 	offerID, orderID, itemID, buyerID, sellerID uint
 	itemName                                    string
-	price                                        float64
+	price                                       float64
 }
 
 // fakePublisher implemente events.Publisher et se contente d'enregistrer les
