@@ -28,8 +28,12 @@
 		<h2>3. Annonces et transactions</h2>
 		<ul>
 			<li>Chaque annonce doit décrire fidèlement l'objet proposé à la vente.</li>
-			<li>Toute annonce nouvellement publiée est soumise à une modération avant sa mise en ligne.</li>
-			<li>Le vendeur choisit d'accepter ou de refuser une commande reçue sur l'une de ses annonces.</li>
+			<li>
+				Toute annonce nouvellement publiée est soumise à une modération avant sa mise en ligne.
+			</li>
+			<li>
+				Le vendeur choisit d'accepter ou de refuser une commande reçue sur l'une de ses annonces.
+			</li>
 			<li>Aucune donnée bancaire n'est collectée ni traitée par la plateforme.</li>
 		</ul>
 

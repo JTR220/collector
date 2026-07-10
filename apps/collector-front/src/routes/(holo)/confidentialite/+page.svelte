@@ -20,63 +20,86 @@
 
 		<h2>2. Quelles données sont collectées</h2>
 		<ul>
-			<li><strong>Compte</strong> : nom, adresse email, mot de passe (stocké haché, jamais en clair).</li>
 			<li>
-				<strong>Activité sur le marché</strong> : annonces publiées, achats, ventes, wishlist, avis
-				laissés.
+				<strong>Compte</strong> : nom, adresse email, mot de passe (stocké haché, jamais en clair).
 			</li>
 			<li>
-				<strong>Messagerie</strong> : messages échangés entre acheteurs et vendeurs au sujet d'une
-				annonce. Un filtre automatique bloque l'envoi de coordonnées personnelles (email,
-				téléphone) dans ces messages, pour éviter les échanges hors plateforme.
+				<strong>Activité sur le marché</strong> : annonces publiées, achats, ventes, wishlist, avis laissés.
 			</li>
 			<li>
-				<strong>Notifications</strong> : alertes de prix, de commande ou de fraude générées par
-				votre activité.
+				<strong>Messagerie</strong> : messages échangés entre acheteurs et vendeurs au sujet d'une annonce.
+				Un filtre automatique bloque l'envoi de coordonnées personnelles (email, téléphone) dans ces messages,
+				pour éviter les échanges hors plateforme.
+			</li>
+			<li>
+				<strong>Notifications</strong> : alertes de prix, de commande ou de fraude générées par votre
+				activité.
 			</li>
 		</ul>
-		<p>Nous ne collectons pas d'adresse postale, de numéro de téléphone ni de moyen de paiement : aucune donnée bancaire ne transite par nos serveurs.</p>
+		<p>
+			Nous ne collectons pas d'adresse postale, de numéro de téléphone ni de moyen de paiement :
+			aucune donnée bancaire ne transite par nos serveurs.
+		</p>
 
 		<h2>3. Pourquoi ces données sont traitées</h2>
 		<ul>
 			<li>Créer et gérer votre compte, vous authentifier (exécution du contrat de service).</li>
 			<li>Permettre la publication d'annonces et le suivi des commandes.</li>
-			<li>Vous envoyer les notifications liées à votre activité (email transactionnel, temps réel).</li>
-			<li>Assurer la sécurité de la plateforme (limitation des tentatives de connexion, détection de fraude sur les prix).</li>
+			<li>
+				Vous envoyer les notifications liées à votre activité (email transactionnel, temps réel).
+			</li>
+			<li>
+				Assurer la sécurité de la plateforme (limitation des tentatives de connexion, détection de
+				fraude sur les prix).
+			</li>
 		</ul>
 
 		<h2>4. Durée de conservation</h2>
 		<ul>
 			<li>
-				<strong>Données de compte</strong> (nom, email, mot de passe) : conservées tant que le
-				compte existe, supprimées définitivement à la clôture du compte.
+				<strong>Données de compte</strong> (nom, email, mot de passe) : conservées tant que le compte
+				existe, supprimées définitivement à la clôture du compte.
 			</li>
 			<li>
-				<strong>Messages et notifications</strong> : conservés 12 mois, puis supprimés
-				automatiquement par une purge périodique.
+				<strong>Messages et notifications</strong> : conservés 12 mois, puis supprimés automatiquement
+				par une purge périodique.
 			</li>
 		</ul>
 
 		<h2>5. Cookies</h2>
 		<p>
-			Le site utilise uniquement un cookie de session strictement nécessaire à l'authentification
-			(<code>httpOnly</code>, non accessible en JavaScript). Aucun cookie de mesure d'audience ni
-			publicitaire n'est déposé.
+			Le site utilise uniquement un cookie de session strictement nécessaire à l'authentification (<code
+				>httpOnly</code
+			>, non accessible en JavaScript). Aucun cookie de mesure d'audience ni publicitaire n'est
+			déposé.
 		</p>
 
 		<h2>6. Vos droits</h2>
 		<p>Conformément au RGPD, vous disposez des droits suivants sur vos données :</p>
 		<ul>
-			<li><strong>Accès et rectification</strong> : modifiez votre nom et votre email directement depuis votre <a href="/profil">profil</a>.</li>
-			<li><strong>Portabilité</strong> : téléchargez une copie de vos données personnelles depuis votre profil.</li>
-			<li><strong>Effacement</strong> : supprimez définitivement votre compte et vos données personnelles depuis votre profil, à tout moment.</li>
-			<li>Pour toute autre demande (opposition, limitation), contactez <a href="mailto:contact@collector.shop">contact@collector.shop</a>.</li>
+			<li>
+				<strong>Accès et rectification</strong> : modifiez votre nom et votre email directement
+				depuis votre <a href="/profil">profil</a>.
+			</li>
+			<li>
+				<strong>Portabilité</strong> : téléchargez une copie de vos données personnelles depuis votre
+				profil.
+			</li>
+			<li>
+				<strong>Effacement</strong> : supprimez définitivement votre compte et vos données personnelles
+				depuis votre profil, à tout moment.
+			</li>
+			<li>
+				Pour toute autre demande (opposition, limitation), contactez <a
+					href="mailto:contact@collector.shop">contact@collector.shop</a
+				>.
+			</li>
 		</ul>
 
 		<h2>7. Destinataires des données</h2>
 		<p>
-			Vos données ne sont jamais vendues ni partagées avec des tiers à des fins commerciales.
-			Elles sont traitées uniquement par les services internes de la plateforme (authentification,
+			Vos données ne sont jamais vendues ni partagées avec des tiers à des fins commerciales. Elles
+			sont traitées uniquement par les services internes de la plateforme (authentification,
 			catalogue, notifications) et, pour l'envoi d'email transactionnel, par le serveur SMTP
 			configuré par l'éditeur.
 		</p>

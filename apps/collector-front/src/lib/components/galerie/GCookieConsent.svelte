@@ -19,8 +19,8 @@
 {#if visible}
 	<div class="g-cookie-banner" role="dialog" aria-label="Information sur les cookies">
 		<p class="g-cookie-text">
-			Collector.shop utilise uniquement un cookie de session strictement necessaire a la
-			connexion (aucun cookie de mesure d'audience ni publicitaire). En savoir plus dans notre
+			Collector.shop utilise uniquement un cookie de session strictement necessaire a la connexion
+			(aucun cookie de mesure d'audience ni publicitaire). En savoir plus dans notre
 			<a href="/confidentialite">politique de confidentialité</a>.
 		</p>
 		<button class="g-cookie-btn" onclick={acknowledge}>J'ai compris</button>
