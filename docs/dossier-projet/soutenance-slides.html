@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>collector.shop — Soutenance bloc « Superviser et assurer le développement des applications logicielles »</title>
+<style>
+:root{
+  --bg:#19170f;
+  --bg2:#221f16;
+  --panel:#26221a;
+  --accent:#c9813f;
+  --accent2:#8d4f2a;
+  --accent-soft:#e8c193;
+  --text:#f3ecdd;
+  --text-dim:#c9bda3;
+  --text-faint:#8f8672;
+  --card-bg:#f8f4ec;
+  --card-text:#221f16;
+  --border:#3a3426;
+  --ok:#7fae6a;
+  --warn:#d2a13a;
+  --crit:#c1553f;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+  overflow:hidden;
+  height:100vh;
+  width:100vw;
+}
+.deck{
+  position:relative;
+  height:100vh;
+  width:100vw;
+}
+.slide{
+  position:absolute;
+  inset:0;
+  display:none;
+  flex-direction:column;
+  padding:clamp(20px,4vh,56px) clamp(24px,6vw,90px);
+  overflow-y:auto;
+}
+.slide.active{display:flex;}
+.slide::-webkit-scrollbar{width:8px;}
+.slide::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+.slide-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:clamp(10px,1.6vh,18px);
+  flex-shrink:0;
+}
+.kicker{
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  font-size:clamp(11px,1.1vw,13px);
+  color:var(--accent-soft);
+  font-weight:600;
+}
+.badge{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#1b1509;
+  font-weight:700;
+  font-size:clamp(11px,1.1vw,13px);
+  padding:5px 14px;
+  border-radius:999px;
+  white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+}
+h1{
+  font-size:clamp(30px,5vw,58px);
+  margin:0 0 8px 0;
+  font-weight:700;
+  line-height:1.08;
+  color:var(--text);
+}
+h2{
+  font-size:clamp(22px,3.1vw,38px);
+  margin:0 0 clamp(10px,2vh,22px) 0;
+  font-weight:700;
+  line-height:1.15;
+  color:var(--text);
+  border-bottom:2px solid var(--border);
+  padding-bottom:clamp(8px,1.4vh,14px);
+  flex-shrink:0;
+}
+h3{
+  font-size:clamp(15px,1.5vw,19px);
+  margin:0 0 8px 0;
+  color:var(--accent-soft);
+  font-weight:700;
+}
+p{line-height:1.55;color:var(--text-dim);font-size:clamp(14px,1.25vw,17px);}
+strong{color:var(--text);}
+.slide-body{
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  gap:clamp(10px,1.6vh,18px);
+}
+.cols{
+  display:grid;
+  gap:clamp(16px,2.4vw,32px);
+  flex:1;
+  min-height:0;
+}
+.cols.c2{grid-template-columns:1fr 1fr;}
+.cols.c2-wide{grid-template-columns:1.15fr 1fr;}
+.cols.c3{grid-template-columns:repeat(3,1fr);}
+.col{min-width:0;display:flex;flex-direction:column;gap:10px;}
+
+ul{margin:0;padding-left:1.15em;}
+li{line-height:1.5;color:var(--text-dim);font-size:clamp(13.5px,1.15vw,16px);margin-bottom:6px;}
+li strong{color:var(--text);}
+li code, p code, td code{
+  background:var(--panel);
+  border:1px solid var(--border);
+  color:var(--accent-soft);
+  padding:1px 6px;
+  border-radius:5px;
+  font-size:.92em;
+  font-family:"Cascadia Code","Consolas",monospace;
+}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:clamp(12px,1.8vh,20px) clamp(14px,1.8vw,22px);
+}
+.card.accent{border-color:var(--accent2);}
+.card h3{margin-top:0;}
+
+.schema-card{
+  background:var(--card-bg);
+  border-radius:var(--radius);
+  padding:clamp(10px,1.6vh,18px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:auto;
+  flex:1;
+  min-height:0;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+.schema-card svg{width:100%;height:auto;max-height:100%;display:block;}
+.schema-caption{
+  color:var(--text-faint);
+  font-size:clamp(11px,1vw,13px);
+  text-align:center;
+  margin-top:6px;
+  flex-shrink:0;
+}
+
+table{border-collapse:collapse;width:100%;font-size:clamp(12.5px,1.05vw,15px);}
+th,td{
+  text-align:left;
+  padding:8px 12px;
+  border-bottom:1px solid var(--border);
+  vertical-align:top;
+  color:var(--text-dim);
+  line-height:1.4;
+}
+th{
+  color:var(--accent-soft);
+  font-weight:700;
+  text-transform:uppercase;
+  font-size:.82em;
+  letter-spacing:.04em;
+  border-bottom:2px solid var(--accent2);
+}
+td strong, tr:first-child td{color:var(--text);}
+.table-wrap{flex:1;min-height:0;overflow:auto;}
+
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;}
+.pill{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  padding:4px 12px;
+  border-radius:999px;
+  font-size:clamp(12px,1vw,14px);
+}
+.pill.ok{border-color:var(--ok);color:var(--ok);}
+.pill.crit{border-color:var(--crit);color:#e8a798;}
+
+.status{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:.85em;}
+.status.ok::before{content:"✓";color:var(--ok);}
+.status.warn::before{content:"◐";color:var(--warn);}
+
+.title-slide{justify-content:center;align-items:flex-start;}
+.title-slide .brand{
+  font-size:clamp(40px,7vw,84px);
+  font-weight:800;
+  background:linear-gradient(135deg,var(--accent-soft),var(--accent));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  margin-bottom:6px;
+}
+.title-slide .subtitle{font-size:clamp(16px,2vw,24px);color:var(--text-dim);margin-bottom:clamp(24px,5vh,52px);max-width:900px;}
+.title-meta{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:8px 18px;
+  font-size:clamp(14px,1.3vw,18px);
+  color:var(--text-dim);
+}
+.title-meta b{color:var(--accent-soft);font-weight:700;}
+.editable-hint{
+  margin-top:clamp(24px,5vh,48px);
+  font-size:12px;
+  color:var(--text-faint);
+  border:1px dashed var(--border);
+  border-radius:8px;
+  padding:8px 12px;
+  max-width:520px;
+}
+
+.closing-slide{justify-content:center;align-items:center;text-align:center;}
+.closing-slide h1{font-size:clamp(32px,5.5vw,64px);}
+
+/* Nav */
+.navbar{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 18px;
+  background:linear-gradient(0deg,rgba(0,0,0,.55),transparent);
+  z-index:50;
+  pointer-events:none;
+}
+.navbar > *{pointer-events:auto;}
+.nav-btn{
+  background:var(--panel);
+  border:1px solid var(--border);
+  color:var(--text);
+  width:38px;height:38px;
+  border-radius:50%;
+  cursor:pointer;
+  font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.nav-btn:hover{background:var(--accent2);}
+.nav-center{display:flex;align-items:center;gap:14px;}
+.counter{font-size:13px;color:var(--text-dim);font-variant-numeric:tabular-nums;}
+.progress{
+  position:fixed;top:0;left:0;right:0;height:3px;background:var(--bg2);z-index:60;
+}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .25s;}
+
+.tool-btn{
+  background:transparent;border:1px solid var(--border);color:var(--text-faint);
+  font-size:11px;padding:5px 10px;border-radius:7px;cursor:pointer;
+}
+.tool-btn:hover{color:var(--text);border-color:var(--accent);}
+.toolbar{position:fixed;top:10px;right:14px;z-index:60;display:flex;gap:8px;}
+
+.notes-panel{
+  position:fixed;left:0;right:0;bottom:52px;
+  max-height:34vh;
+  background:#0f0d09;
+  border-top:1px solid var(--accent2);
+  color:var(--accent-soft);
+  padding:14px 24px;
+  font-size:14px;
+  line-height:1.6;
+  display:none;
+  z-index:55;
+  overflow-y:auto;
+}
+.notes-panel.show{display:block;}
+.notes-panel b{color:var(--text);}
+
+.menu-overlay{
+  position:fixed;inset:0;background:rgba(10,9,6,.92);
+  z-index:70;display:none;
+  padding:6vh 8vw;overflow-y:auto;
+}
+.menu-overlay.show{display:block;}
+.menu-overlay h2{border:none;}
+.menu-list{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 32px;}
+.menu-list li{
+  padding:9px 14px;border-radius:8px;cursor:pointer;
+  color:var(--text-dim);font-size:15px;
+  display:flex;gap:10px;align-items:baseline;
+}
+.menu-list li:hover{background:var(--panel);color:var(--text);}
+.menu-list li .n{color:var(--accent-soft);font-weight:700;min-width:1.6em;}
+
+@media print{
+  body{overflow:visible;height:auto;}
+  .navbar,.toolbar,.notes-panel,.progress,.menu-overlay{display:none !important;}
+  .slide{
+    display:flex !important;
+    position:static;
+    page-break-after:always;
+    height:100vh;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+<div class="toolbar">
+  <button class="tool-btn" id="notesToggle" title="Afficher/masquer les notes (touche N)">Notes [N]</button>
+  <button class="tool-btn" id="menuToggle" title="Sommaire (touche M)">Sommaire [M]</button>
+</div>
+
+<div class="deck" id="deck">
+
+<!-- 0. TITRE -->
+<section class="slide title-slide" data-title="Titre">
+  <div class="brand">collector.shop</div>
+  <div class="subtitle">Superviser et assurer le développement des applications logicielles — soutenance individuelle de bloc (INFMAALSIA2V)</div>
+  <div class="title-meta">
+    <b>Rôle</b><span>Lead Developer — équipe IT de la start-up Collector</span>
+    <b>Présenté par</b><span>Chaker BRAIKIA</span>
+    <b>Format</b><span>Présentation orale + démonstration, suivie d'un échange avec le jury</span>
+    <b>Périmètre</b><span>Structuration du processus · POC développement/déploiement · Plan de remédiation sécurité</span>
+  </div>
+</section>
+
+<!-- 1. CONTEXTE -->
+<section class="slide" data-title="Contexte Collector">
+  <div class="slide-head"><span class="kicker">Contexte métier</span></div>
+  <h2>Collector : d'organisateur de salons à marketplace</h2>
+  <div class="slide-body">
+    <div class="cols c2">
+      <div class="col card">
+        <h3>La start-up</h3>
+        <ul>
+          <li>5 ans d'existence, orientée <strong>événementiel</strong> (salons d'objets de collection) avant la levée de fonds par crowdfunding.</li>
+          <li>Nouvelle équipe IT : <strong>1 Lead Developer</strong> (ce rôle) + <strong>2 développeur·euse·s confirmé·e·s</strong> (5 ans d'XP).</li>
+          <li>SI existant limité : Office 365, site vitrine WordPress — aucune base technique produit à reprendre.</li>
+        </ul>
+      </div>
+      <div class="col card accent">
+        <h3>Pourquoi la sécurité est prioritaire</h3>
+        <ul>
+          <li>L'application porte des <strong>transactions financières réelles</strong> — commission de 5 % prélevée par la plateforme.</li>
+          <li>Paiement <strong>exclusivement via la plateforme</strong> : les échanges directs acheteur/vendeur (email, téléphone) doivent être techniquement empêchés.</li>
+          <li>Contrainte explicite du contexte : <em>« l'application incluant des transactions financières, la sécurité est une exigence de premier plan »</em>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Ma mission (Lead Developer)</h3>
+      <p style="margin:0">Définir un processus de développement conforme aux exigences de qualité logicielle (référentiel <strong>ISO 25010</strong>), livrer une <strong>V1</strong> avec pipeline CI/CD testé, déploiement orchestré et sécurité minimale, puis <strong>auditer</strong> cette V1 pour proposer un plan de remédiation priorisé.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2. EXIGENCES PRODUIT -->
+<section class="slide" data-title="Exigences produit">
+  <div class="slide-head"><span class="kicker">Cadrage fonctionnel</span></div>
+  <h2>Exigences clés de collector.shop</h2>
+  <div class="slide-body">
+    <div class="cols c3">
+      <div class="col card">
+        <h3>Utilisateurs & rôles</h3>
+        <ul>
+          <li>2 profils : <strong>acheteur</strong> / <strong>vendeur</strong> (cumulables), espace dédié avec suivi achats/ventes, notation, historique.</li>
+          <li><strong>Admin</strong> : back-office, catégories, modération articles/vendeurs.</li>
+          <li>Chat intégré acheteur↔vendeur, modérable par l'admin.</li>
+          <li>Inscription obligatoire pour vendre/acheter ; catalogue navigable sans authentification.</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Transaction & contrôle</h3>
+        <ul>
+          <li>Paiement CB uniquement, <strong>via la plateforme</strong> — jamais en direct.</li>
+          <li>Échange de coordonnées personnelles <strong>interdit</strong> dans la messagerie.</li>
+          <li>Publication d'article soumise à <strong>contrôle avant mise en vente</strong>, automatisable au maximum.</li>
+          <li>Variation de prix collectée, notifiée aux intéressés + à un composant back-office anti-fraude.</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Évolutivité attendue</h3>
+        <ul>
+          <li>Recommandations par centre d'intérêt (V1), puis parcours catalogue (V2).</li>
+          <li>Intégration future d'un outil de détection de fraude (interne ou tiers).</li>
+          <li>Internationalisation et accessibilité.</li>
+          <li>Architecture prête pour enchères, événements live, bot avant-vente, analytics direction.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. METHODE -->
+<section class="slide" data-title="Méthode & ISO 25010">
+  <div class="slide-head"><span class="kicker">Structuration du processus</span></div>
+  <h2>Méthode : 3 phases, référentiel ISO 25010</h2>
+  <div class="slide-body">
+    <div class="cols c3">
+      <div class="col card">
+        <h3>1 · Structuration</h3>
+        <ul>
+          <li>4 indicateurs qualité (ISO 25010)</li>
+          <li>Cycle de vie DevSecOps + pipeline CI/CD schématisé</li>
+          <li>Cartographie des compétences + formation</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>2 · Développement / déploiement</h3>
+        <ul>
+          <li>Backlog + fonctionnalité métier (achat validé vendeur)</li>
+          <li>Schéma d'architecture technique</li>
+          <li>Protocole d'expérimentation bac à sable</li>
+          <li>POC intégrant CI/CD, sécurité, observabilité</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>3 · Plan de remédiation</h3>
+        <ul>
+          <li>Analyse des tests et métriques collectées</li>
+          <li>Vulnérabilités identifiées</li>
+          <li>Actions de remédiation priorisées et justifiées</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card accent">
+      <h3>Pourquoi ISO 25010</h3>
+      <p style="margin:0">Chaque indicateur suivi est relié à une <strong>caractéristique de qualité</strong> (fiabilité, sécurité, maintenabilité, efficacité de performance). Le suivi continu de ces métriques dans le pipeline CI, plutôt qu'un contrôle ponctuel, est ce qui empêche l'accumulation silencieuse de <strong>dette technique</strong> : une régression est bloquée au commit, pas découverte en production.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. ARCHITECTURE -->
+<section class="slide" data-title="Architecture système">
+  <div class="slide-head">
+    <span class="kicker">Phase 2 · Développement &amp; déploiement</span>
+    <span class="badge">Grille : 4 pts</span>
+  </div>
+  <h2>Architecture système — microservices event-driven</h2>
+  <div class="slide-body cols c2-wide" style="flex:1;min-height:0;">
+    <div class="col">
+      <div class="schema-card"><svg id="svgarch" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 1569.27px; background-color: transparent;" viewBox="0 -0.000003814697265625 1569.265625 383.3465270996094" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#svgarch{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#svgarch .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#svgarch .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#svgarch .error-icon{fill:#552222;}#svgarch .error-text{fill:#552222;stroke:#552222;}#svgarch .edge-thickness-normal{stroke-width:1px;}#svgarch .edge-thickness-thick{stroke-width:3.5px;}#svgarch .edge-pattern-solid{stroke-dasharray:0;}#svgarch .edge-thickness-invisible{stroke-width:0;fill:none;}#svgarch .edge-pattern-dashed{stroke-dasharray:3;}#svgarch .edge-pattern-dotted{stroke-dasharray:2;}#svgarch .marker{fill:#333333;stroke:#333333;}#svgarch .marker.cross{stroke:#333333;}#svgarch svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#svgarch p{margin:0;}#svgarch .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#svgarch .cluster-label text{fill:#333;}#svgarch .cluster-label span{color:#333;}#svgarch .cluster-label span p{background-color:transparent;}#svgarch .label text,#svgarch span{fill:#333;color:#333;}#svgarch .node rect,#svgarch .node circle,#svgarch .node ellipse,#svgarch .node polygon,#svgarch .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#svgarch .rough-node .label text,#svgarch .node .label text,#svgarch .image-shape .label,#svgarch .icon-shape .label{text-anchor:middle;}#svgarch .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#svgarch .rough-node .label,#svgarch .node .label,#svgarch .image-shape .label,#svgarch .icon-shape .label{text-align:center;}#svgarch .node.clickable{cursor:pointer;}#svgarch .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#svgarch .arrowheadPath{fill:#333333;}#svgarch .edgePath .path{stroke:#333333;stroke-width:1px;}#svgarch .flowchart-link{stroke:#333333;fill:none;}#svgarch .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#svgarch .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#svgarch .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#svgarch .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#svgarch .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#svgarch .cluster text{fill:#333;}#svgarch .cluster span{color:#333;}#svgarch div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#svgarch .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#svgarch rect.text{fill:none;stroke-width:0;}#svgarch .icon-shape,#svgarch .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#svgarch .icon-shape p,#svgarch .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#svgarch .icon-shape .label rect,#svgarch .image-shape .label rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#svgarch .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#svgarch .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#svgarch .node .neo-node{stroke:#9370DB;}#svgarch [data-look="neo"].node rect,#svgarch [data-look="neo"].cluster rect,#svgarch [data-look="neo"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgarch [data-look="neo"].swimlane.cluster rect{filter:none;}#svgarch [data-look="neo"].node path{stroke:#9370DB;stroke-width:1px;}#svgarch [data-look="neo"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgarch [data-look="neo"].node .neo-line path{stroke:#9370DB;filter:none;}#svgarch [data-look="neo"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgarch [data-look="neo"].node circle .state-start{fill:#000000;}#svgarch [data-look="neo"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgarch [data-look="neo"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgarch :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="svgarch_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="svgarch_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"/></marker><marker id="svgarch_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"><path d="M143.484,236.089L147.651,236.089C151.818,236.089,160.151,236.089,167.818,236.089C175.484,236.089,182.484,236.089,185.984,236.089L189.484,236.089" id="svgarch-L_U_F_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_U_F_0" data-points="W3sieCI6MTQzLjQ4NDM3NSwieSI6MjM2LjA4ODc5MjgwMDkwMzMyfSx7IngiOjE2OC40ODQzNzUsInkiOjIzNi4wODg3OTI4MDA5MDMzMn0seyJ4IjoxOTMuNDg0Mzc1LCJ5IjoyMzYuMDg4NzkyODAwOTAzMzJ9XQ==" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M290.927,209.089L306.423,180.687C321.92,152.284,352.913,95.48,373.592,67.078C394.271,38.675,404.635,38.675,409.818,38.675L415,38.675" id="svgarch-L_F_A_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_F_A_0" data-points="W3sieCI6MjkwLjkyNjgwMDM4OTIzOTkzLCJ5IjoyMDkuMDg4NzkyODAwOTAzMzJ9LHsieCI6MzgzLjkwNjI1LCJ5IjozOC42NzUyNDMzNzc2ODU1NX0seyJ4Ijo0MTksInkiOjM4LjY3NTI0MzM3NzY4NTU1fV0=" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M316.137,209.089L327.432,201.454C338.727,193.819,361.317,178.549,376.111,170.914C390.906,163.279,397.906,163.279,401.406,163.279L404.906,163.279" id="svgarch-L_F_C_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_F_C_0" data-points="W3sieCI6MzE2LjEzNzQ1NDE2Mzk4MiwieSI6MjA5LjA4ODc5MjgwMDkwMzMyfSx7IngiOjM4My45MDYyNSwieSI6MTYzLjI3ODU5MzA2MzM1NDV9LHsieCI6NDA4LjkwNjI1LCJ5IjoxNjMuMjc4NTkzMDYzMzU0NX1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M358.906,250.499L363.073,251.225C367.24,251.951,375.573,253.403,397.97,254.129C420.367,254.855,456.828,254.855,507.247,254.855C557.667,254.855,622.044,254.855,685.87,254.855C749.695,254.855,812.969,254.855,868.824,254.855C924.68,254.855,973.117,254.855,1015.773,245.845C1058.43,236.836,1095.305,218.818,1113.742,209.809L1132.18,200.8" id="svgarch-L_F_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_F_P_0" data-points="W3sieCI6MzU4LjkwNjI1LCJ5IjoyNTAuNDk4OTQ0NTU5OTgwNjN9LHsieCI6MzgzLjkwNjI1LCJ5IjoyNTQuODU0NTIwNzk3NzI5NX0seyJ4Ijo0OTMuMjg5MDYyNSwieSI6MjU0Ljg1NDUyMDc5NzcyOTV9LHsieCI6Njg2LjQyMTg3NSwieSI6MjU0Ljg1NDUyMDc5NzcyOTV9LHsieCI6ODc2LjI0MjE4NzUsInkiOjI1NC44NTQ1MjA3OTc3Mjk1fSx7IngiOjEwMjEuNTU0Njg3NSwieSI6MjU0Ljg1NDUyMDc5NzcyOTV9LHsieCI6MTEzNS43NzM5NjA0MTQ4NzI0LCJ5IjoxOTkuMDQ0MzIxMDYwMTgwNjZ9XQ==" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M318.935,263.089L329.763,269.93C340.592,276.77,362.249,290.452,391.308,297.293C420.367,304.133,456.828,304.133,507.247,304.133C557.667,304.133,622.044,304.133,685.87,304.133C749.695,304.133,812.969,304.133,868.824,304.133C924.68,304.133,973.117,304.133,1008.283,305.167C1043.449,306.2,1065.343,308.267,1076.289,309.301L1087.236,310.334" id="svgarch-L_F_N_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_F_N_0" data-points="W3sieCI6MzE4LjkzNDkzOTA3MjE4MzgsInkiOjI2My4wODg3OTI4MDA5MDMzfSx7IngiOjM4My45MDYyNSwieSI6MzA0LjEzMzI2NDU0MTYyNn0seyJ4Ijo0OTMuMjg5MDYyNSwieSI6MzA0LjEzMzI2NDU0MTYyNn0seyJ4Ijo2ODYuNDIxODc1LCJ5IjozMDQuMTMzMjY0NTQxNjI2fSx7IngiOjg3Ni4yNDIxODc1LCJ5IjozMDQuMTMzMjY0NTQxNjI2fSx7IngiOjEwMjEuNTU0Njg3NSwieSI6MzA0LjEzMzI2NDU0MTYyNn0seyJ4IjoxMDkxLjIxODc1LCJ5IjozMTAuNzEwMTMyNjU1NzY0Mn1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M576.585,136.279L594.891,130.345C613.197,124.411,649.809,112.543,685.598,101.82C721.386,91.097,756.35,81.519,773.832,76.73L791.314,71.941" id="svgarch-L_C_DB1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_C_DB1_0" data-points="W3sieCI6NTc2LjU4NDcwMDI1MjMzMTIsInkiOjEzNi4yNzg1OTMwNjMzNTQ1fSx7IngiOjY4Ni40MjE4NzUsInkiOjEwMC42NzUyNDMzNzc2ODU1NX0seyJ4Ijo3OTUuMTcxODc1LCJ5Ijo3MC44ODM5MTExMTQ0NDMxOH1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M567.578,38.675L587.385,38.675C607.193,38.675,646.807,38.675,684.074,39.595C721.34,40.515,756.259,42.354,773.718,43.274L791.177,44.194" id="svgarch-L_A_DB1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_A_DB1_0" data-points="W3sieCI6NTY3LjU3ODEyNSwieSI6MzguNjc1MjQzMzc3Njg1NTV9LHsieCI6Njg2LjQyMTg3NSwieSI6MzguNjc1MjQzMzc3Njg1NTV9LHsieCI6Nzk1LjE3MTg3NSwieSI6NDQuNDA0MzQ1NzM2MDAxMzl9XQ==" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M1296.266,172.044L1300.432,172.044C1304.599,172.044,1312.932,172.044,1321.276,172.044C1329.62,172.044,1337.974,172.044,1342.151,172.044L1346.328,172.044" id="svgarch-L_P_DB2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_P_DB2_0" data-points="W3sieCI6MTI5Ni4yNjU2MjUsInkiOjE3Mi4wNDQzMjEwNjAxODA2Nn0seyJ4IjoxMzIxLjI2NTYyNSwieSI6MTcyLjA0NDMyMTA2MDE4MDY2fSx7IngiOjEzNTAuMzI4MTI1LCJ5IjoxNzIuMDQ0MzIxMDYwMTgwNjZ9XQ==" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M1290.844,320.133L1295.914,320.133C1300.984,320.133,1311.125,320.133,1319.695,320.133C1328.266,320.133,1335.266,320.133,1338.766,320.133L1342.266,320.133" id="svgarch-L_N_DB3_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_N_DB3_0" data-points="W3sieCI6MTI5MC44NDM3NSwieSI6MzIwLjEzMzI2NDU0MTYyNn0seyJ4IjoxMzIxLjI2NTYyNSwieSI6MzIwLjEzMzI2NDU0MTYyNn0seyJ4IjoxMzQ2LjI2NTYyNSwieSI6MzIwLjEzMzI2NDU0MTYyNn1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M577.672,170.269L595.797,171.771C613.922,173.272,650.172,176.275,692.298,177.777C734.424,179.279,782.427,179.279,806.428,179.279L830.43,179.279" id="svgarch-L_C_R_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_C_R_0" data-points="W3sieCI6NTc3LjY3MTg3NSwieSI6MTcwLjI2OTI0ODc4MTE2NTI2fSx7IngiOjY4Ni40MjE4NzUsInkiOjE3OS4yNzg1OTMwNjMzNTQ1fSx7IngiOjgzNC40Mjk2ODc1LCJ5IjoxNzkuMjc4NTkzMDYzMzU0NX1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M918.055,156.835L935.305,147.575C952.555,138.316,987.055,119.797,1021.159,117.575C1055.262,115.353,1088.97,129.428,1105.824,136.466L1122.678,143.503" id="svgarch-L_R_P_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_R_P_0" data-points="W3sieCI6OTE4LjA1NDY4NzUsInkiOjE1Ni44MzQ3MjIwOTU2MTI1Nn0seyJ4IjoxMDIxLjU1NDY4NzUsInkiOjEwMS4yNzg1OTMwNjMzNTQ0OX0seyJ4IjoxMTI2LjM2OTA1NjYzMjgyMDUsInkiOjE0NS4wNDQzMjEwNjAxODA2Nn1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M918.055,176.414L935.305,175.232C952.555,174.05,987.055,171.687,1026.996,190.697C1066.937,209.707,1112.319,250.09,1135.01,270.282L1157.701,290.474" id="svgarch-L_R_N_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_R_N_0" data-points="W3sieCI6OTE4LjA1NDY4NzUsInkiOjE3Ni40MTM5NzAwOTMyNjU2NX0seyJ4IjoxMDIxLjU1NDY4NzUsInkiOjE2OS4zMjMwNjQ4MDQwNzcxNX0seyJ4IjoxMTYwLjY4OTM1NTM4MzY5OSwieSI6MjkzLjEzMzI2NDU0MTYyNn1d" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M1085.797,191.942L1075.09,193.966C1064.383,195.991,1042.969,200.04,1015.669,199.231C988.369,198.423,955.183,192.757,938.59,189.924L921.998,187.091" id="svgarch-L_P_R_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_P_R_0" data-points="W3sieCI6MTA4NS43OTY4NzUsInkiOjE5MS45NDE5MzkzODYyNTUxN30seyJ4IjoxMDIxLjU1NDY4NzUsInkiOjIwNC4wODg3OTI4MDA5MDMzMn0seyJ4Ijo5MTguMDU0Njg3NSwieSI6MTg2LjQxNzUyNzk1NTU3ODJ9XQ==" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/><path d="M1091.219,329.556L1079.608,330.653C1067.997,331.749,1044.776,333.941,1008.947,335.037C973.117,336.133,924.68,336.133,868.824,336.133C812.969,336.133,749.695,336.133,685.87,336.133C622.044,336.133,557.667,336.133,507.247,336.133C456.828,336.133,420.367,336.133,389.518,324.413C358.669,312.693,333.432,289.252,320.814,277.531L308.195,265.811" id="svgarch-L_N_F_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_N_F_0" data-points="W3sieCI6MTA5MS4yMTg3NSwieSI6MzI5LjU1NjM5NjQyNzQ4Nzc1fSx7IngiOjEwMjEuNTU0Njg3NSwieSI6MzM2LjEzMzI2NDU0MTYyNn0seyJ4Ijo4NzYuMjQyMTg3NSwieSI6MzM2LjEzMzI2NDU0MTYyNn0seyJ4Ijo2ODYuNDIxODc1LCJ5IjozMzYuMTMzMjY0NTQxNjI2fSx7IngiOjQ5My4yODkwNjI1LCJ5IjozMzYuMTMzMjY0NTQxNjI2fSx7IngiOjM4My45MDYyNSwieSI6MzM2LjEzMzI2NDU0MTYyNn0seyJ4IjozMDUuMjY0MzM4MTIzMjk0MiwieSI6MjYzLjA4ODc5MjgwMDkwMzN9XQ==" data-look="classic" marker-end="url(#svgarch_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_U_F_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_F_A_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_F_C_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_F_P_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_F_N_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_C_DB1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_A_DB1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_P_DB2_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_N_DB3_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(686.421875, 179.2785930633545)"><g class="label" data-id="L_C_R_0" transform="translate(-83.75, -12)"><foreignObject width="167.5" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>price.updated / order.*</p></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_R_P_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_R_N_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(1002.02861, 200.75497)"><g class="label" data-id="L_P_R_0" transform="translate(-39.2421875, -12)"><foreignObject width="78.484375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>fraud.alert</p></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(686.421875, 336.133264541626)"><g class="label" data-id="L_N_F_0" transform="translate(-38.9453125, -12)"><foreignObject width="77.890625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>WebSocket</p></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="svgarch-flowchart-U-0" data-look="classic" transform="translate(75.7421875, 236.08879280090332)"><rect class="basic label-container" style="" x="-67.7421875" y="-27" width="135.484375" height="54"/><g class="label" style="" transform="translate(-37.7421875, -12)"><rect/><foreignObject width="75.484375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Utilisateur</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-F-1" data-look="classic" transform="translate(276.1953125, 236.08879280090332)"><rect class="basic label-container" style="" x="-82.7109375" y="-27" width="165.421875" height="54"/><g class="label" style="" transform="translate(-52.7109375, -12)"><rect/><foreignObject width="105.421875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>collector-front</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-A-3" data-look="classic" transform="translate(493.2890625, 38.67524337768555)"><rect class="basic label-container" style="" x="-74.2890625" y="-27" width="148.578125" height="54"/><g class="label" style="" transform="translate(-44.2890625, -12)"><rect/><foreignObject width="88.578125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>auth-service</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-C-5" data-look="classic" transform="translate(493.2890625, 163.2785930633545)"><rect class="basic label-container" style="" x="-84.3828125" y="-27" width="168.765625" height="54"/><g class="label" style="" transform="translate(-54.3828125, -12)"><rect/><foreignObject width="108.765625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>catalog-service</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-P-7" data-look="classic" transform="translate(1191.03125, 172.04432106018066)"><rect class="basic label-container" style="" x="-105.234375" y="-27" width="210.46875" height="54"/><g class="label" style="" transform="translate(-75.234375, -12)"><rect/><foreignObject width="150.46875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>price-tracker-service</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-N-9" data-look="classic" transform="translate(1191.03125, 320.133264541626)"><rect class="basic label-container" style="" x="-99.8125" y="-27" width="199.625" height="54"/><g class="label" style="" transform="translate(-69.8125, -12)"><rect/><foreignObject width="139.625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>notification-service</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-DB1-11" data-look="classic" transform="translate(876.2421875, 48.67524337768555)"><path d="M0,14.116830821135116 a81.0703125,14.116830821135116 0,0,0 162.140625,0 a81.0703125,14.116830821135116 0,0,0 -162.140625,0 l0,53.11683082113512 a81.0703125,14.116830821135116 0,0,0 162.140625,0 l0,-53.11683082113512" class="basic label-container outer-path" style="" transform="translate(-81.0703125, -40.67524623170267)"/><g class="label" style="" transform="translate(-73.5703125, -2)"><rect/><foreignObject width="147.140625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>PostgreSQL collector</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-DB2-15" data-look="classic" transform="translate(1453.765625, 172.04432106018066)"><path d="M0,15.583804143126176 a103.4375,15.583804143126176 0,0,0 206.875,0 a103.4375,15.583804143126176 0,0,0 -206.875,0 l0,54.58380414312617 a103.4375,15.583804143126176 0,0,0 206.875,0 l0,-54.58380414312617" class="basic label-container outer-path" style="" transform="translate(-103.4375, -42.87570621468926)"/><g class="label" style="" transform="translate(-95.9375, -2)"><rect/><foreignObject width="191.875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>PostgreSQL collector_price</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-DB3-17" data-look="classic" transform="translate(1453.765625, 320.133264541626)"><path d="M0,15.808823529411764 a107.5,15.808823529411764 0,0,0 215,0 a107.5,15.808823529411764 0,0,0 -215,0 l0,78.80882352941177 a107.5,15.808823529411764 0,0,0 215,0 l0,-78.80882352941177" class="basic label-container outer-path" style="" transform="translate(-107.5, -55.21323529411765)"/><g class="label" style="" transform="translate(-100, -14)"><rect/><foreignObject width="200" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>PostgreSQL collector_notifications</p></span></div></foreignObject></g></g><g class="node default" id="svgarch-flowchart-R-19" data-look="classic" transform="translate(876.2421875, 179.2785930633545)"><path d="M0,10.020970641102457 a41.8125,10.020970641102457 0,0,0 83.625,0 a41.8125,10.020970641102457 0,0,0 -83.625,0 l0,49.02097064110246 a41.8125,10.020970641102457 0,0,0 83.625,0 l0,-49.02097064110246" class="basic label-container outer-path" style="" transform="translate(-41.8125, -34.531455961653684)"/><g class="label" style="" transform="translate(-34.3125, -2)"><rect/><foreignObject width="68.625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>RabbitMQ</p></span></div></foreignObject></g></g></g></g></g><defs><filter id="svgarch-drop-shadow" height="130%" width="130%"><feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"/></filter></defs><defs><filter id="svgarch-drop-shadow-small" height="150%" width="150%"><feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"/></filter></defs></svg></div>
+      <div class="schema-caption">Monorepo : 1 frontend, 4 microservices Go, 3 bases PostgreSQL isolées par domaine, RabbitMQ pour le découplage événementiel.</div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Principes structurants</h3>
+        <ul>
+          <li><strong>Découpage par domaine</strong> : identité / catalogue-vente / suivi prix / notifications — chaque service a sa propre base.</li>
+          <li>REST synchrone pour les opérations utilisateur, <strong>RabbitMQ</strong> pour les réactions métier asynchrones (découple catalog-service du reste).</li>
+          <li>Mapping déterministe <code>uint → UUID</code> pour exposer les IDs catalogue aux services consommateurs.</li>
+          <li>Communication interservice authentifiée : endpoint interne <code>auth-service</code> protégé par secret partagé <code>X-Internal-Secret</code>.</li>
+        </ul>
+      </div>
+      <div class="card accent">
+        <h3>Ce que le POC valide</h3>
+        <p style="margin:0">Le découpage applicatif, la communication interservice (REST + événements), la sécurité (JWT, secrets internes) et l'orchestration (Kubernetes/GitOps) sont <strong>tous implémentés et documentés</strong> — pas seulement schématisés sur papier.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. MICROSERVICES DETAIL -->
+<section class="slide" data-title="Microservices en détail">
+  <div class="slide-head"><span class="kicker">Phase 2 · Développement &amp; déploiement</span></div>
+  <h2>Les 4 microservices Go</h2>
+  <div class="table-wrap">
+  <table>
+    <tr><th>Service</th><th>Responsabilité</th><th>Stack</th><th>Particularité sécurité/design</th></tr>
+    <tr>
+      <td><strong>auth-service</strong></td>
+      <td>Comptes, JWT, rôles, back-office admin (suspension de comptes)</td>
+      <td>Go, Gin, Gorm, PostgreSQL</td>
+      <td>JWT HS256 fail-fast (démarrage refusé sans <code>JWT_SECRET</code>), rate-limiting sur <code>/login</code></td>
+    </tr>
+    <tr>
+      <td><strong>catalog-service</strong></td>
+      <td>Articles, catégories, achats, ventes, avis, wishlist, upload image, modération</td>
+      <td>Go, Gin, Gorm, PostgreSQL, publisher RabbitMQ</td>
+      <td>Réservation transactionnelle anti double-vente ; upload durci (type par octets, 5 Mo, <code>nosniff</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>price-tracker-service</strong></td>
+      <td>Historique de prix, détection d'anomalies (spike, flood pricing, dumping)</td>
+      <td>Go, Gin, sqlx, PostgreSQL, consumer/publisher RabbitMQ</td>
+      <td>Consomme <code>price.updated</code>, publie <code>fraud.alert</code> — répond à l'exigence « détection de fraude » du contexte</td>
+    </tr>
+    <tr>
+      <td><strong>notification-service</strong></td>
+      <td>Notifications temps réel, email, messagerie acheteur/vendeur</td>
+      <td>Go, Gin, sqlx, PostgreSQL, Gorilla WebSocket</td>
+      <td>WebSocket protégé (contrôle d'<code>Origin</code>), filtre anti-coordonnées personnelles dans les messages</td>
+    </tr>
+  </table>
+  </div>
+</section>
+
+<!-- 6. FONCTIONNALITE METIER -->
+<section class="slide" data-title="Fonctionnalité métier">
+  <div class="slide-head">
+    <span class="kicker">Phase 2 · Fonctionnalité métier POC</span>
+    <span class="badge">Grille : 1 pt</span>
+  </div>
+  <h2>Achat avec validation vendeur</h2>
+  <div class="cols c2-wide" style="flex:1;min-height:0;">
+    <div class="col">
+      <div class="schema-card"><svg id="svgachat" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="max-width: 1066px; background-color: transparent;" viewBox="-50 -10 1066 391" role="graphics-document document" aria-roledescription="sequence"><g><rect x="816" y="305" fill="#eaeaea" stroke="#666" width="150" height="65" name="N" rx="3" ry="3" class="actor actor-bottom"/><text x="891" y="337.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="891" dy="0">notification-service</tspan></text></g><g><rect x="615" y="305" fill="#eaeaea" stroke="#666" width="150" height="65" name="R" rx="3" ry="3" class="actor actor-bottom"/><text x="690" y="337.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="690" dy="0">RabbitMQ</tspan></text></g><g><rect x="409" y="305" fill="#eaeaea" stroke="#666" width="150" height="65" name="C" rx="3" ry="3" class="actor actor-bottom"/><text x="484" y="337.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="484" dy="0">catalog-service</tspan></text></g><g><rect x="200" y="305" fill="#eaeaea" stroke="#666" width="150" height="65" name="F" rx="3" ry="3" class="actor actor-bottom"/><text x="275" y="337.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="275" dy="0">Frontend</tspan></text></g><g><rect x="0" y="305" fill="#eaeaea" stroke="#666" width="150" height="65" name="B" rx="3" ry="3" class="actor actor-bottom"/><text x="75" y="337.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="75" dy="0">Acheteur</tspan></text></g><g><line id="actor4" x1="891" y1="65" x2="891" y2="305" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="N" data-et="life-line" data-id="N"/><g id="root-4" data-et="participant" data-type="participant" data-id="N"><rect x="816" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="N" rx="3" ry="3" class="actor actor-top"/><text x="891" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="891" dy="0">notification-service</tspan></text></g></g><g><line id="actor3" x1="690" y1="65" x2="690" y2="305" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="R" data-et="life-line" data-id="R"/><g id="root-3" data-et="participant" data-type="participant" data-id="R"><rect x="615" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="R" rx="3" ry="3" class="actor actor-top"/><text x="690" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="690" dy="0">RabbitMQ</tspan></text></g></g><g><line id="actor2" x1="484" y1="65" x2="484" y2="305" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="C" data-et="life-line" data-id="C"/><g id="root-2" data-et="participant" data-type="participant" data-id="C"><rect x="409" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="C" rx="3" ry="3" class="actor actor-top"/><text x="484" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="484" dy="0">catalog-service</tspan></text></g></g><g><line id="actor1" x1="275" y1="65" x2="275" y2="305" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="F" data-et="life-line" data-id="F"/><g id="root-1" data-et="participant" data-type="participant" data-id="F"><rect x="200" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="F" rx="3" ry="3" class="actor actor-top"/><text x="275" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="275" dy="0">Frontend</tspan></text></g></g><g><line id="actor0" x1="75" y1="65" x2="75" y2="305" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="B" data-et="life-line" data-id="B"/><g id="root-0" data-et="participant" data-type="participant" data-id="B"><rect x="0" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="B" rx="3" ry="3" class="actor actor-top"/><text x="75" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="75" dy="0">Acheteur</tspan></text></g></g><style>#svgachat{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#svgachat .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#svgachat .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#svgachat .error-icon{fill:#552222;}#svgachat .error-text{fill:#552222;stroke:#552222;}#svgachat .edge-thickness-normal{stroke-width:1px;}#svgachat .edge-thickness-thick{stroke-width:3.5px;}#svgachat .edge-pattern-solid{stroke-dasharray:0;}#svgachat .edge-thickness-invisible{stroke-width:0;fill:none;}#svgachat .edge-pattern-dashed{stroke-dasharray:3;}#svgachat .edge-pattern-dotted{stroke-dasharray:2;}#svgachat .marker{fill:#333333;stroke:#333333;}#svgachat .marker.cross{stroke:#333333;}#svgachat svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#svgachat p{margin:0;}#svgachat .actor{stroke:#9370DB;fill:#ECECFF;stroke-width:1;}#svgachat rect.actor.outer-path[data-look="neo"]{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat rect.note[data-look="neo"]{stroke:#aaaa33;fill:#fff5ad;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat text.actor&gt;tspan{fill:black;stroke:none;}#svgachat .actor-line{stroke:#9370DB;}#svgachat .innerArc{stroke-width:1.5;stroke-dasharray:none;}#svgachat .messageLine0{stroke-width:1.5;stroke-dasharray:none;stroke:#333;}#svgachat .messageLine1{stroke-width:1.5;stroke-dasharray:2,2;stroke:#333;}#svgachat [id$="-arrowhead"] path{fill:#333;stroke:#333;}#svgachat .sequenceNumber{fill:white;}#svgachat [id$="-sequencenumber"]{fill:#333;}#svgachat [id$="-crosshead"] path{fill:#333;stroke:#333;}#svgachat .messageText{fill:#333;stroke:none;}#svgachat .labelBox{stroke:#9370DB;fill:#ECECFF;filter:none;}#svgachat .labelText,#svgachat .labelText&gt;tspan{fill:black;stroke:none;}#svgachat .loopText,#svgachat .loopText&gt;tspan{fill:black;stroke:none;}#svgachat .sectionTitle,#svgachat .sectionTitle&gt;tspan{fill:black;stroke:none;}#svgachat .loopLine{stroke-width:2px;stroke-dasharray:2,2;stroke:#9370DB;fill:#9370DB;}#svgachat .note{stroke:#aaaa33;fill:#fff5ad;}#svgachat .noteText,#svgachat .noteText&gt;tspan{fill:black;stroke:none;font-weight:normal;}#svgachat .activation0{fill:#f4f4f4;stroke:#666;}#svgachat .activation1{fill:#f4f4f4;stroke:#666;}#svgachat .activation2{fill:#f4f4f4;stroke:#666;}#svgachat .actorPopupMenu{position:absolute;}#svgachat .actorPopupMenuPanel{position:absolute;fill:#ECECFF;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);filter:drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4));}#svgachat .actor-man circle,#svgachat line{fill:#ECECFF;stroke-width:2px;}#svgachat g rect.rect{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));stroke:#9370DB;}#svgachat .node .neo-node{stroke:#9370DB;}#svgachat [data-look="neo"].node rect,#svgachat [data-look="neo"].cluster rect,#svgachat [data-look="neo"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat [data-look="neo"].swimlane.cluster rect{filter:none;}#svgachat [data-look="neo"].node path{stroke:#9370DB;stroke-width:1px;}#svgachat [data-look="neo"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat [data-look="neo"].node .neo-line path{stroke:#9370DB;filter:none;}#svgachat [data-look="neo"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat [data-look="neo"].node circle .state-start{fill:#000000;}#svgachat [data-look="neo"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat [data-look="neo"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgachat :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g/><defs><symbol id="svgachat-computer" width="24" height="24"><path transform="scale(.5)" d="M2 2v13h20v-13h-20zm18 11h-16v-9h16v9zm-10.228 6l.466-1h3.524l.467 1h-4.457zm14.228 3h-24l2-6h2.104l-1.33 4h18.45l-1.297-4h2.073l2 6zm-5-10h-14v-7h14v7z"/></symbol></defs><defs><symbol id="svgachat-database" fill-rule="evenodd" clip-rule="evenodd"><path transform="scale(.5)" d="M12.258.001l.256.004.255.005.253.008.251.01.249.012.247.015.246.016.242.019.241.02.239.023.236.024.233.027.231.028.229.031.225.032.223.034.22.036.217.038.214.04.211.041.208.043.205.045.201.046.198.048.194.05.191.051.187.053.183.054.18.056.175.057.172.059.168.06.163.061.16.063.155.064.15.066.074.033.073.033.071.034.07.034.069.035.068.035.067.035.066.035.064.036.064.036.062.036.06.036.06.037.058.037.058.037.055.038.055.038.053.038.052.038.051.039.05.039.048.039.047.039.045.04.044.04.043.04.041.04.04.041.039.041.037.041.036.041.034.041.033.042.032.042.03.042.029.042.027.042.026.043.024.043.023.043.021.043.02.043.018.044.017.043.015.044.013.044.012.044.011.045.009.044.007.045.006.045.004.045.002.045.001.045v17l-.001.045-.002.045-.004.045-.006.045-.007.045-.009.044-.011.045-.012.044-.013.044-.015.044-.017.043-.018.044-.02.043-.021.043-.023.043-.024.043-.026.043-.027.042-.029.042-.03.042-.032.042-.033.042-.034.041-.036.041-.037.041-.039.041-.04.041-.041.04-.043.04-.044.04-.045.04-.047.039-.048.039-.05.039-.051.039-.052.038-.053.038-.055.038-.055.038-.058.037-.058.037-.06.037-.06.036-.062.036-.064.036-.064.036-.066.035-.067.035-.068.035-.069.035-.07.034-.071.034-.073.033-.074.033-.15.066-.155.064-.16.063-.163.061-.168.06-.172.059-.175.057-.18.056-.183.054-.187.053-.191.051-.194.05-.198.048-.201.046-.205.045-.208.043-.211.041-.214.04-.217.038-.22.036-.223.034-.225.032-.229.031-.231.028-.233.027-.236.024-.239.023-.241.02-.242.019-.246.016-.247.015-.249.012-.251.01-.253.008-.255.005-.256.004-.258.001-.258-.001-.256-.004-.255-.005-.253-.008-.251-.01-.249-.012-.247-.015-.245-.016-.243-.019-.241-.02-.238-.023-.236-.024-.234-.027-.231-.028-.228-.031-.226-.032-.223-.034-.22-.036-.217-.038-.214-.04-.211-.041-.208-.043-.204-.045-.201-.046-.198-.048-.195-.05-.19-.051-.187-.053-.184-.054-.179-.056-.176-.057-.172-.059-.167-.06-.164-.061-.159-.063-.155-.064-.151-.066-.074-.033-.072-.033-.072-.034-.07-.034-.069-.035-.068-.035-.067-.035-.066-.035-.064-.036-.063-.036-.062-.036-.061-.036-.06-.037-.058-.037-.057-.037-.056-.038-.055-.038-.053-.038-.052-.038-.051-.039-.049-.039-.049-.039-.046-.039-.046-.04-.044-.04-.043-.04-.041-.04-.04-.041-.039-.041-.037-.041-.036-.041-.034-.041-.033-.042-.032-.042-.03-.042-.029-.042-.027-.042-.026-.043-.024-.043-.023-.043-.021-.043-.02-.043-.018-.044-.017-.043-.015-.044-.013-.044-.012-.044-.011-.045-.009-.044-.007-.045-.006-.045-.004-.045-.002-.045-.001-.045v-17l.001-.045.002-.045.004-.045.006-.045.007-.045.009-.044.011-.045.012-.044.013-.044.015-.044.017-.043.018-.044.02-.043.021-.043.023-.043.024-.043.026-.043.027-.042.029-.042.03-.042.032-.042.033-.042.034-.041.036-.041.037-.041.039-.041.04-.041.041-.04.043-.04.044-.04.046-.04.046-.039.049-.039.049-.039.051-.039.052-.038.053-.038.055-.038.056-.038.057-.037.058-.037.06-.037.061-.036.062-.036.063-.036.064-.036.066-.035.067-.035.068-.035.069-.035.07-.034.072-.034.072-.033.074-.033.151-.066.155-.064.159-.063.164-.061.167-.06.172-.059.176-.057.179-.056.184-.054.187-.053.19-.051.195-.05.198-.048.201-.046.204-.045.208-.043.211-.041.214-.04.217-.038.22-.036.223-.034.226-.032.228-.031.231-.028.234-.027.236-.024.238-.023.241-.02.243-.019.245-.016.247-.015.249-.012.251-.01.253-.008.255-.005.256-.004.258-.001.258.001zm-9.258 20.499v.01l.001.021.003.021.004.022.005.021.006.022.007.022.009.023.01.022.011.023.012.023.013.023.015.023.016.024.017.023.018.024.019.024.021.024.022.025.023.024.024.025.052.049.056.05.061.051.066.051.07.051.075.051.079.052.084.052.088.052.092.052.097.052.102.051.105.052.11.052.114.051.119.051.123.051.127.05.131.05.135.05.139.048.144.049.147.047.152.047.155.047.16.045.163.045.167.043.171.043.176.041.178.041.183.039.187.039.19.037.194.035.197.035.202.033.204.031.209.03.212.029.216.027.219.025.222.024.226.021.23.02.233.018.236.016.24.015.243.012.246.01.249.008.253.005.256.004.259.001.26-.001.257-.004.254-.005.25-.008.247-.011.244-.012.241-.014.237-.016.233-.018.231-.021.226-.021.224-.024.22-.026.216-.027.212-.028.21-.031.205-.031.202-.034.198-.034.194-.036.191-.037.187-.039.183-.04.179-.04.175-.042.172-.043.168-.044.163-.045.16-.046.155-.046.152-.047.148-.048.143-.049.139-.049.136-.05.131-.05.126-.05.123-.051.118-.052.114-.051.11-.052.106-.052.101-.052.096-.052.092-.052.088-.053.083-.051.079-.052.074-.052.07-.051.065-.051.06-.051.056-.05.051-.05.023-.024.023-.025.021-.024.02-.024.019-.024.018-.024.017-.024.015-.023.014-.024.013-.023.012-.023.01-.023.01-.022.008-.022.006-.022.006-.022.004-.022.004-.021.001-.021.001-.021v-4.127l-.077.055-.08.053-.083.054-.085.053-.087.052-.09.052-.093.051-.095.05-.097.05-.1.049-.102.049-.105.048-.106.047-.109.047-.111.046-.114.045-.115.045-.118.044-.12.043-.122.042-.124.042-.126.041-.128.04-.13.04-.132.038-.134.038-.135.037-.138.037-.139.035-.142.035-.143.034-.144.033-.147.032-.148.031-.15.03-.151.03-.153.029-.154.027-.156.027-.158.026-.159.025-.161.024-.162.023-.163.022-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.011-.178.01-.179.008-.179.008-.181.006-.182.005-.182.004-.184.003-.184.002h-.37l-.184-.002-.184-.003-.182-.004-.182-.005-.181-.006-.179-.008-.179-.008-.178-.01-.176-.011-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.022-.162-.023-.161-.024-.159-.025-.157-.026-.156-.027-.155-.027-.153-.029-.151-.03-.15-.03-.148-.031-.146-.032-.145-.033-.143-.034-.141-.035-.14-.035-.137-.037-.136-.037-.134-.038-.132-.038-.13-.04-.128-.04-.126-.041-.124-.042-.122-.042-.12-.044-.117-.043-.116-.045-.113-.045-.112-.046-.109-.047-.106-.047-.105-.048-.102-.049-.1-.049-.097-.05-.095-.05-.093-.052-.09-.051-.087-.052-.085-.053-.083-.054-.08-.054-.077-.054v4.127zm0-5.654v.011l.001.021.003.021.004.021.005.022.006.022.007.022.009.022.01.022.011.023.012.023.013.023.015.024.016.023.017.024.018.024.019.024.021.024.022.024.023.025.024.024.052.05.056.05.061.05.066.051.07.051.075.052.079.051.084.052.088.052.092.052.097.052.102.052.105.052.11.051.114.051.119.052.123.05.127.051.131.05.135.049.139.049.144.048.147.048.152.047.155.046.16.045.163.045.167.044.171.042.176.042.178.04.183.04.187.038.19.037.194.036.197.034.202.033.204.032.209.03.212.028.216.027.219.025.222.024.226.022.23.02.233.018.236.016.24.014.243.012.246.01.249.008.253.006.256.003.259.001.26-.001.257-.003.254-.006.25-.008.247-.01.244-.012.241-.015.237-.016.233-.018.231-.02.226-.022.224-.024.22-.025.216-.027.212-.029.21-.03.205-.032.202-.033.198-.035.194-.036.191-.037.187-.039.183-.039.179-.041.175-.042.172-.043.168-.044.163-.045.16-.045.155-.047.152-.047.148-.048.143-.048.139-.05.136-.049.131-.05.126-.051.123-.051.118-.051.114-.052.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.051.07-.052.065-.051.06-.05.056-.051.051-.049.023-.025.023-.024.021-.025.02-.024.019-.024.018-.024.017-.024.015-.023.014-.023.013-.024.012-.022.01-.023.01-.023.008-.022.006-.022.006-.022.004-.021.004-.022.001-.021.001-.021v-4.139l-.077.054-.08.054-.083.054-.085.052-.087.053-.09.051-.093.051-.095.051-.097.05-.1.049-.102.049-.105.048-.106.047-.109.047-.111.046-.114.045-.115.044-.118.044-.12.044-.122.042-.124.042-.126.041-.128.04-.13.039-.132.039-.134.038-.135.037-.138.036-.139.036-.142.035-.143.033-.144.033-.147.033-.148.031-.15.03-.151.03-.153.028-.154.028-.156.027-.158.026-.159.025-.161.024-.162.023-.163.022-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.011-.178.009-.179.009-.179.007-.181.007-.182.005-.182.004-.184.003-.184.002h-.37l-.184-.002-.184-.003-.182-.004-.182-.005-.181-.007-.179-.007-.179-.009-.178-.009-.176-.011-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.022-.162-.023-.161-.024-.159-.025-.157-.026-.156-.027-.155-.028-.153-.028-.151-.03-.15-.03-.148-.031-.146-.033-.145-.033-.143-.033-.141-.035-.14-.036-.137-.036-.136-.037-.134-.038-.132-.039-.13-.039-.128-.04-.126-.041-.124-.042-.122-.043-.12-.043-.117-.044-.116-.044-.113-.046-.112-.046-.109-.046-.106-.047-.105-.048-.102-.049-.1-.049-.097-.05-.095-.051-.093-.051-.09-.051-.087-.053-.085-.052-.083-.054-.08-.054-.077-.054v4.139zm0-5.666v.011l.001.02.003.022.004.021.005.022.006.021.007.022.009.023.01.022.011.023.012.023.013.023.015.023.016.024.017.024.018.023.019.024.021.025.022.024.023.024.024.025.052.05.056.05.061.05.066.051.07.051.075.052.079.051.084.052.088.052.092.052.097.052.102.052.105.051.11.052.114.051.119.051.123.051.127.05.131.05.135.05.139.049.144.048.147.048.152.047.155.046.16.045.163.045.167.043.171.043.176.042.178.04.183.04.187.038.19.037.194.036.197.034.202.033.204.032.209.03.212.028.216.027.219.025.222.024.226.021.23.02.233.018.236.017.24.014.243.012.246.01.249.008.253.006.256.003.259.001.26-.001.257-.003.254-.006.25-.008.247-.01.244-.013.241-.014.237-.016.233-.018.231-.02.226-.022.224-.024.22-.025.216-.027.212-.029.21-.03.205-.032.202-.033.198-.035.194-.036.191-.037.187-.039.183-.039.179-.041.175-.042.172-.043.168-.044.163-.045.16-.045.155-.047.152-.047.148-.048.143-.049.139-.049.136-.049.131-.051.126-.05.123-.051.118-.052.114-.051.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.052.07-.051.065-.051.06-.051.056-.05.051-.049.023-.025.023-.025.021-.024.02-.024.019-.024.018-.024.017-.024.015-.023.014-.024.013-.023.012-.023.01-.022.01-.023.008-.022.006-.022.006-.022.004-.022.004-.021.001-.021.001-.021v-4.153l-.077.054-.08.054-.083.053-.085.053-.087.053-.09.051-.093.051-.095.051-.097.05-.1.049-.102.048-.105.048-.106.048-.109.046-.111.046-.114.046-.115.044-.118.044-.12.043-.122.043-.124.042-.126.041-.128.04-.13.039-.132.039-.134.038-.135.037-.138.036-.139.036-.142.034-.143.034-.144.033-.147.032-.148.032-.15.03-.151.03-.153.028-.154.028-.156.027-.158.026-.159.024-.161.024-.162.023-.163.023-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.01-.178.01-.179.009-.179.007-.181.006-.182.006-.182.004-.184.003-.184.001-.185.001-.185-.001-.184-.001-.184-.003-.182-.004-.182-.006-.181-.006-.179-.007-.179-.009-.178-.01-.176-.01-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.023-.162-.023-.161-.024-.159-.024-.157-.026-.156-.027-.155-.028-.153-.028-.151-.03-.15-.03-.148-.032-.146-.032-.145-.033-.143-.034-.141-.034-.14-.036-.137-.036-.136-.037-.134-.038-.132-.039-.13-.039-.128-.041-.126-.041-.124-.041-.122-.043-.12-.043-.117-.044-.116-.044-.113-.046-.112-.046-.109-.046-.106-.048-.105-.048-.102-.048-.1-.05-.097-.049-.095-.051-.093-.051-.09-.052-.087-.052-.085-.053-.083-.053-.08-.054-.077-.054v4.153zm8.74-8.179l-.257.004-.254.005-.25.008-.247.011-.244.012-.241.014-.237.016-.233.018-.231.021-.226.022-.224.023-.22.026-.216.027-.212.028-.21.031-.205.032-.202.033-.198.034-.194.036-.191.038-.187.038-.183.04-.179.041-.175.042-.172.043-.168.043-.163.045-.16.046-.155.046-.152.048-.148.048-.143.048-.139.049-.136.05-.131.05-.126.051-.123.051-.118.051-.114.052-.11.052-.106.052-.101.052-.096.052-.092.052-.088.052-.083.052-.079.052-.074.051-.07.052-.065.051-.06.05-.056.05-.051.05-.023.025-.023.024-.021.024-.02.025-.019.024-.018.024-.017.023-.015.024-.014.023-.013.023-.012.023-.01.023-.01.022-.008.022-.006.023-.006.021-.004.022-.004.021-.001.021-.001.021.001.021.001.021.004.021.004.022.006.021.006.023.008.022.01.022.01.023.012.023.013.023.014.023.015.024.017.023.018.024.019.024.02.025.021.024.023.024.023.025.051.05.056.05.06.05.065.051.07.052.074.051.079.052.083.052.088.052.092.052.096.052.101.052.106.052.11.052.114.052.118.051.123.051.126.051.131.05.136.05.139.049.143.048.148.048.152.048.155.046.16.046.163.045.168.043.172.043.175.042.179.041.183.04.187.038.191.038.194.036.198.034.202.033.205.032.21.031.212.028.216.027.22.026.224.023.226.022.231.021.233.018.237.016.241.014.244.012.247.011.25.008.254.005.257.004.26.001.26-.001.257-.004.254-.005.25-.008.247-.011.244-.012.241-.014.237-.016.233-.018.231-.021.226-.022.224-.023.22-.026.216-.027.212-.028.21-.031.205-.032.202-.033.198-.034.194-.036.191-.038.187-.038.183-.04.179-.041.175-.042.172-.043.168-.043.163-.045.16-.046.155-.046.152-.048.148-.048.143-.048.139-.049.136-.05.131-.05.126-.051.123-.051.118-.051.114-.052.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.051.07-.052.065-.051.06-.05.056-.05.051-.05.023-.025.023-.024.021-.024.02-.025.019-.024.018-.024.017-.023.015-.024.014-.023.013-.023.012-.023.01-.023.01-.022.008-.022.006-.023.006-.021.004-.022.004-.021.001-.021.001-.021-.001-.021-.001-.021-.004-.021-.004-.022-.006-.021-.006-.023-.008-.022-.01-.022-.01-.023-.012-.023-.013-.023-.014-.023-.015-.024-.017-.023-.018-.024-.019-.024-.02-.025-.021-.024-.023-.024-.023-.025-.051-.05-.056-.05-.06-.05-.065-.051-.07-.052-.074-.051-.079-.052-.083-.052-.088-.052-.092-.052-.096-.052-.101-.052-.106-.052-.11-.052-.114-.052-.118-.051-.123-.051-.126-.051-.131-.05-.136-.05-.139-.049-.143-.048-.148-.048-.152-.048-.155-.046-.16-.046-.163-.045-.168-.043-.172-.043-.175-.042-.179-.041-.183-.04-.187-.038-.191-.038-.194-.036-.198-.034-.202-.033-.205-.032-.21-.031-.212-.028-.216-.027-.22-.026-.224-.023-.226-.022-.231-.021-.233-.018-.237-.016-.241-.014-.244-.012-.247-.011-.25-.008-.254-.005-.257-.004-.26-.001-.26.001z"/></symbol></defs><defs><symbol id="svgachat-clock" width="24" height="24"><path transform="scale(.5)" d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10-10-4.486-10-10 4.486-10 10-10zm0-2c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.848 12.459c.202.038.202.333.001.372-1.907.361-6.045 1.111-6.547 1.111-.719 0-1.301-.582-1.301-1.301 0-.512.77-5.447 1.125-7.445.034-.192.312-.181.343.014l.985 6.238 5.394 1.011z"/></symbol></defs><defs><marker id="svgachat-arrowhead" refX="7.9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M -1 0 L 10 5 L 0 10 z"/></marker></defs><defs><marker id="svgachat-crosshead" markerWidth="15" markerHeight="8" orient="auto" refX="4" refY="4.5"><path fill="none" stroke="#000000" stroke-width="1pt" d="M 1,2 L 6,7 M 6,2 L 1,7" style="stroke-dasharray: 0, 0;"/></marker></defs><defs><marker id="svgachat-filled-head" refX="15.5" refY="7" markerWidth="20" markerHeight="28" orient="auto"><path d="M 18,7 L9,13 L14,7 L9,1 Z"/></marker></defs><defs><marker id="svgachat-sequencenumber" refX="15" refY="15" markerWidth="60" markerHeight="40" orient="auto"><circle cx="15" cy="15" r="6"/></marker></defs><defs><marker id="svgachat-solidTopArrowHead" refX="7.9" refY="7.25" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 10 8 L 0 8 z"/></marker></defs><defs><marker id="svgachat-solidBottomArrowHead" refX="7.9" refY="0.75" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 10 0 L 0 8 z"/></marker></defs><defs><marker id="svgachat-stickTopArrowHead" refX="7.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 7 7" stroke="black" stroke-width="1.5" fill="none"/></marker></defs><defs><marker id="svgachat-stickBottomArrowHead" refX="7.5" refY="0" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 7 L 7 0" stroke="black" stroke-width="1.5" fill="none"/></marker></defs><text x="174" y="80" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">acheter un article</text><line x1="76" y1="109" x2="271" y2="109" class="messageLine0" data-et="message" data-id="i0" data-from="B" data-to="F" stroke-width="2" stroke="none" marker-end="url(#svgachat-arrowhead)" style="fill: none;"/><text x="378" y="124" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">POST /article/:id/buy</text><line x1="276" y1="153" x2="480" y2="153" class="messageLine0" data-et="message" data-id="i1" data-from="F" data-to="C" stroke-width="2" stroke="none" marker-end="url(#svgachat-arrowhead)" style="fill: none;"/><text x="381" y="168" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">commande creee</text><line x1="483" y1="197" x2="279" y2="197" class="messageLine1" data-et="message" data-id="i2" data-from="C" data-to="F" stroke-width="2" stroke="none" marker-end="url(#svgachat-arrowhead)" style="stroke-dasharray: 3, 3; fill: none;"/><text x="586" y="212" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">publish order.created</text><line x1="485" y1="241" x2="686" y2="241" class="messageLine0" data-et="message" data-id="i3" data-from="C" data-to="R" stroke-width="2" stroke="none" marker-end="url(#svgachat-arrowhead)" style="fill: none;"/><text x="789" y="256" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">notification vendeur</text><line x1="691" y1="285" x2="887" y2="285" class="messageLine0" data-et="message" data-id="i4" data-from="R" data-to="N" stroke-width="2" stroke="none" marker-end="url(#svgachat-arrowhead)" style="fill: none;"/></svg></div>
+      <div class="schema-caption">Le vendeur garde la main avant que la transaction ne soit actée — répond à l'exigence « paiement via la plateforme uniquement ».</div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>User story</h3>
+        <p style="margin:0"><em>« En tant que vendeur, je veux être notifié et pouvoir accepter ou refuser chaque demande d'achat, afin de garder le contrôle sur mes ventes avant que la transaction ne soit finalisée. »</em></p>
+      </div>
+      <div class="card">
+        <h3>Critères d'acceptation testés</h3>
+        <ul>
+          <li>Achat propre annonce refusé (400) — <code>TestAcceptance_CannotBuyOwnArticle</code></li>
+          <li>Achat → commande <code>pending</code> + article réservé — <code>TestAcceptance_BuyCreatesPendingOrderAndReservesArticle</code></li>
+          <li>Seul le vendeur peut décider (403 sinon) — <code>TestAcceptance_OnlySellerCanAcceptOrder</code></li>
+          <li>Refus → article redevient disponible — <code>TestAcceptance_SellerRejectsOrderReleasesArticle</code></li>
+          <li>Décision non rejouable (409) — <code>TestAcceptance_CannotDecideOrderTwice</code></li>
+        </ul>
+        <p style="margin-top:8px">Tests d'acceptation HTTP <strong>de bout en bout</strong> sur le vrai routeur Gin (middleware JWT réel inclus) — le second type de test exigé, en plus des tests unitaires.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. FLUX PRIX FRAUDE -->
+<section class="slide" data-title="Flux prix & fraude">
+  <div class="slide-head"><span class="kicker">Phase 2 · Architecture événementielle</span></div>
+  <h2>Flux mise à jour de prix & détection de fraude</h2>
+  <div class="cols c2-wide" style="flex:1;min-height:0;">
+    <div class="col">
+      <div class="schema-card"><svg id="svgfraude" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="max-width: 1384.5px; background-color: transparent;" viewBox="-50 -10 1384.5 509" role="graphics-document document" aria-roledescription="sequence"><g><rect x="1134.5" y="423" fill="#eaeaea" stroke="#666" width="150" height="65" name="W" rx="3" ry="3" class="actor actor-bottom"/><text x="1209.5" y="455.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="1209.5" dy="0">WebSocket</tspan></text></g><g><rect x="884.5" y="423" fill="#eaeaea" stroke="#666" width="150" height="65" name="N" rx="3" ry="3" class="actor actor-bottom"/><text x="959.5" y="455.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="959.5" dy="0">notification-service</tspan></text></g><g><rect x="681.5" y="423" fill="#eaeaea" stroke="#666" width="153" height="65" name="P" rx="3" ry="3" class="actor actor-bottom"/><text x="758" y="455.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="758" dy="0">price-tracker-service</tspan></text></g><g><rect x="410" y="423" fill="#eaeaea" stroke="#666" width="150" height="65" name="R" rx="3" ry="3" class="actor actor-bottom"/><text x="485" y="455.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="485" dy="0">RabbitMQ</tspan></text></g><g><rect x="200" y="423" fill="#eaeaea" stroke="#666" width="150" height="65" name="C" rx="3" ry="3" class="actor actor-bottom"/><text x="275" y="455.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="275" dy="0">catalog-service</tspan></text></g><g><rect x="0" y="423" fill="#eaeaea" stroke="#666" width="150" height="65" name="F" rx="3" ry="3" class="actor actor-bottom"/><text x="75" y="455.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="75" dy="0">Frontend</tspan></text></g><g><line id="actor5" x1="1209.5" y1="65" x2="1209.5" y2="423" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="W" data-et="life-line" data-id="W"/><g id="root-5" data-et="participant" data-type="participant" data-id="W"><rect x="1134.5" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="W" rx="3" ry="3" class="actor actor-top"/><text x="1209.5" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="1209.5" dy="0">WebSocket</tspan></text></g></g><g><line id="actor4" x1="959.5" y1="65" x2="959.5" y2="423" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="N" data-et="life-line" data-id="N"/><g id="root-4" data-et="participant" data-type="participant" data-id="N"><rect x="884.5" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="N" rx="3" ry="3" class="actor actor-top"/><text x="959.5" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="959.5" dy="0">notification-service</tspan></text></g></g><g><line id="actor3" x1="758" y1="65" x2="758" y2="423" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="P" data-et="life-line" data-id="P"/><g id="root-3" data-et="participant" data-type="participant" data-id="P"><rect x="681.5" y="0" fill="#eaeaea" stroke="#666" width="153" height="65" name="P" rx="3" ry="3" class="actor actor-top"/><text x="758" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="758" dy="0">price-tracker-service</tspan></text></g></g><g><line id="actor2" x1="485" y1="65" x2="485" y2="423" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="R" data-et="life-line" data-id="R"/><g id="root-2" data-et="participant" data-type="participant" data-id="R"><rect x="410" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="R" rx="3" ry="3" class="actor actor-top"/><text x="485" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="485" dy="0">RabbitMQ</tspan></text></g></g><g><line id="actor1" x1="275" y1="65" x2="275" y2="423" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="C" data-et="life-line" data-id="C"/><g id="root-1" data-et="participant" data-type="participant" data-id="C"><rect x="200" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="C" rx="3" ry="3" class="actor actor-top"/><text x="275" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="275" dy="0">catalog-service</tspan></text></g></g><g><line id="actor0" x1="75" y1="65" x2="75" y2="423" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="F" data-et="life-line" data-id="F"/><g id="root-0" data-et="participant" data-type="participant" data-id="F"><rect x="0" y="0" fill="#eaeaea" stroke="#666" width="150" height="65" name="F" rx="3" ry="3" class="actor actor-top"/><text x="75" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box" style="text-anchor: middle; font-size: 16px; font-weight: 400;"><tspan x="75" dy="0">Frontend</tspan></text></g></g><style>#svgfraude{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#svgfraude .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#svgfraude .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#svgfraude .error-icon{fill:#552222;}#svgfraude .error-text{fill:#552222;stroke:#552222;}#svgfraude .edge-thickness-normal{stroke-width:1px;}#svgfraude .edge-thickness-thick{stroke-width:3.5px;}#svgfraude .edge-pattern-solid{stroke-dasharray:0;}#svgfraude .edge-thickness-invisible{stroke-width:0;fill:none;}#svgfraude .edge-pattern-dashed{stroke-dasharray:3;}#svgfraude .edge-pattern-dotted{stroke-dasharray:2;}#svgfraude .marker{fill:#333333;stroke:#333333;}#svgfraude .marker.cross{stroke:#333333;}#svgfraude svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#svgfraude p{margin:0;}#svgfraude .actor{stroke:#9370DB;fill:#ECECFF;stroke-width:1;}#svgfraude rect.actor.outer-path[data-look="neo"]{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude rect.note[data-look="neo"]{stroke:#aaaa33;fill:#fff5ad;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude text.actor&gt;tspan{fill:black;stroke:none;}#svgfraude .actor-line{stroke:#9370DB;}#svgfraude .innerArc{stroke-width:1.5;stroke-dasharray:none;}#svgfraude .messageLine0{stroke-width:1.5;stroke-dasharray:none;stroke:#333;}#svgfraude .messageLine1{stroke-width:1.5;stroke-dasharray:2,2;stroke:#333;}#svgfraude [id$="-arrowhead"] path{fill:#333;stroke:#333;}#svgfraude .sequenceNumber{fill:white;}#svgfraude [id$="-sequencenumber"]{fill:#333;}#svgfraude [id$="-crosshead"] path{fill:#333;stroke:#333;}#svgfraude .messageText{fill:#333;stroke:none;}#svgfraude .labelBox{stroke:#9370DB;fill:#ECECFF;filter:none;}#svgfraude .labelText,#svgfraude .labelText&gt;tspan{fill:black;stroke:none;}#svgfraude .loopText,#svgfraude .loopText&gt;tspan{fill:black;stroke:none;}#svgfraude .sectionTitle,#svgfraude .sectionTitle&gt;tspan{fill:black;stroke:none;}#svgfraude .loopLine{stroke-width:2px;stroke-dasharray:2,2;stroke:#9370DB;fill:#9370DB;}#svgfraude .note{stroke:#aaaa33;fill:#fff5ad;}#svgfraude .noteText,#svgfraude .noteText&gt;tspan{fill:black;stroke:none;font-weight:normal;}#svgfraude .activation0{fill:#f4f4f4;stroke:#666;}#svgfraude .activation1{fill:#f4f4f4;stroke:#666;}#svgfraude .activation2{fill:#f4f4f4;stroke:#666;}#svgfraude .actorPopupMenu{position:absolute;}#svgfraude .actorPopupMenuPanel{position:absolute;fill:#ECECFF;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);filter:drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4));}#svgfraude .actor-man circle,#svgfraude line{fill:#ECECFF;stroke-width:2px;}#svgfraude g rect.rect{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));stroke:#9370DB;}#svgfraude .node .neo-node{stroke:#9370DB;}#svgfraude [data-look="neo"].node rect,#svgfraude [data-look="neo"].cluster rect,#svgfraude [data-look="neo"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude [data-look="neo"].swimlane.cluster rect{filter:none;}#svgfraude [data-look="neo"].node path{stroke:#9370DB;stroke-width:1px;}#svgfraude [data-look="neo"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude [data-look="neo"].node .neo-line path{stroke:#9370DB;filter:none;}#svgfraude [data-look="neo"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude [data-look="neo"].node circle .state-start{fill:#000000;}#svgfraude [data-look="neo"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude [data-look="neo"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgfraude :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g/><defs><symbol id="svgfraude-computer" width="24" height="24"><path transform="scale(.5)" d="M2 2v13h20v-13h-20zm18 11h-16v-9h16v9zm-10.228 6l.466-1h3.524l.467 1h-4.457zm14.228 3h-24l2-6h2.104l-1.33 4h18.45l-1.297-4h2.073l2 6zm-5-10h-14v-7h14v7z"/></symbol></defs><defs><symbol id="svgfraude-database" fill-rule="evenodd" clip-rule="evenodd"><path transform="scale(.5)" d="M12.258.001l.256.004.255.005.253.008.251.01.249.012.247.015.246.016.242.019.241.02.239.023.236.024.233.027.231.028.229.031.225.032.223.034.22.036.217.038.214.04.211.041.208.043.205.045.201.046.198.048.194.05.191.051.187.053.183.054.18.056.175.057.172.059.168.06.163.061.16.063.155.064.15.066.074.033.073.033.071.034.07.034.069.035.068.035.067.035.066.035.064.036.064.036.062.036.06.036.06.037.058.037.058.037.055.038.055.038.053.038.052.038.051.039.05.039.048.039.047.039.045.04.044.04.043.04.041.04.04.041.039.041.037.041.036.041.034.041.033.042.032.042.03.042.029.042.027.042.026.043.024.043.023.043.021.043.02.043.018.044.017.043.015.044.013.044.012.044.011.045.009.044.007.045.006.045.004.045.002.045.001.045v17l-.001.045-.002.045-.004.045-.006.045-.007.045-.009.044-.011.045-.012.044-.013.044-.015.044-.017.043-.018.044-.02.043-.021.043-.023.043-.024.043-.026.043-.027.042-.029.042-.03.042-.032.042-.033.042-.034.041-.036.041-.037.041-.039.041-.04.041-.041.04-.043.04-.044.04-.045.04-.047.039-.048.039-.05.039-.051.039-.052.038-.053.038-.055.038-.055.038-.058.037-.058.037-.06.037-.06.036-.062.036-.064.036-.064.036-.066.035-.067.035-.068.035-.069.035-.07.034-.071.034-.073.033-.074.033-.15.066-.155.064-.16.063-.163.061-.168.06-.172.059-.175.057-.18.056-.183.054-.187.053-.191.051-.194.05-.198.048-.201.046-.205.045-.208.043-.211.041-.214.04-.217.038-.22.036-.223.034-.225.032-.229.031-.231.028-.233.027-.236.024-.239.023-.241.02-.242.019-.246.016-.247.015-.249.012-.251.01-.253.008-.255.005-.256.004-.258.001-.258-.001-.256-.004-.255-.005-.253-.008-.251-.01-.249-.012-.247-.015-.245-.016-.243-.019-.241-.02-.238-.023-.236-.024-.234-.027-.231-.028-.228-.031-.226-.032-.223-.034-.22-.036-.217-.038-.214-.04-.211-.041-.208-.043-.204-.045-.201-.046-.198-.048-.195-.05-.19-.051-.187-.053-.184-.054-.179-.056-.176-.057-.172-.059-.167-.06-.164-.061-.159-.063-.155-.064-.151-.066-.074-.033-.072-.033-.072-.034-.07-.034-.069-.035-.068-.035-.067-.035-.066-.035-.064-.036-.063-.036-.062-.036-.061-.036-.06-.037-.058-.037-.057-.037-.056-.038-.055-.038-.053-.038-.052-.038-.051-.039-.049-.039-.049-.039-.046-.039-.046-.04-.044-.04-.043-.04-.041-.04-.04-.041-.039-.041-.037-.041-.036-.041-.034-.041-.033-.042-.032-.042-.03-.042-.029-.042-.027-.042-.026-.043-.024-.043-.023-.043-.021-.043-.02-.043-.018-.044-.017-.043-.015-.044-.013-.044-.012-.044-.011-.045-.009-.044-.007-.045-.006-.045-.004-.045-.002-.045-.001-.045v-17l.001-.045.002-.045.004-.045.006-.045.007-.045.009-.044.011-.045.012-.044.013-.044.015-.044.017-.043.018-.044.02-.043.021-.043.023-.043.024-.043.026-.043.027-.042.029-.042.03-.042.032-.042.033-.042.034-.041.036-.041.037-.041.039-.041.04-.041.041-.04.043-.04.044-.04.046-.04.046-.039.049-.039.049-.039.051-.039.052-.038.053-.038.055-.038.056-.038.057-.037.058-.037.06-.037.061-.036.062-.036.063-.036.064-.036.066-.035.067-.035.068-.035.069-.035.07-.034.072-.034.072-.033.074-.033.151-.066.155-.064.159-.063.164-.061.167-.06.172-.059.176-.057.179-.056.184-.054.187-.053.19-.051.195-.05.198-.048.201-.046.204-.045.208-.043.211-.041.214-.04.217-.038.22-.036.223-.034.226-.032.228-.031.231-.028.234-.027.236-.024.238-.023.241-.02.243-.019.245-.016.247-.015.249-.012.251-.01.253-.008.255-.005.256-.004.258-.001.258.001zm-9.258 20.499v.01l.001.021.003.021.004.022.005.021.006.022.007.022.009.023.01.022.011.023.012.023.013.023.015.023.016.024.017.023.018.024.019.024.021.024.022.025.023.024.024.025.052.049.056.05.061.051.066.051.07.051.075.051.079.052.084.052.088.052.092.052.097.052.102.051.105.052.11.052.114.051.119.051.123.051.127.05.131.05.135.05.139.048.144.049.147.047.152.047.155.047.16.045.163.045.167.043.171.043.176.041.178.041.183.039.187.039.19.037.194.035.197.035.202.033.204.031.209.03.212.029.216.027.219.025.222.024.226.021.23.02.233.018.236.016.24.015.243.012.246.01.249.008.253.005.256.004.259.001.26-.001.257-.004.254-.005.25-.008.247-.011.244-.012.241-.014.237-.016.233-.018.231-.021.226-.021.224-.024.22-.026.216-.027.212-.028.21-.031.205-.031.202-.034.198-.034.194-.036.191-.037.187-.039.183-.04.179-.04.175-.042.172-.043.168-.044.163-.045.16-.046.155-.046.152-.047.148-.048.143-.049.139-.049.136-.05.131-.05.126-.05.123-.051.118-.052.114-.051.11-.052.106-.052.101-.052.096-.052.092-.052.088-.053.083-.051.079-.052.074-.052.07-.051.065-.051.06-.051.056-.05.051-.05.023-.024.023-.025.021-.024.02-.024.019-.024.018-.024.017-.024.015-.023.014-.024.013-.023.012-.023.01-.023.01-.022.008-.022.006-.022.006-.022.004-.022.004-.021.001-.021.001-.021v-4.127l-.077.055-.08.053-.083.054-.085.053-.087.052-.09.052-.093.051-.095.05-.097.05-.1.049-.102.049-.105.048-.106.047-.109.047-.111.046-.114.045-.115.045-.118.044-.12.043-.122.042-.124.042-.126.041-.128.04-.13.04-.132.038-.134.038-.135.037-.138.037-.139.035-.142.035-.143.034-.144.033-.147.032-.148.031-.15.03-.151.03-.153.029-.154.027-.156.027-.158.026-.159.025-.161.024-.162.023-.163.022-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.011-.178.01-.179.008-.179.008-.181.006-.182.005-.182.004-.184.003-.184.002h-.37l-.184-.002-.184-.003-.182-.004-.182-.005-.181-.006-.179-.008-.179-.008-.178-.01-.176-.011-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.022-.162-.023-.161-.024-.159-.025-.157-.026-.156-.027-.155-.027-.153-.029-.151-.03-.15-.03-.148-.031-.146-.032-.145-.033-.143-.034-.141-.035-.14-.035-.137-.037-.136-.037-.134-.038-.132-.038-.13-.04-.128-.04-.126-.041-.124-.042-.122-.042-.12-.044-.117-.043-.116-.045-.113-.045-.112-.046-.109-.047-.106-.047-.105-.048-.102-.049-.1-.049-.097-.05-.095-.05-.093-.052-.09-.051-.087-.052-.085-.053-.083-.054-.08-.054-.077-.054v4.127zm0-5.654v.011l.001.021.003.021.004.021.005.022.006.022.007.022.009.022.01.022.011.023.012.023.013.023.015.024.016.023.017.024.018.024.019.024.021.024.022.024.023.025.024.024.052.05.056.05.061.05.066.051.07.051.075.052.079.051.084.052.088.052.092.052.097.052.102.052.105.052.11.051.114.051.119.052.123.05.127.051.131.05.135.049.139.049.144.048.147.048.152.047.155.046.16.045.163.045.167.044.171.042.176.042.178.04.183.04.187.038.19.037.194.036.197.034.202.033.204.032.209.03.212.028.216.027.219.025.222.024.226.022.23.02.233.018.236.016.24.014.243.012.246.01.249.008.253.006.256.003.259.001.26-.001.257-.003.254-.006.25-.008.247-.01.244-.012.241-.015.237-.016.233-.018.231-.02.226-.022.224-.024.22-.025.216-.027.212-.029.21-.03.205-.032.202-.033.198-.035.194-.036.191-.037.187-.039.183-.039.179-.041.175-.042.172-.043.168-.044.163-.045.16-.045.155-.047.152-.047.148-.048.143-.048.139-.05.136-.049.131-.05.126-.051.123-.051.118-.051.114-.052.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.051.07-.052.065-.051.06-.05.056-.051.051-.049.023-.025.023-.024.021-.025.02-.024.019-.024.018-.024.017-.024.015-.023.014-.023.013-.024.012-.022.01-.023.01-.023.008-.022.006-.022.006-.022.004-.021.004-.022.001-.021.001-.021v-4.139l-.077.054-.08.054-.083.054-.085.052-.087.053-.09.051-.093.051-.095.051-.097.05-.1.049-.102.049-.105.048-.106.047-.109.047-.111.046-.114.045-.115.044-.118.044-.12.044-.122.042-.124.042-.126.041-.128.04-.13.039-.132.039-.134.038-.135.037-.138.036-.139.036-.142.035-.143.033-.144.033-.147.033-.148.031-.15.03-.151.03-.153.028-.154.028-.156.027-.158.026-.159.025-.161.024-.162.023-.163.022-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.011-.178.009-.179.009-.179.007-.181.007-.182.005-.182.004-.184.003-.184.002h-.37l-.184-.002-.184-.003-.182-.004-.182-.005-.181-.007-.179-.007-.179-.009-.178-.009-.176-.011-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.022-.162-.023-.161-.024-.159-.025-.157-.026-.156-.027-.155-.028-.153-.028-.151-.03-.15-.03-.148-.031-.146-.033-.145-.033-.143-.033-.141-.035-.14-.036-.137-.036-.136-.037-.134-.038-.132-.039-.13-.039-.128-.04-.126-.041-.124-.042-.122-.043-.12-.043-.117-.044-.116-.044-.113-.046-.112-.046-.109-.046-.106-.047-.105-.048-.102-.049-.1-.049-.097-.05-.095-.051-.093-.051-.09-.051-.087-.053-.085-.052-.083-.054-.08-.054-.077-.054v4.139zm0-5.666v.011l.001.02.003.022.004.021.005.022.006.021.007.022.009.023.01.022.011.023.012.023.013.023.015.023.016.024.017.024.018.023.019.024.021.025.022.024.023.024.024.025.052.05.056.05.061.05.066.051.07.051.075.052.079.051.084.052.088.052.092.052.097.052.102.052.105.051.11.052.114.051.119.051.123.051.127.05.131.05.135.05.139.049.144.048.147.048.152.047.155.046.16.045.163.045.167.043.171.043.176.042.178.04.183.04.187.038.19.037.194.036.197.034.202.033.204.032.209.03.212.028.216.027.219.025.222.024.226.021.23.02.233.018.236.017.24.014.243.012.246.01.249.008.253.006.256.003.259.001.26-.001.257-.003.254-.006.25-.008.247-.01.244-.013.241-.014.237-.016.233-.018.231-.02.226-.022.224-.024.22-.025.216-.027.212-.029.21-.03.205-.032.202-.033.198-.035.194-.036.191-.037.187-.039.183-.039.179-.041.175-.042.172-.043.168-.044.163-.045.16-.045.155-.047.152-.047.148-.048.143-.049.139-.049.136-.049.131-.051.126-.05.123-.051.118-.052.114-.051.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.052.07-.051.065-.051.06-.051.056-.05.051-.049.023-.025.023-.025.021-.024.02-.024.019-.024.018-.024.017-.024.015-.023.014-.024.013-.023.012-.023.01-.022.01-.023.008-.022.006-.022.006-.022.004-.022.004-.021.001-.021.001-.021v-4.153l-.077.054-.08.054-.083.053-.085.053-.087.053-.09.051-.093.051-.095.051-.097.05-.1.049-.102.048-.105.048-.106.048-.109.046-.111.046-.114.046-.115.044-.118.044-.12.043-.122.043-.124.042-.126.041-.128.04-.13.039-.132.039-.134.038-.135.037-.138.036-.139.036-.142.034-.143.034-.144.033-.147.032-.148.032-.15.03-.151.03-.153.028-.154.028-.156.027-.158.026-.159.024-.161.024-.162.023-.163.023-.165.021-.166.02-.167.019-.169.018-.169.017-.171.016-.173.015-.173.014-.175.013-.175.012-.177.01-.178.01-.179.009-.179.007-.181.006-.182.006-.182.004-.184.003-.184.001-.185.001-.185-.001-.184-.001-.184-.003-.182-.004-.182-.006-.181-.006-.179-.007-.179-.009-.178-.01-.176-.01-.176-.012-.175-.013-.173-.014-.172-.015-.171-.016-.17-.017-.169-.018-.167-.019-.166-.02-.165-.021-.163-.023-.162-.023-.161-.024-.159-.024-.157-.026-.156-.027-.155-.028-.153-.028-.151-.03-.15-.03-.148-.032-.146-.032-.145-.033-.143-.034-.141-.034-.14-.036-.137-.036-.136-.037-.134-.038-.132-.039-.13-.039-.128-.041-.126-.041-.124-.041-.122-.043-.12-.043-.117-.044-.116-.044-.113-.046-.112-.046-.109-.046-.106-.048-.105-.048-.102-.048-.1-.05-.097-.049-.095-.051-.093-.051-.09-.052-.087-.052-.085-.053-.083-.053-.08-.054-.077-.054v4.153zm8.74-8.179l-.257.004-.254.005-.25.008-.247.011-.244.012-.241.014-.237.016-.233.018-.231.021-.226.022-.224.023-.22.026-.216.027-.212.028-.21.031-.205.032-.202.033-.198.034-.194.036-.191.038-.187.038-.183.04-.179.041-.175.042-.172.043-.168.043-.163.045-.16.046-.155.046-.152.048-.148.048-.143.048-.139.049-.136.05-.131.05-.126.051-.123.051-.118.051-.114.052-.11.052-.106.052-.101.052-.096.052-.092.052-.088.052-.083.052-.079.052-.074.051-.07.052-.065.051-.06.05-.056.05-.051.05-.023.025-.023.024-.021.024-.02.025-.019.024-.018.024-.017.023-.015.024-.014.023-.013.023-.012.023-.01.023-.01.022-.008.022-.006.023-.006.021-.004.022-.004.021-.001.021-.001.021.001.021.001.021.004.021.004.022.006.021.006.023.008.022.01.022.01.023.012.023.013.023.014.023.015.024.017.023.018.024.019.024.02.025.021.024.023.024.023.025.051.05.056.05.06.05.065.051.07.052.074.051.079.052.083.052.088.052.092.052.096.052.101.052.106.052.11.052.114.052.118.051.123.051.126.051.131.05.136.05.139.049.143.048.148.048.152.048.155.046.16.046.163.045.168.043.172.043.175.042.179.041.183.04.187.038.191.038.194.036.198.034.202.033.205.032.21.031.212.028.216.027.22.026.224.023.226.022.231.021.233.018.237.016.241.014.244.012.247.011.25.008.254.005.257.004.26.001.26-.001.257-.004.254-.005.25-.008.247-.011.244-.012.241-.014.237-.016.233-.018.231-.021.226-.022.224-.023.22-.026.216-.027.212-.028.21-.031.205-.032.202-.033.198-.034.194-.036.191-.038.187-.038.183-.04.179-.041.175-.042.172-.043.168-.043.163-.045.16-.046.155-.046.152-.048.148-.048.143-.048.139-.049.136-.05.131-.05.126-.051.123-.051.118-.051.114-.052.11-.052.106-.052.101-.052.096-.052.092-.052.088-.052.083-.052.079-.052.074-.051.07-.052.065-.051.06-.05.056-.05.051-.05.023-.025.023-.024.021-.024.02-.025.019-.024.018-.024.017-.023.015-.024.014-.023.013-.023.012-.023.01-.023.01-.022.008-.022.006-.023.006-.021.004-.022.004-.021.001-.021.001-.021-.001-.021-.001-.021-.004-.021-.004-.022-.006-.021-.006-.023-.008-.022-.01-.022-.01-.023-.012-.023-.013-.023-.014-.023-.015-.024-.017-.023-.018-.024-.019-.024-.02-.025-.021-.024-.023-.024-.023-.025-.051-.05-.056-.05-.06-.05-.065-.051-.07-.052-.074-.051-.079-.052-.083-.052-.088-.052-.092-.052-.096-.052-.101-.052-.106-.052-.11-.052-.114-.052-.118-.051-.123-.051-.126-.051-.131-.05-.136-.05-.139-.049-.143-.048-.148-.048-.152-.048-.155-.046-.16-.046-.163-.045-.168-.043-.172-.043-.175-.042-.179-.041-.183-.04-.187-.038-.191-.038-.194-.036-.198-.034-.202-.033-.205-.032-.21-.031-.212-.028-.216-.027-.22-.026-.224-.023-.226-.022-.231-.021-.233-.018-.237-.016-.241-.014-.244-.012-.247-.011-.25-.008-.254-.005-.257-.004-.26-.001-.26.001z"/></symbol></defs><defs><symbol id="svgfraude-clock" width="24" height="24"><path transform="scale(.5)" d="M12 2c5.514 0 10 4.486 10 10s-4.486 10-10 10-10-4.486-10-10 4.486-10 10-10zm0-2c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.848 12.459c.202.038.202.333.001.372-1.907.361-6.045 1.111-6.547 1.111-.719 0-1.301-.582-1.301-1.301 0-.512.77-5.447 1.125-7.445.034-.192.312-.181.343.014l.985 6.238 5.394 1.011z"/></symbol></defs><defs><marker id="svgfraude-arrowhead" refX="7.9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M -1 0 L 10 5 L 0 10 z"/></marker></defs><defs><marker id="svgfraude-crosshead" markerWidth="15" markerHeight="8" orient="auto" refX="4" refY="4.5"><path fill="none" stroke="#000000" stroke-width="1pt" d="M 1,2 L 6,7 M 6,2 L 1,7" style="stroke-dasharray: 0, 0;"/></marker></defs><defs><marker id="svgfraude-filled-head" refX="15.5" refY="7" markerWidth="20" markerHeight="28" orient="auto"><path d="M 18,7 L9,13 L14,7 L9,1 Z"/></marker></defs><defs><marker id="svgfraude-sequencenumber" refX="15" refY="15" markerWidth="60" markerHeight="40" orient="auto"><circle cx="15" cy="15" r="6"/></marker></defs><defs><marker id="svgfraude-solidTopArrowHead" refX="7.9" refY="7.25" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 10 8 L 0 8 z"/></marker></defs><defs><marker id="svgfraude-solidBottomArrowHead" refX="7.9" refY="0.75" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 10 0 L 0 8 z"/></marker></defs><defs><marker id="svgfraude-stickTopArrowHead" refX="7.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 0 L 7 7" stroke="black" stroke-width="1.5" fill="none"/></marker></defs><defs><marker id="svgfraude-stickBottomArrowHead" refX="7.5" refY="0" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M 0 7 L 7 0" stroke="black" stroke-width="1.5" fill="none"/></marker></defs><text x="174" y="80" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">PUT /article/:id</text><line x1="76" y1="109" x2="271" y2="109" class="messageLine0" data-et="message" data-id="i0" data-from="F" data-to="C" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/><text x="379" y="124" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">publish price.updated</text><line x1="276" y1="153" x2="481" y2="153" class="messageLine0" data-et="message" data-id="i1" data-from="C" data-to="R" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/><text x="620" y="168" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">consume price.updated</text><line x1="486" y1="197" x2="754" y2="197" class="messageLine0" data-et="message" data-id="i2" data-from="R" data-to="P" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/><text x="759" y="212" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">persist history + detect fraud</text><path d="M 759,241 C 819,231 819,271 759,261" class="messageLine0" data-et="message" data-id="i3" data-from="P" data-to="P" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/><text x="623" y="286" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">publish fraud.alert si necessaire</text><line x1="757" y1="315" x2="489" y2="315" class="messageLine0" data-et="message" data-id="i4" data-from="P" data-to="R" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/><text x="721" y="330" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">consume price.updated / fraud.alert</text><line x1="486" y1="359" x2="955.5" y2="359" class="messageLine0" data-et="message" data-id="i5" data-from="R" data-to="N" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/><text x="1083" y="374" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em" style="font-size: 16px; font-weight: 400;">push notification temps reel</text><line x1="960.5" y1="403" x2="1205.5" y2="403" class="messageLine0" data-et="message" data-id="i6" data-from="N" data-to="W" stroke-width="2" stroke="none" marker-end="url(#svgfraude-arrowhead)" style="fill: none;"/></svg></div>
+      <div class="schema-caption">catalog-service ne connaît ni price-tracker ni notification — chaque service se teste, se déploie et scale indépendamment.</div>
+    </div>
+    <div class="col card">
+      <h3>Pourquoi RabbitMQ ici</h3>
+      <ul>
+        <li>Une mise à jour de prix doit <strong>simultanément</strong> : s'historiser, être analysée pour fraude, et notifier les acheteurs intéressés — sans coupler ces responsabilités.</li>
+        <li>Règles de détection déjà implémentées dans <code>price-tracker-service</code> : <code>SUSPICIOUS_SPIKE</code>, <code>FLOOD_PRICING</code>, <code>DUMPING</code>.</li>
+        <li>Répond directement à l'exigence du contexte : <em>« la notification de changement de prix doit aussi être reçue par un composant back-office de détection des fraudes »</em>.</li>
+        <li>Alertes exposées via <code>GET /api/v1/alerts</code>, résolution admin via <code>PUT /alerts/:id/resolve</code>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 8. INDICATEURS QUALITE -->
+<section class="slide" data-title="Indicateurs qualité ISO 25010">
+  <div class="slide-head">
+    <span class="kicker">Phase 1 · Assurance qualité logicielle</span>
+    <span class="badge">Grille : 1 pt</span>
+  </div>
+  <h2>4 indicateurs qualité (ISO 25010)</h2>
+  <div class="table-wrap">
+  <table>
+    <tr><th>Indicateur</th><th>Exigence ISO 25010</th><th>Outil</th><th>Lien avec la dette technique</th></tr>
+    <tr>
+      <td><strong>Couverture de tests</strong></td>
+      <td>Fiabilité</td>
+      <td><code>go test -race -covermode=atomic</code>, vitest, SonarCloud</td>
+      <td>Code non couvert = régressions silencieuses à chaque évolution future</td>
+    </tr>
+    <tr>
+      <td><strong>Vulnérabilités CRITICAL/HIGH</strong></td>
+      <td>Sécurité</td>
+      <td>Trivy, gosec (SARIF), govulncheck</td>
+      <td>Bloquant en CI (exit-code 1) : une CVE non corrigée devient exponentiellement plus coûteuse avec le temps</td>
+    </tr>
+    <tr>
+      <td><strong>Dette technique / code smells</strong></td>
+      <td>Maintenabilité</td>
+      <td>SonarCloud (backend), ESLint + Prettier (front)</td>
+      <td>Mesure directe de la dette plutôt qu'un symptôme — le <em>technical debt ratio</em> ne doit pas augmenter d'un commit à l'autre</td>
+    </tr>
+    <tr>
+      <td><strong>Latence &amp; erreurs sous charge</strong></td>
+      <td>Efficacité de performance</td>
+      <td>Siege / JMeter sur endpoints critiques</td>
+      <td>Une dégradation non détectée (requête N+1, pool DB non borné) s'aggrave avec la croissance du trafic</td>
+    </tr>
+  </table>
+  </div>
+</section>
+
+<!-- 9. TESTS -->
+<section class="slide" data-title="Politique de tests">
+  <div class="slide-head">
+    <span class="kicker">Phase 1 · Assurance qualité logicielle</span>
+    <span class="badge">Grille : 2 pts</span>
+  </div>
+  <h2>Politique de tests — formalisée et exécutée</h2>
+  <div class="slide-body">
+    <div class="cols c3">
+      <div class="col card">
+        <h3>Unitaires</h3>
+        <ul>
+          <li>Controllers, middlewares, detector, hub WebSocket, mailer, authclient, repositories</li>
+          <li>Front : Vitest sur clients API et stores critiques</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Acceptation / Intégration</h3>
+        <ul>
+          <li>Tests HTTP de bout en bout sur le vrai routeur Gin (middleware JWT réel)</li>
+          <li>Tests d'intégration repository (notification-service)</li>
+          <li>Tests de concurrence : réservation anti double-vente, alertes</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Statique / conformité</h3>
+        <ul>
+          <li><code>svelte-check</code> (typecheck), ESLint + Prettier</li>
+          <li><code>golangci-lint</code>, <code>go vet</code>, <code>hadolint</code></li>
+          <li>Gitleaks (secrets) sur tout push/PR</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card accent">
+      <p style="margin:0"><strong>Au moins 2 types de tests exigés par le sujet, exécutés avec succès</strong> : unitaires (contrôleurs/middlewares) + acceptation HTTP (parcours achat) sont tous deux intégrés au pipeline CI et bloquants. Les résultats alimentent directement l'indicateur « couverture de tests » présenté à la diapositive précédente.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10. CICD -->
+<section class="slide" data-title="Pipeline CI/CD DevSecOps">
+  <div class="slide-head">
+    <span class="kicker">Phase 1 · Cycle de vie &amp; sécurité du développement</span>
+    <span class="badge">Grille : 3 pts</span>
+  </div>
+  <h2>Pipeline CI/CD — chaîne de livraison continue GitOps</h2>
+  <div class="slide-body" style="flex:1;min-height:0;">
+    <div class="schema-card" style="flex:1.3;"><svg id="svgcicd" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 1998.78px; background-color: transparent;" viewBox="0 0 1998.78125 94" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#svgcicd{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#svgcicd .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#svgcicd .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#svgcicd .error-icon{fill:#552222;}#svgcicd .error-text{fill:#552222;stroke:#552222;}#svgcicd .edge-thickness-normal{stroke-width:1px;}#svgcicd .edge-thickness-thick{stroke-width:3.5px;}#svgcicd .edge-pattern-solid{stroke-dasharray:0;}#svgcicd .edge-thickness-invisible{stroke-width:0;fill:none;}#svgcicd .edge-pattern-dashed{stroke-dasharray:3;}#svgcicd .edge-pattern-dotted{stroke-dasharray:2;}#svgcicd .marker{fill:#333333;stroke:#333333;}#svgcicd .marker.cross{stroke:#333333;}#svgcicd svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#svgcicd p{margin:0;}#svgcicd .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#svgcicd .cluster-label text{fill:#333;}#svgcicd .cluster-label span{color:#333;}#svgcicd .cluster-label span p{background-color:transparent;}#svgcicd .label text,#svgcicd span{fill:#333;color:#333;}#svgcicd .node rect,#svgcicd .node circle,#svgcicd .node ellipse,#svgcicd .node polygon,#svgcicd .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#svgcicd .rough-node .label text,#svgcicd .node .label text,#svgcicd .image-shape .label,#svgcicd .icon-shape .label{text-anchor:middle;}#svgcicd .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#svgcicd .rough-node .label,#svgcicd .node .label,#svgcicd .image-shape .label,#svgcicd .icon-shape .label{text-align:center;}#svgcicd .node.clickable{cursor:pointer;}#svgcicd .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#svgcicd .arrowheadPath{fill:#333333;}#svgcicd .edgePath .path{stroke:#333333;stroke-width:1px;}#svgcicd .flowchart-link{stroke:#333333;fill:none;}#svgcicd .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#svgcicd .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#svgcicd .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#svgcicd .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#svgcicd .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#svgcicd .cluster text{fill:#333;}#svgcicd .cluster span{color:#333;}#svgcicd div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#svgcicd .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#svgcicd rect.text{fill:none;stroke-width:0;}#svgcicd .icon-shape,#svgcicd .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#svgcicd .icon-shape p,#svgcicd .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#svgcicd .icon-shape .label rect,#svgcicd .image-shape .label rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#svgcicd .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#svgcicd .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#svgcicd .node .neo-node{stroke:#9370DB;}#svgcicd [data-look="neo"].node rect,#svgcicd [data-look="neo"].cluster rect,#svgcicd [data-look="neo"].node polygon{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgcicd [data-look="neo"].swimlane.cluster rect{filter:none;}#svgcicd [data-look="neo"].node path{stroke:#9370DB;stroke-width:1px;}#svgcicd [data-look="neo"].node .outer-path{filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgcicd [data-look="neo"].node .neo-line path{stroke:#9370DB;filter:none;}#svgcicd [data-look="neo"].node circle{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgcicd [data-look="neo"].node circle .state-start{fill:#000000;}#svgcicd [data-look="neo"].icon-shape .icon{fill:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgcicd [data-look="neo"].icon-shape .icon-neo path{stroke:#9370DB;filter:drop-shadow(1px 2px 2px rgba(185, 185, 185, 1));}#svgcicd :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="svgcicd_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto"><path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto"><polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 0; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="svgcicd_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5;"/></marker><marker id="svgcicd_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" style="stroke-width: 2.5; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"><path d="M150.172,47L154.339,47C158.505,47,166.839,47,174.505,47C182.172,47,189.172,47,192.672,47L196.172,47" id="svgcicd-L_Dev_CI_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_Dev_CI_0" data-points="W3sieCI6MTUwLjE3MTg3NSwieSI6NDd9LHsieCI6MTc1LjE3MTg3NSwieSI6NDd9LHsieCI6MjAwLjE3MTg3NSwieSI6NDd9XQ==" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/><path d="M366.031,47L370.198,47C374.365,47,382.698,47,390.365,47C398.031,47,405.031,47,408.531,47L412.031,47" id="svgcicd-L_CI_Scan_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_CI_Scan_0" data-points="W3sieCI6MzY2LjAzMTI1LCJ5Ijo0N30seyJ4IjozOTEuMDMxMjUsInkiOjQ3fSx7IngiOjQxNi4wMzEyNSwieSI6NDd9XQ==" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/><path d="M676.031,47L680.198,47C684.365,47,692.698,47,700.365,47C708.031,47,715.031,47,718.531,47L722.031,47" id="svgcicd-L_Scan_Sign_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_Scan_Sign_0" data-points="W3sieCI6Njc2LjAzMTI1LCJ5Ijo0N30seyJ4Ijo3MDEuMDMxMjUsInkiOjQ3fSx7IngiOjcyNi4wMzEyNSwieSI6NDd9XQ==" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/><path d="M958.344,47L962.51,47C966.677,47,975.01,47,982.677,47C990.344,47,997.344,47,1000.844,47L1004.344,47" id="svgcicd-L_Sign_StagingCommit_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_Sign_StagingCommit_0" data-points="W3sieCI6OTU4LjM0Mzc1LCJ5Ijo0N30seyJ4Ijo5ODMuMzQzNzUsInkiOjQ3fSx7IngiOjEwMDguMzQzNzUsInkiOjQ3fV0=" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/><path d="M1268.344,47L1272.51,47C1276.677,47,1285.01,47,1292.677,47C1300.344,47,1307.344,47,1310.844,47L1314.344,47" id="svgcicd-L_StagingCommit_Argo_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_StagingCommit_Argo_0" data-points="W3sieCI6MTI2OC4zNDM3NSwieSI6NDd9LHsieCI6MTI5My4zNDM3NSwieSI6NDd9LHsieCI6MTMxOC4zNDM3NSwieSI6NDd9XQ==" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/><path d="M1434.828,47L1438.995,47C1443.161,47,1451.495,47,1459.161,47C1466.828,47,1473.828,47,1477.328,47L1480.828,47" id="svgcicd-L_Argo_Cluster_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_Argo_Cluster_0" data-points="W3sieCI6MTQzNC44MjgxMjUsInkiOjQ3fSx7IngiOjE0NTkuODI4MTI1LCJ5Ijo0N30seyJ4IjoxNDg0LjgyODEyNSwieSI6NDd9XQ==" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/><path d="M1680.781,47L1684.948,47C1689.115,47,1697.448,47,1705.115,47C1712.781,47,1719.781,47,1723.281,47L1726.781,47" id="svgcicd-L_Cluster_Prod_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_Cluster_Prod_0" data-points="W3sieCI6MTY4MC43ODEyNSwieSI6NDd9LHsieCI6MTcwNS43ODEyNSwieSI6NDd9LHsieCI6MTczMC43ODEyNSwieSI6NDd9XQ==" data-look="classic" marker-end="url(#svgcicd_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_Dev_CI_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_CI_Scan_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_Scan_Sign_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_Sign_StagingCommit_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_StagingCommit_Argo_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_Argo_Cluster_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_Cluster_Prod_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="svgcicd-flowchart-Dev-0" data-look="classic" transform="translate(79.0859375, 47)"><rect class="basic label-container" style="" x="-71.0859375" y="-27" width="142.171875" height="54"/><g class="label" style="" transform="translate(-41.0859375, -12)"><rect/><foreignObject width="82.171875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Commit Git</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-CI-1" data-look="classic" transform="translate(283.1015625, 47)"><rect class="basic label-container" style="" x="-82.9296875" y="-27" width="165.859375" height="54"/><g class="label" style="" transform="translate(-52.9296875, -12)"><rect/><foreignObject width="105.859375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>GitHub Actions</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-Scan-3" data-look="classic" transform="translate(546.03125, 47)"><rect class="basic label-container" style="" x="-130" y="-39" width="260" height="78"/><g class="label" style="" transform="translate(-100, -24)"><rect/><foreignObject width="200" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>Tests + SAST + SCA + Build + Scan image</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-Sign-5" data-look="classic" transform="translate(842.1875, 47)"><rect class="basic label-container" style="" x="-116.15625" y="-27" width="232.3125" height="54"/><g class="label" style="" transform="translate(-86.15625, -12)"><rect/><foreignObject width="172.3125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>SBOM + signature cosign</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-StagingCommit-7" data-look="classic" transform="translate(1138.34375, 47)"><rect class="basic label-container" style="" x="-130" y="-39" width="260" height="78"/><g class="label" style="" transform="translate(-100, -24)"><rect/><foreignObject width="200" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>Commit du digest dans overlay staging</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-Argo-9" data-look="classic" transform="translate(1376.5859375, 47)"><rect class="basic label-container" style="" x="-58.2421875" y="-27" width="116.484375" height="54"/><g class="label" style="" transform="translate(-28.2421875, -12)"><rect/><foreignObject width="56.484375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Argo CD</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-Cluster-11" data-look="classic" transform="translate(1582.8046875, 47)"><rect class="basic label-container" style="" x="-97.9765625" y="-27" width="195.953125" height="54"/><g class="label" style="" transform="translate(-67.9765625, -12)"><rect/><foreignObject width="135.953125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Cluster Kubernetes</p></span></div></foreignObject></g></g><g class="node default" id="svgcicd-flowchart-Prod-13" data-look="classic" transform="translate(1860.78125, 47)"><rect class="basic label-container" style="" x="-130" y="-39" width="260" height="78"/><g class="label" style="" transform="translate(-100, -24)"><rect/><foreignObject width="200" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>Promotion prod via PR puis sync manuel</p></span></div></foreignObject></g></g></g></g></g><defs><filter id="svgcicd-drop-shadow" height="130%" width="130%"><feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"/></filter></defs><defs><filter id="svgcicd-drop-shadow-small" height="150%" width="150%"><feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"/></filter></defs></svg></div>
+    <div class="cols c3">
+      <div class="col card">
+        <h3>Build (SAST/SCA)</h3>
+        <ul>
+          <li>go vet, ESLint, Prettier</li>
+          <li>go test -race, vitest</li>
+          <li>gosec, Semgrep, SonarCloud</li>
+          <li>govulncheck, npm audit, Dependabot</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Package</h3>
+        <ul>
+          <li>hadolint (Dockerfile)</li>
+          <li>Image distroless non-root</li>
+          <li>Trivy scan bloquant</li>
+          <li>SBOM Syft + signature cosign keyless</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Release → Deploy</h3>
+        <ul>
+          <li>Commit du digest dans l'overlay staging (GitOps)</li>
+          <li>Argo CD sync auto (staging), sync manuel (prod)</li>
+          <li>Admission Kyverno : signature vérifiée, non-root, no-latest, resources — <strong>Enforce</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <p style="margin:0"><strong>Principe GitOps</strong> : la CI ne pousse jamais directement vers le cluster — elle modifie l'état désiré dans Git, Argo CD applique cet état. La production reste protégée par une promotion explicite (PR + synchronisation manuelle).</p>
+    </div>
+  </div>
+</section>
+
+<!-- 11. SECURITE -->
+<section class="slide" data-title="Sécurité & remédiation">
+  <div class="slide-head">
+    <span class="kicker">Phase 3 · Plan de remédiation</span>
+    <span class="badge">Grille : 2 pts</span>
+  </div>
+  <h2>Sécurité — bonnes pratiques et remédiation</h2>
+  <div class="cols c2">
+    <div class="col card">
+      <h3>Bonnes pratiques déjà en place (&gt;2 exigées)</h3>
+      <ul>
+        <li>JWT fail-fast, aucun secret par défaut compilé en dur</li>
+        <li>Rate-limiting anti brute-force sur <code>/login</code></li>
+        <li>HTTPS de bout en bout (cert-manager + Let's Encrypt)</li>
+        <li>DTO anti mass-assignment ; <code>sellerId</code> toujours dérivé du JWT</li>
+        <li>Endpoint interservice protégé par secret partagé</li>
+        <li>Chaîne d'image de confiance : distroless, Trivy, cosign, SBOM, vérification Kyverno</li>
+        <li>Transaction SQL anti double-vente</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="table-wrap">
+      <table>
+        <tr><th>Constat initial</th><th>Sévérité</th><th>Statut</th></tr>
+        <tr><td>Messagerie sans filtre anti-coordonnées</td><td>Critique</td><td><span class="status ok">Résolu — filtre regex</span></td></tr>
+        <tr><td>JWT en <code>localStorage</code></td><td>Élevé</td><td><span class="status ok">Résolu — cookie httpOnly</span></td></tr>
+        <tr><td>Publication sans contrôle avant mise en ligne</td><td>Moyen</td><td><span class="status warn">Résolu (contrôle manuel)</span></td></tr>
+        <tr><td>Kyverno en mode Audit</td><td>Moyen</td><td><span class="status ok">Résolu — Enforce</span></td></tr>
+        <tr><td>Pas d'observabilité applicative</td><td>Faible</td><td><span class="status warn">Résolu (catalog-service)</span></td></tr>
+      </table>
+      </div>
+      <div class="card accent" style="margin-top:10px;">
+        <p style="margin:0">Méthode d'audit : revue de code des flux sensibles + résultats des scans CI (0 CRITICAL/HIGH bloquant) + confrontation aux exigences explicites du contexte métier (interdiction d'échange de coordonnées).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 12. COMPETENCES -->
+<section class="slide" data-title="Compétences & formation">
+  <div class="slide-head">
+    <span class="kicker">Phase 1 · Compétences et formation</span>
+    <span class="badge">Grille : 1 pt</span>
+  </div>
+  <h2>Cartographie des compétences & formation</h2>
+  <div class="cols c2">
+    <div class="col">
+      <div class="table-wrap">
+      <table>
+        <tr><th>Profil</th><th>Compétences en place</th></tr>
+        <tr><td><strong>Lead Developer</strong></td><td>Archi microservices, Go/Gin, SvelteKit, CI/CD, GitOps Argo CD/Kustomize, sécurité applicative de base</td></tr>
+        <tr><td><strong>Dev confirmé #1</strong></td><td>Backend Go, tests unitaires, intégration API REST</td></tr>
+        <tr><td><strong>Dev confirmé #2</strong></td><td>Frontend SvelteKit/TypeScript, intégration UI</td></tr>
+      </table>
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <h3>Écarts identifiés</h3>
+        <ul>
+          <li>Sécurité offensive / détection de fraude avancée</li>
+          <li>Data / ML (recommandations V2)</li>
+          <li>Accessibilité (WCAG) &amp; i18n front</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col card accent">
+      <h3>Action de formation proposée</h3>
+      <p><strong>« Sécuriser une architecture microservices et détecter la fraude applicative »</strong> — format court (2-3 jours), Lead Developer + 1 dev confirmé.</p>
+      <ul>
+        <li>OWASP API Security Top 10 appliqué au contexte paiement/marketplace</li>
+        <li>Détection d'anomalies par règles/seuils statistiques (sans ML lourd — cohérent avec <code>price-tracker-service</code>)</li>
+        <li>Retour d'expérience Kyverno Enforce et gestion de secrets en production</li>
+      </ul>
+      <p style="margin-top:8px">Choix réaliste : pas de recrutement d'un profil « mouton à 5 pattes » — montée en compétence ciblée sur un axe actionnable à court terme.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 13. DEPLOIEMENT -->
+<section class="slide" data-title="Déploiement & montée en charge">
+  <div class="slide-head">
+    <span class="kicker">Phase 2 · Environnement managé</span>
+    <span class="badge">Grille : 2 pts</span>
+  </div>
+  <h2>Déploiement, disponibilité et montée en charge</h2>
+  <div class="cols c2">
+    <div class="col card">
+      <h3>Environnement managé (GitOps / Kustomize / Argo CD)</h3>
+      <ul>
+        <li><code>infra/k8s/base</code> commun + overlays <code>staging</code>/<code>prod</code></li>
+        <li>App-of-Apps Argo CD ; staging en sync auto, prod en sync manuel</li>
+        <li>Sealed Secrets pour les secrets Kubernetes</li>
+        <li><code>catalog-service</code> : PVC <code>catalog-uploads</code> (images), <code>replicas: 1</code> tant que le volume est <code>ReadWriteOnce</code></li>
+        <li>Cluster k3s sur VPS OVH, HTTPS via cert-manager / Let's Encrypt</li>
+      </ul>
+    </div>
+    <div class="col card">
+      <h3>Test de montée en charge (Siege)</h3>
+      <p>Endpoints publics en lecture ciblés (<code>/health</code>, <code>/article</code>, <code>/category</code>, <code>/article/:id</code>) — rejouables sans muter de données.</p>
+      <div class="pill-row">
+        <span class="pill">Transactions</span>
+        <span class="pill">Availability %</span>
+        <span class="pill">Temps de réponse p95</span>
+        <span class="pill">Failed transactions</span>
+      </div>
+      <div class="card" style="margin-top:10px;background:var(--bg2);">
+        <p style="margin:0"><strong>→ Démonstration live pendant la soutenance</strong> : <code>./run-siege.sh &lt;url&gt; 25 1M</code>, concurrence montée progressivement (10 → 25 → 50). Résultats commentés en direct (throughput, disponibilité, éventuelle dégradation).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 14. PROTOCOLE EXPERIMENTATION -->
+<section class="slide" data-title="Protocole d'expérimentation">
+  <div class="slide-head">
+    <span class="kicker">Phase 2 · Bac à sable</span>
+    <span class="badge">Grille : 2 pts</span>
+  </div>
+  <h2>Protocole d'expérimentation — HTTPS via cert-manager</h2>
+  <div class="cols c2">
+    <div class="col card">
+      <h3>Technologie testée &amp; environnement</h3>
+      <ul>
+        <li><strong>cert-manager</strong> + Ingress NGINX + autorité <strong>Let's Encrypt</strong> sur cluster k3s (VPS OVH, Ubuntu, 4 vCore/8 Go)</li>
+        <li>Piloté en déclaratif par Argo CD (App-of-Apps)</li>
+        <li><code>ClusterIssuer</code> Let's Encrypt + ressource <code>Certificate</code> par overlay (staging/prod)</li>
+      </ul>
+      <h3 style="margin-top:14px;">Étapes clés</h3>
+      <ul>
+        <li>Bootstrap cluster + Argo CD → déploiement cert-manager (Helm Jetstack)</li>
+        <li><code>ClusterIssuer</code> ACME HTTP-01 → <code>Certificate</code> référencé par l'Ingress TLS</li>
+        <li>Vérification <code>kubectl get certificate</code> → <code>READY=True</code>, puis <code>curl -v https://...</code></li>
+      </ul>
+    </div>
+    <div class="col card accent">
+      <h3>Difficultés rencontrées</h3>
+      <ul>
+        <li>Résolution du challenge HTTP-01 : ordre de déploiement critique (Ingress TLS actif avant émission = blocage)</li>
+        <li>Propagation DNS avant relance de l'émission (rate-limit Let's Encrypt à surveiller)</li>
+        <li>Double environnement : secrets <code>Certificate</code> distincts pour éviter les écrasements croisés Argo CD</li>
+      </ul>
+      <h3 style="margin-top:14px;">Résultat &amp; décision</h3>
+      <p style="margin:0">HTTPS opérationnel de bout en bout, renouvellement automatique (~30 j avant expiration). <strong>Adoption validée</strong> — alternative écartée : certificats manuels, incompatibles avec un flux GitOps automatisé (risque de rupture de disponibilité).</p>
+    </div>
+  </div>
+</section>
+
+<!-- 15. ETAT DU JOUR -->
+<section class="slide" data-title="État du jour">
+  <div class="slide-head"><span class="kicker">Vélocité &amp; suivi continu</span></div>
+  <h2>État du jour — dernières livraisons</h2>
+  <div class="slide-body">
+    <p>Le plan de remédiation n'est pas un document figé : deux axes supplémentaires ont été livrés dans les dernières itérations, illustrant le suivi continu des exigences du contexte métier.</p>
+    <div class="cols c2">
+      <div class="col card">
+        <h3>Conformité RGPD</h3>
+        <ul>
+          <li>Droits self-service : rectification (<code>PATCH /me</code>), portabilité (<code>GET /me/export</code>), effacement (<code>DELETE /me</code>)</li>
+          <li><strong>Cascade d'anonymisation</strong> best-effort vers catalog-service et notification-service (copies dénormalisées : annonces, avis, messages)</li>
+          <li>Purge automatique des notifications/messages selon <code>RETENTION_DAYS</code> (minimisation, art. 5.1.e)</li>
+          <li>Bandeau cookies, pages CGU / confidentialité, footer légal</li>
+        </ul>
+      </div>
+      <div class="col card">
+        <h3>Négociation de prix</h3>
+        <ul>
+          <li>Modèle <code>Offer</code> (catalog-service) : cycle de vie <code>pending → accepted/rejected → purchased</code></li>
+          <li>Événements RabbitMQ <code>offer.created/decided/purchased</code></li>
+          <li>Notification + WebSocket + email à chaque étape</li>
+          <li>Le vendeur confirme l'offre, l'acheteur paie ensuite au tarif négocié</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 16. BILAN -->
+<section class="slide" data-title="Bilan & perspectives">
+  <div class="slide-head"><span class="kicker">Synthèse</span></div>
+  <h2>Bilan honnête : limites assumées et perspectives</h2>
+  <div class="cols c2">
+    <div class="col card">
+      <h3>Limites assumées (à ne pas cacher)</h3>
+      <ul>
+        <li>Modération d'annonce <strong>100 % manuelle</strong> — porte de sécurité fermée, optimisation de charge encore ouverte</li>
+        <li>Instrumentation Prometheus applicative limitée à <code>catalog-service</code></li>
+        <li>Couverture de tests encore partielle sur certains modules</li>
+        <li>Conventions JSON pas parfaitement homogènes entre services</li>
+        <li>Rotation de la clé privée Sealed Secrets non sauvegardée hors cluster</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Court terme</h3>
+        <ul><li>Homogénéiser les réponses API</li><li>Documentation OpenAPI centralisée</li><li>Compléter les tests de parcours critiques</li></ul>
+      </div>
+      <div class="card">
+        <h3>Moyen / long terme</h3>
+        <ul><li>Rôles plus fins, correlation id sur les événements métier</li><li>Recommandations V2 (parcours catalogue, ML)</li><li>BFF si le frontend continue de grossir ; SLA/SLO d'exploitation</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 17. GRILLE -->
+<section class="slide" data-title="Couverture grille d'évaluation">
+  <div class="slide-head"><span class="kicker">Auto-évaluation</span></div>
+  <h2>Couverture de la grille d'évaluation (20 points)</h2>
+  <div class="table-wrap">
+  <table>
+    <tr><th>Thème</th><th>Critère</th><th>Pts</th><th>Diapositive</th></tr>
+    <tr><td rowspan="3">Maintenir &amp; développer son expertise</td><td>Protocole d'expérimentation bac à sable</td><td>2</td><td>#14</td></tr>
+    <tr><td>POC valide la faisabilité de l'architecture, documentée</td><td>4</td><td>#4</td></tr>
+    <tr><td>Fonctionnalité métier répond au besoin MOA</td><td>1</td><td>#6</td></tr>
+    <tr><td rowspan="3">Piloter le développement &amp; déploiement</td><td>Processus de livraison continue schématisé et intégré</td><td>3</td><td>#10</td></tr>
+    <tr><td>Compétences recensées + action de formation</td><td>1</td><td>#12</td></tr>
+    <tr><td>Environnement managé, disponibilité &amp; montée en charge démontrées</td><td>2</td><td>#13</td></tr>
+    <tr><td rowspan="3">Élaborer le processus d'assurance qualité</td><td>≥4 indicateurs qualité définis</td><td>1</td><td>#8</td></tr>
+    <tr><td>Processus de test formalisé, ≥2 types exécutés avec succès</td><td>2</td><td>#9</td></tr>
+    <tr><td>Plan de remédiation priorisé, ≥2 bonnes pratiques intégrées</td><td>2</td><td>#11</td></tr>
+    <tr><td rowspan="2">Présentation orale</td><td>Schémas/tableaux lisibles, supports de la prestation</td><td>1</td><td>l'ensemble</td></tr>
+    <tr><td>Prestation fluide, dynamique, structurée</td><td>1</td><td>l'ensemble</td></tr>
+    <tr><td colspan="2" style="text-align:right;"><strong>Total</strong></td><td><strong>20</strong></td><td></td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- 18. DEMO / CLOSING -->
+<section class="slide closing-slide" data-title="Démonstration & questions">
+  <h1>Démonstration &amp; questions</h1>
+  <div class="cols c3" style="max-width:1000px;margin-top:24px;">
+    <div class="col card">
+      <h3>Parcours démo</h3>
+      <ul style="text-align:left;">
+        <li>Inscription / connexion, cookie httpOnly</li>
+        <li>Publication d'annonce → statut <code>pending_review</code> → validation admin</li>
+        <li>Achat → validation vendeur → notification temps réel</li>
+        <li>Variation de prix → alerte fraude</li>
+        <li>Test de charge Siege en direct</li>
+      </ul>
+    </div>
+    <div class="col card">
+      <h3>Filet de sécurité</h3>
+      <p style="text-align:left;margin:0">Vidéo de secours disponible en cas d'incident technique pendant la démo live (« effet démo »).</p>
+    </div>
+    <div class="col card">
+      <h3>Échange</h3>
+      <p style="text-align:left;margin:0">15 minutes de questions — architecture, choix techniques, sécurité, arbitrages et limites assumées.</p>
+    </div>
+  </div>
+  <p style="margin-top:32px;color:var(--text-faint);">collector.shop — Merci de votre attention</p>
+</section>
+
+</div>
+
+<div class="notes-panel" id="notesPanel"></div>
+
+<div class="navbar">
+  <button class="nav-btn" id="prevBtn" aria-label="Précédent">‹</button>
+  <div class="nav-center">
+    <span class="counter" id="counter">1 / 19</span>
+  </div>
+  <button class="nav-btn" id="nextBtn" aria-label="Suivant">›</button>
+</div>
+
+<div class="menu-overlay" id="menuOverlay">
+  <h2>Sommaire</h2>
+  <ul class="menu-list" id="menuList"></ul>
+</div>
+
+<script>
+const slides = Array.from(document.querySelectorAll('.slide'));
+const total = slides.length;
+let idx = 0;
+
+const notes = [
+"~20s — Se présenter comme Lead Developer, annoncer le plan (contexte → archi → qualité/sécurité → démo → questions).",
+"~1 min — Insister sur le pivot événementiel→marketplace et sur la commission 5% qui justifie le contrôle de la transaction.",
+"~45s — Rappeler vite ces exigences, elles reviendront à chaque diapositive technique (modération, anti-contact-direct, fraude).",
+"~45s — ISO 25010 = fil rouge de tout l'oral. Bien dire : 3 phases demandées par les consignes.",
+"~1min30 — Décrire le schéma en le pointant : frontend, 4 services, 3 DB, RabbitMQ. Insister sur le découplage.",
+"~1 min — Table à parcourir vite, s'arrêter sur catalog-service (le plus riche) et notification-service (WebSocket + filtre PII).",
+"~1min30 — Dérouler le schéma de séquence en le lisant à voix haute. Citer les noms de tests exacts (vocabulaire précis exigé).",
+"~1 min — Expliquer pourquoi RabbitMQ découple : catalog-service ne sait pas que price-tracker existe.",
+"~1 min — Lire la table ligne par ligne : indicateur → outil → lien dette technique. C'est un critère à 1pt mais souvent mal traité, bien le structurer.",
+"~1min — Distinguer clairement unitaires vs acceptation HTTP. Dire clairement '2 types minimum, exécutés avec succès'.",
+"~1min30 — Suivre le schéma de gauche à droite : Code→Build→Package→Release→Deploy→Operate. Insister sur le principe GitOps (CI ne touche jamais le cluster).",
+"~1min30 — Présenter la table constat→statut. Ne pas cacher le statut 'manuel' sur la modération — le dire avec assurance, c'est une limite assumée pas un oubli.",
+"~45s — Formation réaliste, pas de 'mouton à 5 pattes' — le dire explicitement, c'est un point positif pour le jury.",
+"~1min — Annoncer qu'un test de charge sera lancé en LIVE plus tard (slide démo) ou montrer un résultat déjà capturé ici.",
+"~1min — C'est LE critère bac-à-sable (2pts). Bien dérouler techno testée → environnement → étapes → difficultés → résultat → décision.",
+"~45s — Montre la vélocité du projet. Rapide, ne pas s'attarder, dire 'livré ce jour, preuve de suivi continu'.",
+"~45s — Assumer les limites avec assurance = signe de maturité technique pour le jury.",
+"~30s — Slide de contrôle, peut être sautée à l'oral ou montrée 10s en résumé final avant démo.",
+"~2-4 min — Basculer sur l'application réelle / vidéo de secours. Garder cette slide affichée pendant l'installation technique."
+];
+
+const menuList = document.getElementById('menuList');
+slides.forEach((s, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="n">'+(i+1)+'</span><span>'+(s.dataset.title||'Diapositive '+(i+1))+'</span>';
+  li.addEventListener('click', () => { goTo(i); toggleMenu(false); });
+  menuList.appendChild(li);
+});
+
+function render(){
+  slides.forEach((s,i)=> s.classList.toggle('active', i===idx));
+  document.getElementById('counter').textContent = (idx+1)+' / '+total;
+  document.getElementById('progressBar').style.width = ((idx+1)/total*100)+'%';
+  document.getElementById('notesPanel').innerHTML = '<b>Notes — diapo '+(idx+1)+' :</b> '+(notes[idx]||'');
+}
+function goTo(i){ idx = Math.max(0, Math.min(total-1, i)); render(); }
+function next(){ goTo(idx+1); }
+function prev(){ goTo(idx-1); }
+
+document.getElementById('nextBtn').addEventListener('click', next);
+document.getElementById('prevBtn').addEventListener('click', prev);
+
+let notesOn = false;
+function toggleNotes(force){
+  notesOn = force !== undefined ? force : !notesOn;
+  document.getElementById('notesPanel').classList.toggle('show', notesOn);
+}
+document.getElementById('notesToggle').addEventListener('click', ()=>toggleNotes());
+
+let menuOn = false;
+function toggleMenu(force){
+  menuOn = force !== undefined ? force : !menuOn;
+  document.getElementById('menuOverlay').classList.toggle('show', menuOn);
+}
+document.getElementById('menuToggle').addEventListener('click', ()=>toggleMenu());
+
+document.addEventListener('keydown', (e)=>{
+  if (menuOn && e.key === 'Escape'){ toggleMenu(false); return; }
+  switch(e.key){
+    case 'ArrowRight': case 'PageDown': case ' ': next(); break;
+    case 'ArrowLeft': case 'PageUp': prev(); break;
+    case 'Home': goTo(0); break;
+    case 'End': goTo(total-1); break;
+    case 'n': case 'N': toggleNotes(); break;
+    case 'm': case 'M': toggleMenu(); break;
+  }
+});
+
+render();
+</script>
+
+</body>
+</html>
