@@ -11,6 +11,7 @@ rien ne contourne le tout, et l'observabilité qu'on le voit.
 | # | Étape | Outil | Implémentation | Statut |
 |---|-------|-------|----------------|--------|
 | 1 | Tests & lint | `go test -race`, `go vet`, golangci-lint, vitest, eslint+prettier | [backend.yml](../.github/workflows/backend.yml) `lint-test` · [frontend.yml](../.github/workflows/frontend.yml) `quality`/`tests` | ✅ bloquant |
+| 1bis | Tests e2e | Playwright (auth-service + catalog-service réels via docker compose, pas de mock) | [frontend.yml](../.github/workflows/frontend.yml) `e2e` · specs [apps/collector-front/e2e/](../apps/collector-front/e2e/) | ✅ bloquant — 2e type de test du pipeline |
 | 2 | SAST | gosec (SARIF), Semgrep, SonarCloud | backend `sast`+`sonarcloud` · frontend `sast` | ✅ bloquant |
 | 3 | Secrets scanning | gitleaks (historique complet) | [gitleaks.yml](../.github/workflows/gitleaks.yml) — tous push/PR, tous chemins | ✅ bloquant |
 | 4 | SCA dépendances | govulncheck, Trivy fs, npm audit, Dependabot | backend `sca` · frontend `sca` · [dependabot.yml](../.github/dependabot.yml) | ✅ bloquant |
